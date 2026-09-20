@@ -4,7 +4,10 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import com.dentalcare.api.shared.response.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -13,6 +16,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String UNEXPECTED_ERROR_MESSAGE = "An unexpected error occurred";
 
     @ExceptionHandler(BadRequestException.class)
     ResponseEntity<ApiErrorResponse> handleBadRequest(BadRequestException exception, HttpServletRequest request) {
@@ -36,6 +42,12 @@ public class GlobalExceptionHandler {
         exception.getBindingResult().getFieldErrors().forEach(error ->
                 fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage()));
         return buildResponse(HttpStatus.BAD_REQUEST, "Request validation failed", request, fieldErrors);
+    }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception, HttpServletRequest request) {
+        LOGGER.error("Unexpected error while processing {} {}", request.getMethod(), request.getRequestURI(), exception);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, UNEXPECTED_ERROR_MESSAGE, request, Map.of());
     }
 
     private ResponseEntity<ApiErrorResponse> buildResponse(
