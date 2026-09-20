@@ -1,117 +1,267 @@
 # Security
 
-## Framework
+## Scope and source of truth
 
-Spring Security.
+This document defines the phase-one authentication and authorization model for the DentalCare backend. It is a design contract for Issues #5 through #8; it does not implement persistence, endpoints, tokens, or authorization rules.
 
-## Authentication
+Backend contracts are the source of truth for frontend integration. Frontend middleware may improve navigation and user experience, but it is not a security boundary. Every protected operation must be authenticated and authorized by the backend.
 
-Authentication uses:
+Authentication establishes who the caller is. Authorization determines whether that authenticated caller may perform a specific action.
 
-- username/email + password
-- BCrypt password hashing
-- JWT Access Token
-- Refresh Token
+## Conceptual identity and authorization model
 
-## Login
+### User
 
-Endpoint:
+A user account has:
 
-POST /api/v1/auth/login
+- `id`: UUID primary identifier.
+- `username`: unique login name. It is normalized before uniqueness checks and persistence.
+- `email`: unique email address. It is normalized before uniqueness checks and persistence.
+- `passwordHash`: BCrypt hash; a raw password is never persisted.
+- `status`: one of the account statuses defined below.
+- `createdAt` and `updatedAt`: audit timestamps.
+- `lastLoginAt`: nullable timestamp of the latest successful login.
 
-General flow:
+Username and email normalization must be deterministic and applied consistently before lookups and database uniqueness checks. The exact normalization algorithm belongs to the implementation design, but it must not allow casing or formatting variants to bypass uniqueness.
 
-Client
-→ credentials
-→ backend
-→ user lookup
-→ BCrypt password verification
-→ issue Access Token
-→ issue Refresh Token
+User identity is a shared security concern. It must not contain clinical data or depend on a clinical business entity.
 
-## Access Token
+### Account statuses
 
-Access tokens should be short-lived.
+- `PENDING_ACTIVATION`
+- `ACTIVE`
+- `INACTIVE`
+- `LOCKED`
 
-Recommended initial configuration:
+Authentication and session use must respect account status. Detailed activation, locking, unlocking, and status-transition policies are outside this issue and must be defined before those behaviors are implemented.
 
-30 minutes.
+### Role and Permission
 
-The duration must be configurable.
+A role groups permissions and has:
 
-JWT payload must contain only necessary claims.
+- `id`: UUID primary identifier.
+- `code`: unique stable machine-readable identifier.
+- `name`: display name.
+- `description`: human-readable purpose.
+- `active`: whether the role may currently grant permissions.
 
-Example:
+A permission represents one backend capability and has:
 
-- subject/user id
-- role or authority information
-- issued at
-- expiration
+- `id`: UUID primary identifier.
+- `code`: unique stable machine-readable identifier.
+- `description`: human-readable purpose.
 
-Never include:
+Permission codes use the `RESOURCE_ACTION` convention. For example, `PATIENT_READ` illustrates the syntax only; it is not an approved permission or a requirement for a clinical module.
 
-- password
-- clinical history
-- personal medical information
+Users and roles have a many-to-many relationship through `UserRole`. Roles and permissions have a many-to-many relationship through `RolePermission`. Concrete roles and the permission catalog remain intentionally undefined until their business requirements are approved.
 
-## Refresh Token
+## Password security
 
-Refresh tokens are used to issue new access tokens.
+- Store passwords only as BCrypt hashes using an application-selected work factor.
+- Never store, log, return, or place a raw password in a token.
+- Compare passwords through the password encoder; do not compare hashes directly.
+- Password input must be validated before hashing. The final length and complexity policy remains a product decision.
+- Password reset and account activation flows are outside this issue and must not be inferred from this model.
 
-Endpoint:
+## Access token
 
-POST /api/v1/auth/refresh
+The access token is a signed JWT with a default lifetime of 30 minutes, configured through `JWT_ACCESS_EXPIRATION`. Clients send it as:
 
-Refresh tokens must be managed securely.
+```http
+Authorization: Bearer <access-token>
+```
 
-Token rotation is recommended.
+The token contains only the minimum authorization context:
 
-## Logout
+- `sub`: user UUID.
+- `authorities`: effective authority codes.
+- `jti`: unique token identifier.
+- `iat`: issued-at time.
+- `exp`: expiration time.
+- `typ`: `access`.
 
-Endpoint:
+It must not contain passwords, password hashes, clinical data, addresses, phone numbers, refresh tokens, or other sensitive data. Role or permission changes are not reflected in an already issued access token; they take effect when that token expires or a new token is issued.
 
-POST /api/v1/auth/logout
+Unless a future server-side access-token revocation mechanism is introduced, an issued access token remains valid until expiration even when its associated refresh session is revoked.
 
-Logout must revoke/invalidate the active refresh session where applicable.
+## Refresh token and session
 
-## Password storage
+The refresh token is an opaque, cryptographically secure random value, not a JWT. Its raw value is sent only to the client and is never persisted. The backend stores only a cryptographic hash suitable for deterministic token lookup.
 
-Passwords must use BCrypt.
+Each `RefreshSession` has:
 
-Never store plain text passwords.
+- `id`: UUID primary identifier.
+- `userId`: UUID of the owning user.
+- `familyId`: UUID shared by every token produced from the same login session.
+- `tokenHash`: hash of the current opaque token.
+- `createdAt`: session creation time.
+- `expiresAt`: absolute expiration time.
+- `lastActivityAt`: last successful refresh activity.
+- `revokedAt`: nullable revocation time.
+- `replacedBySessionId`: nullable UUID identifying the session created by rotation.
 
-## Backend authorization
+The absolute lifetime is seven days by default and is configured through `JWT_REFRESH_EXPIRATION`. A session also expires after 24 hours of inactivity by default, configured through `JWT_REFRESH_INACTIVITY_TIMEOUT`. Both absolute expiration and inactivity are evaluated on every refresh request.
 
-Next.js route protection is useful for UX but does not replace backend authorization.
+### Mandatory rotation and reuse detection
 
-Every protected API request must be validated by Spring Security.
+Every successful refresh rotates the token:
 
-## Public endpoints
+1. Read the opaque refresh token from the cookie.
+2. Hash it using the configured lookup strategy.
+3. Find the matching refresh session.
+4. Reject it with a generic authentication failure if no matching session exists.
+5. If the session was already replaced, treat the request as reuse, revoke its entire token family, and return a generic authentication failure.
+6. Reject it generically if it is otherwise revoked, absolutely expired, or inactive.
+7. Validate that the owning user is still eligible to authenticate.
+8. Generate a new opaque refresh token and create its hashed replacement session in the same family, preserving the original absolute lifetime.
+9. Mark the presented session as revoked, link `replacedBySessionId`, and commit both changes atomically.
+10. Issue a new access token and replace the refresh-token cookie only after the rotation succeeds.
 
-Expected examples:
+Presenting a previously rotated token is token reuse. On detected reuse, the backend revokes every active refresh session in that `familyId` and returns a generic `401 Unauthorized` response. Rotation and family revocation require transactional consistency.
 
-POST /api/v1/auth/login
-POST /api/v1/auth/refresh
+## Browser transport and CORS
 
-Swagger endpoints may be public in development.
+The refresh token is transported in a host-only cookie with:
 
-## CORS
+- `HttpOnly` enabled.
+- `Secure` enabled outside local HTTP development.
+- `SameSite=Lax`.
+- `Path=/api/v1/auth`.
+- No `Domain` attribute unless a reviewed deployment requirement makes it necessary.
 
-CORS must allow only explicitly configured frontend origins in production.
+The frontend must not read the refresh token or store it in `localStorage`, `sessionStorage`, or persistent JavaScript variables. Cross-origin browser clients require an explicit allowed origin from `FRONTEND_URL` and credentialed CORS requests; wildcard origins are incompatible with credentials.
 
-Do not use unrestricted wildcard origins in production.
+## Session policy
 
-Frontend URL must be configurable through:
+Each successful login creates an independent refresh-token family, allowing multiple devices or browsers. Phase one imposes no maximum number of concurrent sessions.
 
-FRONTEND_URL
+A refresh session ends through logout, absolute expiration, inactivity expiration, token-family reuse response, or when the account is no longer eligible under the security rules. The model supports a future “logout all devices” operation by revoking all active sessions for a user, but that operation is not part of this issue.
 
-## Secrets
+## Authentication API contracts
 
-Never commit:
+All error responses follow the centralized `ApiErrorResponse` contract in `API-CONVENTIONS.md`. Authentication failures use generic messages and never reveal whether an account, session, or token exists.
 
-- JWT private keys
-- JWT secrets
-- Supabase passwords
-- production credentials
+### Login
 
-Use environment variables.
+`POST /api/v1/auth/login`
+
+Request:
+
+```json
+{
+  "identifier": "username-or-email",
+  "password": "raw-password"
+}
+```
+
+Success: `200 OK`, creates a refresh session, sets the refresh cookie, and returns:
+
+```json
+{
+  "accessToken": "signed-jwt",
+  "tokenType": "Bearer",
+  "expiresIn": 1800,
+  "user": {
+    "id": "uuid",
+    "username": "username",
+    "email": "user@example.com",
+    "status": "ACTIVE",
+    "roles": [],
+    "permissions": []
+  }
+}
+```
+
+The refresh token appears only in the cookie. Invalid credentials return a generic `401 Unauthorized`; malformed or invalid request fields return `400 Bad Request`.
+
+### Refresh
+
+`POST /api/v1/auth/refresh`
+
+The request has no token in its body; the refresh token comes from the cookie. Success returns `200 OK`, rotates the refresh cookie, and returns:
+
+```json
+{
+  "accessToken": "signed-jwt",
+  "tokenType": "Bearer",
+  "expiresIn": 1800
+}
+```
+
+A missing, invalid, expired, inactive, revoked, or reused refresh token returns a generic `401 Unauthorized`.
+
+### Logout
+
+`POST /api/v1/auth/logout`
+
+The backend identifies the current refresh session from the cookie, revokes it, clears the cookie, and returns `204 No Content`. Logout should be idempotent where practical so a missing or already invalidated session does not expose internal session state.
+
+### Current user
+
+`GET /api/v1/auth/me`
+
+Requires a Bearer access token. Success returns `200 OK` with the current user's `id`, `username`, `email`, `status`, roles, and permissions. It never includes password hashes, refresh tokens, or refresh-session data.
+
+## Security flows
+
+### Login flow
+
+1. Validate and normalize the identifier.
+2. Resolve the account and verify its status and BCrypt password.
+3. Create an independent refresh session and token family.
+4. Update `lastLoginAt` after successful authentication.
+5. Return the access token and user view; set the opaque refresh-token cookie.
+
+### Protected request flow
+
+1. Read the Bearer token.
+2. Verify signature, token type, and temporal claims.
+3. Establish the authenticated user and authorities from the approved claims.
+4. Enforce endpoint authorization in the backend.
+
+### Refresh flow
+
+1. Read the refresh cookie.
+2. Evaluate session validity, account eligibility, absolute lifetime, and inactivity.
+3. Rotate the refresh token atomically and detect reuse as described above.
+4. Return a new access token and refresh cookie.
+
+### Logout flow
+
+1. Identify the refresh session from the cookie.
+2. Revoke that session when present.
+3. Clear the browser cookie.
+4. Return `204 No Content`.
+
+## Configuration and secrets
+
+- `JWT_PRIVATE_KEY`
+- `JWT_PUBLIC_KEY`
+- `JWT_ACCESS_EXPIRATION` (default: 30 minutes)
+- `JWT_REFRESH_EXPIRATION` (default: 7 days)
+- `JWT_REFRESH_INACTIVITY_TIMEOUT` (default: 24 hours)
+- `FRONTEND_URL`
+
+Secrets must come from environment variables or an approved secret store. Never commit real keys, credentials, raw refresh tokens, or password material.
+
+## Implementation handoff for Issue #5
+
+Issue #5 should translate this conceptual model into persistence and Liquibase migrations without adding authentication behavior:
+
+- `users`: UUID id, normalized unique username, normalized unique email, BCrypt password hash, status, creation/update timestamps, and nullable last-login timestamp.
+- `roles`: UUID id, unique code, name, description, and active flag.
+- `permissions`: UUID id, unique code, and description.
+- `user_roles`: association between users and roles, with database-enforced uniqueness for each pair.
+- `role_permissions`: association between roles and permissions, with database-enforced uniqueness for each pair.
+- `refresh_sessions`: UUID id, user foreign key, family UUID, unique token hash, creation/absolute-expiration/last-activity timestamps, nullable revocation timestamp, and nullable self-reference to the replacement session.
+
+Foreign keys, unique constraints, required columns, indexes needed for identifier and token lookup, and timestamp types must be defined explicitly in the migrations. No raw refresh-token column is permitted.
+
+Responsibility boundaries:
+
+- Issue #5: persistence model, repositories as needed, and Liquibase schema.
+- Issue #6: login, password verification, access JWT issuance, and `/auth/me` authentication support.
+- Issue #7: refresh-session creation, rotation, reuse detection, and logout.
+- Issue #8: role/permission authorization enforcement.
+
+Still unresolved and intentionally deferred: concrete roles, the complete permission catalog, account activation and lock-transition rules, and the final password policy.
