@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: dentalcare-api
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+dentalcare:
+  cors:
+    allowed-origin: ${FRONTEND_URL}
+  jwt:
+    private-key: ${JWT_PRIVATE_KEY:}
+    public-key: ${JWT_PUBLIC_KEY:}
+    access-expiration: ${JWT_ACCESS_EXPIRATION:30m}
+    refresh-expiration: ${JWT_REFRESH_EXPIRATION:7d}
+  openapi:
+    public-access: false
