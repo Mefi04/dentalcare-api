@@ -1,4 +1,4 @@
-package com.dentalcare.api.exception;
+package com.dentalcare.api.shared.response;
 
 import java.time.Instant;
 import java.util.Map;
