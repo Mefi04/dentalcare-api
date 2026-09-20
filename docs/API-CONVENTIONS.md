@@ -78,41 +78,54 @@ Business validation belongs in services.
 
 Common codes:
 
-200 OK
+- `200 OK`: successful read or update.
+- `201 Created`: successful creation.
+- `204 No Content`: successful operation without a response body.
+- `400 Bad Request`: malformed request or validation failure.
+- `401 Unauthorized`: authentication is missing, invalid, or no longer usable. Authentication errors must be generic and must not disclose whether an account or session exists.
+- `403 Forbidden`: authentication succeeded, but the caller lacks permission for the operation.
+- `404 Not Found`: resource does not exist.
+- `409 Conflict`: unique constraint or state conflict.
+- `422 Unprocessable Entity`: semantically invalid request when specifically appropriate.
+- `500 Internal Server Error`: unexpected server failure.
 
-201 Created
-
-204 No Content
-
-400 Bad Request
-
-401 Unauthorized
-
-403 Forbidden
-
-404 Not Found
-
-409 Conflict
-
-422 Unprocessable Entity when appropriate
-
-500 Internal Server Error
+Do not use `403 Forbidden` as a substitute for failed authentication. Backend authorization is authoritative; frontend route guards and middleware are user-experience aids only.
 
 ## Error responses
 
 Errors must use one consistent structure.
 
-Suggested shape:
+Contract:
 
+```json
 {
   "timestamp": "...",
   "status": 400,
   "error": "Bad Request",
   "message": "...",
-  "path": "/api/v1/..."
+  "path": "/api/v1/example",
+  "fieldErrors": {
+    "fieldName": "must not be blank"
+  }
 }
+```
 
 Validation errors may include field-level details.
+
+The contract always exposes `timestamp`, `status`, `error`, `message`, `path`, and `fieldErrors`; `fieldErrors` may be empty when the error is not field-specific. Error handling is centralized. Responses must never expose stack traces, credentials, database details, token material, or implementation internals.
+
+## Authentication endpoints
+
+Authentication uses `/api/v1/auth`. Detailed token, cookie, rotation, and session rules are defined in `SECURITY.md`.
+
+| Method | Path | Authentication input | Success | Notes |
+|---|---|---|---|---|
+| `POST` | `/api/v1/auth/login` | JSON `identifier` and `password` | `200 OK` with access token and user view | Sets refresh token only in an HttpOnly cookie. Invalid credentials return generic `401`; request validation returns `400`. |
+| `POST` | `/api/v1/auth/refresh` | Refresh cookie; no token in body | `200 OK` with a new access token | Rotates the refresh cookie. Invalid, expired, revoked, or reused tokens return generic `401`. |
+| `POST` | `/api/v1/auth/logout` | Refresh cookie | `204 No Content` | Revokes the identified session and clears the cookie; idempotent where practical. |
+| `GET` | `/api/v1/auth/me` | Bearer access token | `200 OK` with the current user view | Never returns password hashes, token material, or session data. |
+
+Successful access-token responses use `tokenType: "Bearer"` and `expiresIn: 1800` by default. Login additionally returns `user` with `id`, `username`, `email`, `status`, `roles`, and `permissions`. Refresh tokens never appear in JSON responses.
 
 ## Pagination
 
