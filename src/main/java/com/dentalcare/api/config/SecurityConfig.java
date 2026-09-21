@@ -32,7 +32,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(authenticationEntryPoint))
                 .authorizeHttpRequests(authorize -> {
-                    authorize.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/login").permitAll();
+                    authorize.requestMatchers(org.springframework.http.HttpMethod.POST,
+                            "/api/v1/auth/login",
+                            "/api/v1/auth/refresh",
+                            "/api/v1/auth/logout").permitAll();
                     authorize.requestMatchers("/actuator/health").permitAll();
                     if (openApiPublicAccess) {
                         authorize.requestMatchers(OPENAPI_ENDPOINTS).permitAll();

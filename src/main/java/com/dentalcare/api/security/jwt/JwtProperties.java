@@ -9,5 +9,19 @@ public record JwtProperties(
         String privateKey,
         String publicKey,
         Duration accessExpiration,
-        Duration refreshExpiration) {
+        Duration refreshExpiration,
+        Duration refreshInactivityTimeout,
+        boolean cookieSecure) {
+
+    public JwtProperties {
+        if (accessExpiration == null) {
+            accessExpiration = Duration.ofMinutes(30);
+        }
+        if (refreshExpiration == null) {
+            refreshExpiration = Duration.ofDays(7);
+        }
+        if (refreshInactivityTimeout == null) {
+            refreshInactivityTimeout = Duration.ofHours(24);
+        }
+    }
 }

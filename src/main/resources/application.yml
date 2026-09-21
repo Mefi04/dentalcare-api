@@ -32,5 +32,7 @@ dentalcare:
     public-key: ${JWT_PUBLIC_KEY:}
     access-expiration: ${JWT_ACCESS_EXPIRATION:30m}
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:7d}
+    refresh-inactivity-timeout: ${JWT_REFRESH_INACTIVITY_TIMEOUT:24h}
+    cookie-secure: ${JWT_COOKIE_SECURE:false}
   openapi:
     public-access: false
