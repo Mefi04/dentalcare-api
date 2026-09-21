@@ -1,5 +1,7 @@
 package com.dentalcare.api.config;
 
+import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
+import com.dentalcare.api.security.handler.RestAuthenticationEntryPoint;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -9,6 +11,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
@@ -20,20 +23,24 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            RestAuthenticationEntryPoint authenticationEntryPoint,
             @Value("${dentalcare.openapi.public-access:false}") boolean openApiPublicAccess) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(errors -> errors.authenticationEntryPoint(authenticationEntryPoint))
                 .authorizeHttpRequests(authorize -> {
+                    authorize.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/login").permitAll();
                     authorize.requestMatchers("/actuator/health").permitAll();
                     if (openApiPublicAccess) {
                         authorize.requestMatchers(OPENAPI_ENDPOINTS).permitAll();
                     }
                     authorize.anyRequest().authenticated();
-                });
+                })
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
-        // The authentication ticket will add the JWT filter before UsernamePasswordAuthenticationFilter.
         return http.build();
     }
 
