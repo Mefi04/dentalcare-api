@@ -10,6 +10,8 @@ import java.util.List;
 
 @Component
 public class AuthUserMapper {
+    private static final String ROLE_PREFIX = "ROLE_";
+
     public UserResponse toResponse(User user) {
         return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getStatus(),
                 roleCodes(user), permissionCodes(user));
@@ -18,7 +20,9 @@ public class AuthUserMapper {
     public List<String> authorities(User user) {
         return user.getRoles().stream().filter(Role::isActive)
                 .flatMap(role -> java.util.stream.Stream.concat(
-                        java.util.stream.Stream.of(role.getCode()),
+                        java.util.stream.Stream.of(role.getCode())
+                                .filter(code -> code != null && !code.isBlank())
+                                .map(code -> ROLE_PREFIX + code),
                         role.getPermissions().stream().map(Permission::getCode)))
                 .filter(code -> code != null && !code.isBlank()).distinct().sorted().toList();
     }

@@ -11,6 +11,7 @@ import com.dentalcare.api.modules.users.model.UserStatus;
 import com.dentalcare.api.security.cookie.AuthCookieManager;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
 import com.dentalcare.api.security.handler.RestAuthenticationEntryPoint;
+import com.dentalcare.api.security.handler.RestAccessDeniedHandler;
 import com.dentalcare.api.security.jwt.JwtProperties;
 import com.dentalcare.api.security.jwt.JwtService;
 import jakarta.servlet.http.Cookie;
@@ -36,7 +37,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class, AuthCookieManager.class})
+@Import({SecurityConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
+        RestAccessDeniedHandler.class, AuthCookieManager.class})
 class AuthSecurityIntegrationTests {
 
     @Autowired
