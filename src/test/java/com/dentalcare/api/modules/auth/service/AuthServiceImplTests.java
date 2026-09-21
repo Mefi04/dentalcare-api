@@ -5,6 +5,8 @@ import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
 import com.dentalcare.api.modules.auth.dto.response.UserResponse;
 import com.dentalcare.api.modules.auth.mapper.AuthUserMapper;
 import com.dentalcare.api.modules.auth.model.RefreshSession;
+import com.dentalcare.api.modules.users.model.Permission;
+import com.dentalcare.api.modules.users.model.Role;
 import com.dentalcare.api.modules.users.model.User;
 import com.dentalcare.api.modules.users.model.UserStatus;
 import com.dentalcare.api.modules.users.repository.UserRepository;
@@ -23,6 +25,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -260,6 +263,9 @@ class AuthServiceImplTests {
         when(refreshTokenService.findByRawToken("valid-token")).thenReturn(Optional.of(session));
         when(userRepository.findWithRolesAndPermissionsById(user.getId())).thenReturn(Optional.of(user));
         when(refreshTokenService.generateRawToken()).thenReturn("new-raw-token");
+        Role administrator = new Role(UUID.randomUUID(), "ADMINISTRATOR", "Administrator", null, true);
+        administrator.setPermissions(Set.of(new Permission(UUID.randomUUID(), "PATIENT_READ", null)));
+        user.setRoles(Set.of(administrator));
 
         RefreshSession newSession = new RefreshSession(
                 UUID.randomUUID(), user, familyId, "new-hash", now, originalExpiresAt, now);
@@ -277,6 +283,7 @@ class AuthServiceImplTests {
         assertThat(result.cookieMaxAge()).isEqualTo(Duration.ofDays(4));
 
         verify(refreshTokenService).rotateSession(session, "new-raw-token");
+        verify(jwtService).createAccessToken(user.getId(), List.of("PATIENT_READ", "ROLE_ADMINISTRATOR"));
     }
 
     @Test

@@ -265,3 +265,19 @@ Responsibility boundaries:
 - Issue #8: role/permission authorization enforcement.
 
 Still unresolved and intentionally deferred: concrete roles, the complete permission catalog, account activation and lock-transition rules, and the final password policy.
+
+## Authority conventions
+
+Role codes are persisted without a prefix, for example `ADMINISTRATOR`. When an active role is converted to a
+JWT authority or `GrantedAuthority`, the backend prefixes it as `ROLE_ADMINISTRATOR`. This allows method
+authorization such as `@PreAuthorize("hasRole('ADMINISTRATOR')")`. Inactive roles grant neither their role authority
+nor their associated permissions.
+
+Permission codes are used directly as authorities without an additional prefix. For example, a persisted
+`PATIENT_READ` permission is checked with `@PreAuthorize("hasAuthority('PATIENT_READ')")`. API user responses keep
+the original persisted codes: `roles` contains `ADMINISTRATOR`, not `ROLE_ADMINISTRATOR`, and `permissions` contains
+the unmodified permission codes.
+
+Missing or invalid authentication produces `401 Unauthorized`. An authenticated caller who lacks a required role
+or permission produces `403 Forbidden`. Future modules must define and enforce their concrete permissions when
+their business operations are implemented; this infrastructure does not establish an exhaustive permission catalog.
