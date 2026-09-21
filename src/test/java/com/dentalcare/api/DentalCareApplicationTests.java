@@ -21,6 +21,9 @@ class DentalCareApplicationTests {
     @MockitoBean
     UserRepository userRepository;
 
+    @MockitoBean
+    com.dentalcare.api.modules.auth.repository.RefreshSessionRepository refreshSessionRepository;
+
     @Test
     void contextLoads() {
     }

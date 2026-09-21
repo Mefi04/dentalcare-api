@@ -61,6 +61,6 @@ class JjwtServiceTests {
         return new JjwtService(new JwtProperties(
                 Base64.getEncoder().encodeToString(keyPair.getPrivate().getEncoded()),
                 Base64.getEncoder().encodeToString(keyPair.getPublic().getEncoded()),
-                expiration, Duration.ofDays(7)));
+                expiration, Duration.ofDays(7), Duration.ofHours(24), false));
     }
 }

@@ -6,6 +6,8 @@ spring:
 dentalcare:
   openapi:
     public-access: false
+  jwt:
+    cookie-secure: true
 
 springdoc:
   swagger-ui:
