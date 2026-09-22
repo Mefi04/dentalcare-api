@@ -40,7 +40,7 @@ class RefreshTokenServiceImplTests {
         now = Instant.parse("2026-09-21T12:00:00Z");
         fixedClock = Clock.fixed(now, ZoneOffset.UTC);
         service = new RefreshTokenServiceImpl(repository, fixedClock);
-        user = new User(UUID.randomUUID(), "testuser", "test@example.com", "hash",
+        user = new User(UUID.randomUUID(), "testuser", "test@example.com", "1234567890123", "hash",
                 UserStatus.ACTIVE, now, now);
     }
 

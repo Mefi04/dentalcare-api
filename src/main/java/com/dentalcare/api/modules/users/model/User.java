@@ -12,6 +12,8 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -33,6 +35,11 @@ public class User {
 
     @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
+
+    @NotBlank
+    @Pattern(regexp = "^[0-9]{13}$")
+    @Column(name = "cui", nullable = false, unique = true, length = 13)
+    private String cui;
 
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
@@ -61,10 +68,11 @@ public class User {
     public User() {
     }
 
-    public User(UUID id, String username, String email, String passwordHash, UserStatus status, Instant createdAt, Instant updatedAt) {
+    public User(UUID id, String username, String email, String cui, String passwordHash, UserStatus status, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.username = normalize(username);
         this.email = normalize(email);
+        this.cui = normalizeCui(cui);
         this.passwordHash = passwordHash;
         this.status = status;
         this.createdAt = createdAt;
@@ -75,10 +83,15 @@ public class User {
         return value != null ? value.trim().toLowerCase(Locale.ROOT) : null;
     }
 
+    public static String normalizeCui(String value) {
+        return value != null ? value.trim() : null;
+    }
+
     @PrePersist
     protected void onPrePersist() {
         this.username = normalize(this.username);
         this.email = normalize(this.email);
+        this.cui = normalizeCui(this.cui);
         Instant now = Instant.now();
         if (this.createdAt == null) {
             this.createdAt = now;
@@ -92,6 +105,7 @@ public class User {
     protected void onPreUpdate() {
         this.username = normalize(this.username);
         this.email = normalize(this.email);
+        this.cui = normalizeCui(this.cui);
         this.updatedAt = Instant.now();
     }
 
@@ -117,6 +131,14 @@ public class User {
 
     public void setEmail(String email) {
         this.email = normalize(email);
+    }
+
+    public String getCui() {
+        return cui;
+    }
+
+    public void setCui(String cui) {
+        this.cui = normalizeCui(cui);
     }
 
     public String getPasswordHash() {

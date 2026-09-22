@@ -96,12 +96,12 @@ class AuthSecurityIntegrationTests {
 
     @Test
     void invalidLoginCredentialsReturnGeneric401() throws Exception {
-        when(authService.login(new LoginRequest("missing", "wrong")))
+        when(authService.login(new LoginRequest("0000000000000", "wrong")))
                 .thenThrow(new UnauthorizedException("Invalid credentials"));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"identifier\":\"missing\",\"password\":\"wrong\"}"))
+                        .content("{\"cui\":\"0000000000000\",\"password\":\"wrong\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Invalid credentials"))
                 .andExpect(jsonPath("$.fieldErrors").isEmpty());
@@ -114,11 +114,11 @@ class AuthSecurityIntegrationTests {
         LoginResponse loginResponse = new LoginResponse("access-token-123", "Bearer", 1800L, userResponse);
         AuthService.LoginResult loginResult = new AuthService.LoginResult(loginResponse, "raw-refresh-cookie-value", Duration.ofDays(7));
 
-        when(authService.login(new LoginRequest("testuser", "password123"))).thenReturn(loginResult);
+        when(authService.login(new LoginRequest("1234567890123", "password123"))).thenReturn(loginResult);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"identifier\":\"testuser\",\"password\":\"password123\"}"))
+                        .content("{\"cui\":\"1234567890123\",\"password\":\"password123\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access-token-123"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
@@ -129,6 +129,17 @@ class AuthSecurityIntegrationTests {
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Path=/api/v1/auth")))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("SameSite=Lax")));
+    }
+
+    @Test
+    void loginRejectsCuiThatIsNotExactlyThirteenDigits() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cui\":\"12345abc\",\"password\":\"password123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.cui").value("CUI must contain exactly 13 digits"));
+
+        verifyNoInteractions(authService);
     }
 
     @Test

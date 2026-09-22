@@ -64,8 +64,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public LoginResult login(LoginRequest request) {
-        String identifier = User.normalize(request.identifier());
-        User user = userRepository.findWithRolesAndPermissionsByUsernameOrEmail(identifier, identifier)
+        String cui = User.normalizeCui(request.cui());
+        User user = userRepository.findWithRolesAndPermissionsByCui(cui)
                 .orElseThrow(() -> new UnauthorizedException(INVALID_CREDENTIALS));
 
         if (user.getStatus() != UserStatus.ACTIVE || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {

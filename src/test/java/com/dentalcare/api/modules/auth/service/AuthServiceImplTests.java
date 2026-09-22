@@ -80,16 +80,16 @@ class AuthServiceImplTests {
                 clock
         );
 
-        user = new User(UUID.randomUUID(), "testuser", "user@example.com", "hash", UserStatus.ACTIVE,
+        user = new User(UUID.randomUUID(), "testuser", "user@example.com", "1234567890123", "hash", UserStatus.ACTIVE,
                 now.minus(Duration.ofDays(10)), now.minus(Duration.ofDays(10)));
     }
 
     @Test
-    void loginWithNormalizedIdentifierCreatesSessionAndReturnsLoginResult() {
+    void loginWithCuiCreatesSessionAndReturnsLoginResult() {
         successfulLoginLookup();
         when(refreshTokenService.generateRawToken()).thenReturn("raw-refresh-token");
 
-        var result = service.login(new LoginRequest("  TESTUSER ", "secret"));
+        var result = service.login(new LoginRequest("1234567890123", "secret"));
 
         assertThat(result.response().accessToken()).isEqualTo("access-token");
         assertThat(result.response().expiresIn()).isEqualTo(1800);
@@ -97,35 +97,35 @@ class AuthServiceImplTests {
         assertThat(result.cookieMaxAge()).isEqualTo(Duration.ofDays(7));
         assertThat(user.getLastLoginAt()).isEqualTo(now);
 
-        verify(userRepository).findWithRolesAndPermissionsByUsernameOrEmail("testuser", "testuser");
+        verify(userRepository).findWithRolesAndPermissionsByCui("1234567890123");
         verify(userRepository).save(user);
         verify(refreshTokenService).createSession(eq(user), any(UUID.class), eq("raw-refresh-token"), eq(now.plus(Duration.ofDays(7))));
     }
 
     @Test
-    void loginWithNormalizedEmail() {
+    void loginTrimsCuiBeforeLookup() {
         successfulLoginLookup();
         when(refreshTokenService.generateRawToken()).thenReturn("raw-refresh-token");
 
-        service.login(new LoginRequest(" USER@EXAMPLE.COM ", "secret"));
+        service.login(new LoginRequest(" 1234567890123 ", "secret"));
 
-        verify(userRepository).findWithRolesAndPermissionsByUsernameOrEmail("user@example.com", "user@example.com");
+        verify(userRepository).findWithRolesAndPermissionsByCui("1234567890123");
     }
 
     @Test
     void invalidCredentialsDoNotCreateSession() {
-        when(userRepository.findWithRolesAndPermissionsByUsernameOrEmail("missing", "missing"))
+        when(userRepository.findWithRolesAndPermissionsByCui("0000000000000"))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.login(new LoginRequest("missing", "secret")))
+        assertThatThrownBy(() -> service.login(new LoginRequest("0000000000000", "secret")))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Invalid credentials");
 
-        when(userRepository.findWithRolesAndPermissionsByUsernameOrEmail("testuser", "testuser"))
+        when(userRepository.findWithRolesAndPermissionsByCui("1234567890123"))
                 .thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "hash")).thenReturn(false);
 
-        assertThatThrownBy(() -> service.login(new LoginRequest("testuser", "wrong")))
+        assertThatThrownBy(() -> service.login(new LoginRequest("1234567890123", "wrong")))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Invalid credentials");
 
@@ -136,10 +136,10 @@ class AuthServiceImplTests {
     @Test
     void nonActiveUserCannotLogin() {
         user.setStatus(UserStatus.LOCKED);
-        when(userRepository.findWithRolesAndPermissionsByUsernameOrEmail("testuser", "testuser"))
+        when(userRepository.findWithRolesAndPermissionsByCui("1234567890123"))
                 .thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> service.login(new LoginRequest("testuser", "secret")))
+        assertThatThrownBy(() -> service.login(new LoginRequest("1234567890123", "secret")))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Invalid credentials");
 
@@ -345,7 +345,7 @@ class AuthServiceImplTests {
     }
 
     private void successfulLoginLookup() {
-        when(userRepository.findWithRolesAndPermissionsByUsernameOrEmail(anyString(), anyString()))
+        when(userRepository.findWithRolesAndPermissionsByCui(anyString()))
                 .thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
         when(jwtService.createAccessToken(eq(user.getId()), anyList())).thenReturn("access-token");

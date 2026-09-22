@@ -38,7 +38,7 @@ class AuthUserMapperTests {
     }
 
     private static User userWithRoles(Role... roles) {
-        User user = new User(UUID.randomUUID(), "user", "user@example.com", "hash", UserStatus.ACTIVE,
+        User user = new User(UUID.randomUUID(), "user", "user@example.com", "1234567890123", "hash", UserStatus.ACTIVE,
                 Instant.now(), Instant.now());
         user.setRoles(Set.of(roles));
         return user;

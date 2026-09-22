@@ -120,7 +120,7 @@ Authentication uses `/api/v1/auth`. Detailed token, cookie, rotation, and sessio
 
 | Method | Path | Authentication input | Success | Notes |
 |---|---|---|---|---|
-| `POST` | `/api/v1/auth/login` | JSON `identifier` and `password` | `200 OK` with access token and user view | Sets refresh token only in an HttpOnly cookie. Invalid credentials return generic `401`; request validation returns `400`. |
+| `POST` | `/api/v1/auth/login` | JSON `cui` (exactly 13 digits) and `password` | `200 OK` with access token and user view | Sets refresh token only in an HttpOnly cookie. Invalid credentials return generic `401`; request validation returns `400`. |
 | `POST` | `/api/v1/auth/refresh` | Refresh cookie; no token in body | `200 OK` with a new access token | Rotates the refresh cookie. Invalid, expired, revoked, or reused tokens return generic `401`. |
 | `POST` | `/api/v1/auth/logout` | Refresh cookie | `204 No Content` | Revokes the identified session and clears the cookie; idempotent where practical. |
 | `GET` | `/api/v1/auth/me` | Bearer access token | `200 OK` with the current user view | Never returns password hashes, token material, or session data. |

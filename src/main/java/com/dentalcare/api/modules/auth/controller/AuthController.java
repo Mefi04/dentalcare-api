@@ -33,7 +33,7 @@ public class AuthController {
         this.authCookieManager = authCookieManager;
     }
 
-    @Operation(summary = "Authenticate with username or email")
+    @Operation(summary = "Authenticate with CUI/DPI and password")
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest request,

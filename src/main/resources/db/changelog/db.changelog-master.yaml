@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/changes/001-create-security-model.sql
   - include:
       file: db/changelog/changes/002-create-patients-module.sql
+  - include:
+      file: db/changelog/changes/003-add-users-cui.sql

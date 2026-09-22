@@ -15,8 +15,9 @@ Authentication establishes who the caller is. Authorization determines whether t
 A user account has:
 
 - `id`: UUID primary identifier.
-- `username`: unique login name. It is normalized before uniqueness checks and persistence.
+- `username`: unique account name. It is normalized before uniqueness checks and persistence.
 - `email`: unique email address. It is normalized before uniqueness checks and persistence.
+- `cui`: unique, 13-digit Guatemalan CUI/DPI used exclusively for login.
 - `passwordHash`: BCrypt hash; a raw password is never persisted.
 - `status`: one of the account statuses defined below.
 - `createdAt` and `updatedAt`: audit timestamps.
@@ -149,7 +150,7 @@ Request:
 
 ```json
 {
-  "identifier": "username-or-email",
+  "cui": "1234567890123",
   "password": "raw-password"
 }
 ```
@@ -206,7 +207,7 @@ Requires a Bearer access token. Success returns `200 OK` with the current user's
 
 ### Login flow
 
-1. Validate and normalize the identifier.
+1. Validate and normalize the 13-digit CUI.
 2. Resolve the account and verify its status and BCrypt password.
 3. Create an independent refresh session and token family.
 4. Update `lastLoginAt` after successful authentication.

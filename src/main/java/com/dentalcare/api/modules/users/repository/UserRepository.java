@@ -15,8 +15,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByCui(String cui);
+
     @EntityGraph(attributePaths = {"roles", "roles.permissions"})
-    Optional<User> findWithRolesAndPermissionsByUsernameOrEmail(String username, String email);
+    Optional<User> findWithRolesAndPermissionsByCui(String cui);
 
     @EntityGraph(attributePaths = {"roles", "roles.permissions"})
     Optional<User> findWithRolesAndPermissionsById(UUID id);
@@ -24,4 +26,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByUsername(String username);
 
     boolean existsByEmail(String email);
+
+    boolean existsByCui(String cui);
 }
