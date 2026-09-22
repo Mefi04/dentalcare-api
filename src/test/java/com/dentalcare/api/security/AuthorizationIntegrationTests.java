@@ -1,5 +1,6 @@
 package com.dentalcare.api.security;
 
+import com.dentalcare.api.config.CorsConfig;
 import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
 import com.dentalcare.api.security.handler.RestAccessDeniedHandler;
@@ -19,8 +20,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(TestSecurityController.class)
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
+@WebMvcTest(controllers = TestSecurityController.class, properties = "FRONTEND_URL=http://localhost:3000")
+@Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class})
 class AuthorizationIntegrationTests {
     @Autowired
