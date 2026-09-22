@@ -2,6 +2,7 @@ package com.dentalcare.api.security.jwt;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.security.KeyFactory;
@@ -24,6 +25,7 @@ public class JjwtService implements JwtService {
     private final Duration accessExpiration;
     private final Clock clock;
 
+    @Autowired
     public JjwtService(JwtProperties properties) {
         this(properties, Clock.systemUTC());
     }
