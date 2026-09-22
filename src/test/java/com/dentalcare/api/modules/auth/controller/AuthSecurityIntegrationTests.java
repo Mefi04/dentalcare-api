@@ -1,5 +1,6 @@
 package com.dentalcare.api.modules.auth.controller;
 
+import com.dentalcare.api.config.CorsConfig;
 import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.exception.UnauthorizedException;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
@@ -36,8 +37,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
+@WebMvcTest(controllers = AuthController.class, properties = "FRONTEND_URL=http://localhost:3000")
+@Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class, AuthCookieManager.class})
 class AuthSecurityIntegrationTests {
 
