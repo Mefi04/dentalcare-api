@@ -5,6 +5,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import com.dentalcare.api.security.jwt.JwtService;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.users.repository.UserRepository;
+import com.dentalcare.api.modules.users.repository.RoleRepository;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(properties = {
@@ -21,6 +22,9 @@ class DentalCareApplicationTests {
 
     @MockitoBean
     UserRepository userRepository;
+
+    @MockitoBean
+    RoleRepository roleRepository;
 
     @MockitoBean
     PatientRepository patientRepository;

@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -53,6 +55,11 @@ public class GlobalExceptionHandler {
         exception.getBindingResult().getFieldErrors().forEach(error ->
                 fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage()));
         return buildResponse(HttpStatus.BAD_REQUEST, "Request validation failed", request, fieldErrors);
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+    ResponseEntity<ApiErrorResponse> handleMalformedRequest(Exception exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "Request is malformed or contains an invalid value", request, Map.of());
     }
 
     @ExceptionHandler(Exception.class)

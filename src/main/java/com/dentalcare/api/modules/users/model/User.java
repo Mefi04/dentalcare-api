@@ -33,6 +33,9 @@ public class User {
     @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
 
+    @Column(name = "full_name", nullable = false, length = 150)
+    private String fullName;
+
     @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
 
@@ -79,6 +82,12 @@ public class User {
         this.updatedAt = updatedAt;
     }
 
+    public User(UUID id, String username, String fullName, String email, String cui, String passwordHash,
+                UserStatus status, Instant createdAt, Instant updatedAt) {
+        this(id, username, email, cui, passwordHash, status, createdAt, updatedAt);
+        this.fullName = fullName != null ? fullName.trim() : null;
+    }
+
     public static String normalize(String value) {
         return value != null ? value.trim().toLowerCase(Locale.ROOT) : null;
     }
@@ -90,6 +99,7 @@ public class User {
     @PrePersist
     protected void onPrePersist() {
         this.username = normalize(this.username);
+        this.fullName = trim(this.fullName);
         this.email = normalize(this.email);
         this.cui = normalizeCui(this.cui);
         Instant now = Instant.now();
@@ -104,6 +114,7 @@ public class User {
     @PreUpdate
     protected void onPreUpdate() {
         this.username = normalize(this.username);
+        this.fullName = trim(this.fullName);
         this.email = normalize(this.email);
         this.cui = normalizeCui(this.cui);
         this.updatedAt = Instant.now();
@@ -123,6 +134,18 @@ public class User {
 
     public void setUsername(String username) {
         this.username = normalize(username);
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = trim(fullName);
+    }
+
+    private static String trim(String value) {
+        return value != null ? value.trim() : null;
     }
 
     public String getEmail() {
