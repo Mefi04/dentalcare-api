@@ -29,12 +29,12 @@ User identity is a shared security concern. It must not contain clinical data or
 
 ### Account statuses
 
-- `PENDING_ACTIVATION`
-- `ACTIVE`
-- `INACTIVE`
-- `LOCKED`
+- `PENDING_ACTIVATION`: Account is created with a temporary password and must be activated via `/api/v1/auth/activate` before any login.
+- `ACTIVE`: Account is active and eligible for normal authentication and session creation.
+- `INACTIVE`: Account is deactivated by administrative action.
+- `LOCKED`: Account is locked.
 
-Authentication and session use must respect account status. Detailed activation, locking, unlocking, and status-transition policies are outside this issue and must be defined before those behaviors are implemented.
+Authentication and session use respect account status. Accounts in `PENDING_ACTIVATION` cannot log in directly and must complete the initial activation flow.
 
 ### Role and Permission
 
@@ -61,8 +61,8 @@ Users and roles have a many-to-many relationship through `UserRole`. Roles and p
 - Store passwords only as BCrypt hashes using an application-selected work factor.
 - Never store, log, return, or place a raw password in a token.
 - Compare passwords through the password encoder; do not compare hashes directly.
-- Password input must be validated before hashing. The final length and complexity policy remains a product decision.
-- Password reset and account activation flows are outside this issue and must not be inferred from this model.
+- Password input must be validated before hashing. The baseline policy enforces a non-blank password between 8 and 128 characters.
+- Initial account activation establishes the user's permanent password via `/api/v1/auth/activate`. Password reset flows remain deferred.
 
 ## Access token
 
@@ -142,6 +142,38 @@ A refresh session ends through logout, absolute expiration, inactivity expiratio
 
 All error responses follow the centralized `ApiErrorResponse` contract in `API-CONVENTIONS.md`. Authentication failures use generic messages and never reveal whether an account, session, or token exists.
 
+### Account activation
+
+`POST /api/v1/auth/activate`
+
+Public endpoint permitting users in `PENDING_ACTIVATION` status to authenticate with their temporary password and define their permanent password.
+
+Request:
+
+```json
+{
+  "cui": "1234567890123",
+  "temporaryPassword": "TemporaryPassword123!",
+  "newPassword": "NewPermanentPassword123!"
+}
+```
+
+Success: `200 OK`:
+
+```json
+{
+  "status": "ACTIVE",
+  "message": "Account activated successfully"
+}
+```
+
+Key rules:
+- The temporary password is valid solely for activation; it cannot be used for direct login.
+- Successful activation permanently replaces the temporary password hash with the BCrypt hash of the new password.
+- The account transitions atomically to `ACTIVE`.
+- No access token or refresh cookie is generated upon activation. The user must subsequently authenticate via `POST /api/v1/auth/login`.
+- To prevent user enumeration, unknown CUI numbers, non-pending account statuses (`ACTIVE`, `INACTIVE`, `LOCKED`), and invalid temporary passwords all return a generic `401 Unauthorized` with message `"Invalid activation credentials"`.
+
 ### Login
 
 `POST /api/v1/auth/login`
@@ -204,6 +236,17 @@ The backend identifies the current refresh session from the cookie, revokes it, 
 Requires a Bearer access token. Success returns `200 OK` with the current user's `id`, `username`, `email`, `status`, roles, and permissions. It never includes password hashes, refresh tokens, or refresh-session data.
 
 ## Security flows
+
+### Account activation flow
+
+1. Validate and normalize the 13-digit CUI.
+2. Validate new password compliance (8 to 128 characters, non-blank).
+3. Acquire a pessimistic write lock on the user record (`findByCuiForUpdate`).
+4. Reject the request with generic `401 Unauthorized` if the account does not exist, status is not `PENDING_ACTIVATION`, or the temporary password does not match `passwordHash`.
+5. Encode the new password with BCrypt via `PasswordEncoder.encode()`.
+6. Replace `passwordHash`, transition status from `PENDING_ACTIVATION` to `ACTIVE`, and update `updatedAt`.
+7. Atomically persist changes in a single transaction.
+8. Return activation confirmation without issuing any access or refresh tokens.
 
 ### Login flow
 

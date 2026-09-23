@@ -1,6 +1,8 @@
 package com.dentalcare.api.modules.auth.controller;
 
+import com.dentalcare.api.modules.auth.dto.request.ActivateAccountRequest;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
+import com.dentalcare.api.modules.auth.dto.response.ActivateAccountResponse;
 import com.dentalcare.api.modules.auth.dto.response.LoginResponse;
 import com.dentalcare.api.modules.auth.dto.response.RefreshResponse;
 import com.dentalcare.api.modules.auth.dto.response.UserResponse;
@@ -31,6 +33,12 @@ public class AuthController {
     public AuthController(AuthService authService, AuthCookieManager authCookieManager) {
         this.authService = authService;
         this.authCookieManager = authCookieManager;
+    }
+
+    @Operation(summary = "Activate account with temporary password and set new permanent password")
+    @PostMapping("/activate")
+    public ResponseEntity<ActivateAccountResponse> activate(@Valid @RequestBody ActivateAccountRequest request) {
+        return ResponseEntity.ok(authService.activate(request));
     }
 
     @Operation(summary = "Authenticate with CUI/DPI and password")
