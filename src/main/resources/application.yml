@@ -25,6 +25,12 @@ management:
       show-details: never
 
 dentalcare:
+  initial-admin:
+    enabled: ${INITIAL_ADMIN_ENABLED:false}
+    full-name: ${INITIAL_ADMIN_FULL_NAME:}
+    cui: ${INITIAL_ADMIN_CUI:}
+    email: ${INITIAL_ADMIN_EMAIL:}
+    password: ${INITIAL_ADMIN_PASSWORD:}
   cors:
     allowed-origin: ${FRONTEND_URL}
   jwt:

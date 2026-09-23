@@ -36,6 +36,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByCui(String cui);
 
+    boolean existsByRoles_Code(String code);
+
     @EntityGraph(attributePaths = "roles")
     @Query("""
             SELECT DISTINCT u FROM User u LEFT JOIN u.roles r

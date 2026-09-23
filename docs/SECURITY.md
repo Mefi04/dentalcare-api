@@ -245,6 +245,14 @@ Requires a Bearer access token. Success returns `200 OK` with the current user's
 
 Secrets must come from environment variables or an approved secret store. Never commit real keys, credentials, raw refresh tokens, or password material.
 
+## Initial administrator bootstrap
+
+On a new installation, the initial administrator can be created only during application startup. There is no HTTP endpoint for this operation. Set `INITIAL_ADMIN_ENABLED=true` together with `INITIAL_ADMIN_FULL_NAME`, `INITIAL_ADMIN_CUI`, `INITIAL_ADMIN_EMAIL`, and `INITIAL_ADMIN_PASSWORD`.
+
+The bootstrap locks the persisted `ADMINISTRATOR` role, checks whether a user is already associated with that role, and creates one active account only when none exists. Subsequent starts do not create or modify accounts. The persisted role must exist and be active; otherwise startup fails without disclosing secret values.
+
+After successful initialization, set `INITIAL_ADMIN_ENABLED=false` and remove the bootstrap credentials from the environment. The password is read only in memory for BCrypt encoding and is never logged or stored as plaintext.
+
 ## Implementation handoff for Issue #5
 
 Issue #5 should translate this conceptual model into persistence and Liquibase migrations without adding authentication behavior:
