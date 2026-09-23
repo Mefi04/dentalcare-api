@@ -1,6 +1,9 @@
 package com.dentalcare.api.modules.auth.service;
 
+import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.auth.dto.request.ActivateAccountRequest;
+import com.dentalcare.api.modules.auth.dto.response.ActivateAccountResponse;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
 import com.dentalcare.api.modules.auth.dto.response.UserResponse;
 import com.dentalcare.api.modules.auth.mapper.AuthUserMapper;
@@ -350,5 +353,123 @@ class AuthServiceImplTests {
         when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
         when(jwtService.createAccessToken(eq(user.getId()), anyList())).thenReturn("access-token");
         when(jwtService.getAccessTokenLifetimeSeconds()).thenReturn(1800L);
+    }
+
+    @Test
+    void activatePendingUserWithValidCredentialsSuccessfullyActivatesAccount() {
+        user.setStatus(UserStatus.PENDING_ACTIVATION);
+        user.setPasswordHash("temporary-hash");
+        when(userRepository.findByCuiForUpdate("1234567890123")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("TempSecret123!", "temporary-hash")).thenReturn(true);
+        when(passwordEncoder.encode("NewPermanentPassword123!")).thenReturn("new-bcrypt-hash");
+
+        ActivateAccountResponse response = service.activate(
+                new ActivateAccountRequest("1234567890123", "TempSecret123!", "NewPermanentPassword123!"));
+
+        assertThat(response.status()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(response.message()).isEqualTo("Account activated successfully");
+        assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(user.getPasswordHash()).isEqualTo("new-bcrypt-hash");
+        assertThat(user.getUpdatedAt()).isEqualTo(now);
+
+        verify(userRepository).findByCuiForUpdate("1234567890123");
+        verify(passwordEncoder).encode("NewPermanentPassword123!");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void activateTrimsCuiBeforeLookup() {
+        user.setStatus(UserStatus.PENDING_ACTIVATION);
+        user.setPasswordHash("temporary-hash");
+        when(userRepository.findByCuiForUpdate("1234567890123")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("TempSecret123!", "temporary-hash")).thenReturn(true);
+        when(passwordEncoder.encode("NewPermanentPassword123!")).thenReturn("new-bcrypt-hash");
+
+        service.activate(new ActivateAccountRequest("  1234567890123  ", "TempSecret123!", "NewPermanentPassword123!"));
+
+        verify(userRepository).findByCuiForUpdate("1234567890123");
+    }
+
+    @Test
+    void activateWithIncorrectTemporaryPasswordThrowsUnauthorizedAndDoesNotModifyUser() {
+        user.setStatus(UserStatus.PENDING_ACTIVATION);
+        user.setPasswordHash("temporary-hash");
+        when(userRepository.findByCuiForUpdate("1234567890123")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("WrongTempPassword", "temporary-hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.activate(
+                new ActivateAccountRequest("1234567890123", "WrongTempPassword", "NewPermanentPassword123!")))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("Invalid activation credentials");
+
+        assertThat(user.getStatus()).isEqualTo(UserStatus.PENDING_ACTIVATION);
+        assertThat(user.getPasswordHash()).isEqualTo("temporary-hash");
+        verify(passwordEncoder, never()).encode(any());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void activateNonExistentUserThrowsGenericUnauthorizedWithoutDisclosingAccountAbsence() {
+        when(userRepository.findByCuiForUpdate("9999999999999")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.activate(
+                new ActivateAccountRequest("9999999999999", "TempSecret123!", "NewPermanentPassword123!")))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("Invalid activation credentials");
+
+        verifyNoInteractions(passwordEncoder);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void activateRejectsNonPendingStatusesWithoutModifyingUser() {
+        for (UserStatus nonPendingStatus : List.of(UserStatus.ACTIVE, UserStatus.INACTIVE, UserStatus.LOCKED)) {
+            user.setStatus(nonPendingStatus);
+            user.setPasswordHash("original-hash");
+            when(userRepository.findByCuiForUpdate("1234567890123")).thenReturn(Optional.of(user));
+
+            assertThatThrownBy(() -> service.activate(
+                    new ActivateAccountRequest("1234567890123", "TempSecret123!", "NewPermanentPassword123!")))
+                    .isInstanceOf(UnauthorizedException.class)
+                    .hasMessage("Invalid activation credentials");
+
+            assertThat(user.getStatus()).isEqualTo(nonPendingStatus);
+            assertThat(user.getPasswordHash()).isEqualTo("original-hash");
+        }
+        verify(passwordEncoder, never()).encode(any());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void activateRejectsRepeatedActivationAttempts() {
+        user.setStatus(UserStatus.PENDING_ACTIVATION);
+        user.setPasswordHash("temporary-hash");
+        when(userRepository.findByCuiForUpdate("1234567890123")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("TempSecret123!", "temporary-hash")).thenReturn(true);
+        when(passwordEncoder.encode("NewPermanentPassword123!")).thenReturn("new-bcrypt-hash");
+
+        service.activate(new ActivateAccountRequest("1234567890123", "TempSecret123!", "NewPermanentPassword123!"));
+        assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+
+        assertThatThrownBy(() -> service.activate(
+                new ActivateAccountRequest("1234567890123", "TempSecret123!", "AnotherPassword123!")))
+                .isInstanceOf(UnauthorizedException.class)
+                .hasMessage("Invalid activation credentials");
+    }
+
+    @Test
+    void activateWithInvalidNewPasswordThrowsBadRequestAndDoesNotQueryRepository() {
+        assertThatThrownBy(() -> service.activate(
+                new ActivateAccountRequest("1234567890123", "TempSecret123!", "short")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("New password must be between 8 and 128 characters");
+
+        assertThatThrownBy(() -> service.activate(
+                new ActivateAccountRequest("1234567890123", "TempSecret123!", "   ")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("New password is required");
+
+        verifyNoInteractions(userRepository);
+        verifyNoInteractions(passwordEncoder);
     }
 }

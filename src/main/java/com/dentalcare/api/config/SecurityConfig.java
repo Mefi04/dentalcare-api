@@ -42,7 +42,8 @@ public class SecurityConfig {
                     authorize.requestMatchers(org.springframework.http.HttpMethod.POST,
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",
-                            "/api/v1/auth/logout").permitAll();
+                            "/api/v1/auth/logout",
+                            "/api/v1/auth/activate").permitAll();
                     authorize.requestMatchers("/actuator/health").permitAll();
                     if (openApiPublicAccess) {
                         authorize.requestMatchers(OPENAPI_ENDPOINTS).permitAll();

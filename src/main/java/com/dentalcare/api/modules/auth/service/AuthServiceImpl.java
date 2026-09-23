@@ -1,7 +1,9 @@
 package com.dentalcare.api.modules.auth.service;
 
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.auth.dto.request.ActivateAccountRequest;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
+import com.dentalcare.api.modules.auth.dto.response.ActivateAccountResponse;
 import com.dentalcare.api.modules.auth.dto.response.LoginResponse;
 import com.dentalcare.api.modules.auth.dto.response.RefreshResponse;
 import com.dentalcare.api.modules.auth.dto.response.UserResponse;
@@ -12,6 +14,7 @@ import com.dentalcare.api.modules.users.model.UserStatus;
 import com.dentalcare.api.modules.users.repository.UserRepository;
 import com.dentalcare.api.security.jwt.JwtProperties;
 import com.dentalcare.api.security.jwt.JwtService;
+import com.dentalcare.api.shared.validation.PasswordPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ public class AuthServiceImpl implements AuthService {
 
     private static final String INVALID_CREDENTIALS = "Invalid credentials";
     private static final String AUTH_REQUIRED = "Authentication is required";
+    private static final String INVALID_ACTIVATION_CREDENTIALS = "Invalid activation credentials";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -59,6 +63,27 @@ public class AuthServiceImpl implements AuthService {
                            RefreshTokenService refreshTokenService,
                            JwtProperties jwtProperties) {
         this(userRepository, passwordEncoder, jwtService, mapper, refreshTokenService, jwtProperties, Clock.systemUTC());
+    }
+
+    @Override
+    @Transactional
+    public ActivateAccountResponse activate(ActivateAccountRequest request) {
+        PasswordPolicy.validate(request.newPassword());
+        String cui = User.normalizeCui(request.cui());
+        User user = userRepository.findByCuiForUpdate(cui)
+                .orElseThrow(() -> new UnauthorizedException(INVALID_ACTIVATION_CREDENTIALS));
+
+        if (user.getStatus() != UserStatus.PENDING_ACTIVATION
+                || !passwordEncoder.matches(request.temporaryPassword(), user.getPasswordHash())) {
+            throw new UnauthorizedException(INVALID_ACTIVATION_CREDENTIALS);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setStatus(UserStatus.ACTIVE);
+        user.setUpdatedAt(clock.instant());
+        userRepository.save(user);
+
+        return new ActivateAccountResponse(UserStatus.ACTIVE, "Account activated successfully");
     }
 
     @Override

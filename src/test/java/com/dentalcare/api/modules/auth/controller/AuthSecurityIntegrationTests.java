@@ -3,7 +3,9 @@ package com.dentalcare.api.modules.auth.controller;
 import com.dentalcare.api.config.CorsConfig;
 import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.auth.dto.request.ActivateAccountRequest;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
+import com.dentalcare.api.modules.auth.dto.response.ActivateAccountResponse;
 import com.dentalcare.api.modules.auth.dto.response.LoginResponse;
 import com.dentalcare.api.modules.auth.dto.response.RefreshResponse;
 import com.dentalcare.api.modules.auth.dto.response.UserResponse;
@@ -198,5 +200,104 @@ class AuthSecurityIntegrationTests {
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("Max-Age=0")));
 
         verify(authService).logout(null);
+    }
+
+    @Test
+    void activateWithoutBearerTokenSucceedsAndDoesNotReturnTokensOrCookies() throws Exception {
+        ActivateAccountRequest request = new ActivateAccountRequest(
+                "1234567890123", "temp-secret", "NewPermanentPassword123!");
+        ActivateAccountResponse response = new ActivateAccountResponse(
+                UserStatus.ACTIVE, "Account activated successfully");
+
+        when(authService.activate(request)).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/auth/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cui": "1234567890123",
+                                  "temporaryPassword": "temp-secret",
+                                  "newPassword": "NewPermanentPassword123!"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.message").value("Account activated successfully"))
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        verify(authService).activate(request);
+    }
+
+    @Test
+    void activateRejectsCuiThatIsNotExactlyThirteenDigitsWith400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cui": "12345",
+                                  "temporaryPassword": "temp-secret",
+                                  "newPassword": "NewPermanentPassword123!"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.cui").value("CUI must contain exactly 13 digits"));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void activateRejectsBlankTemporaryPasswordWith400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cui": "1234567890123",
+                                  "temporaryPassword": "   ",
+                                  "newPassword": "NewPermanentPassword123!"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.temporaryPassword").value("Temporary password is required"));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void activateRejectsShortNewPasswordWith400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cui": "1234567890123",
+                                  "temporaryPassword": "temp-secret",
+                                  "newPassword": "short"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.newPassword").value("New password must be between 8 and 128 characters"));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void activateWithInvalidCredentialsReturnsGeneric401() throws Exception {
+        when(authService.activate(any()))
+                .thenThrow(new UnauthorizedException("Invalid activation credentials"));
+
+        mockMvc.perform(post("/api/v1/auth/activate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "cui": "1234567890123",
+                                  "temporaryPassword": "wrong-temp-password",
+                                  "newPassword": "NewPermanentPassword123!"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Invalid activation credentials"))
+                .andExpect(jsonPath("$.fieldErrors").isEmpty());
     }
 }
