@@ -103,7 +103,11 @@ public class PatientServiceImpl implements PatientService {
             throw new BadRequestException("Size must be at least 1");
         }
         Pageable pageable = PageRequest.of(page, Math.min(size, MAX_PAGE_SIZE));
-        return patientRepository.search(normalizeSearch(search), pageable).map(patientMapper::toResponse);
+        String normalizedSearch = normalizeSearch(search);
+        Page<Patient> patients = normalizedSearch == null
+                ? patientRepository.findAll(pageable)
+                : patientRepository.search(normalizedSearch, pageable);
+        return patients.map(patientMapper::toResponse);
     }
 
     @Override

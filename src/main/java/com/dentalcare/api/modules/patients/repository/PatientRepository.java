@@ -29,8 +29,7 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
 
     @Query("""
             SELECT p FROM Patient p
-            WHERE :search IS NULL
-               OR LOWER(p.code) LIKE LOWER(CONCAT('%', :search, '%'))
+            WHERE LOWER(p.code) LIKE LOWER(CONCAT('%', :search, '%'))
                OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
                OR p.dpi LIKE CONCAT('%', :search, '%')
                OR LOWER(p.phone) LIKE LOWER(CONCAT('%', :search, '%'))
