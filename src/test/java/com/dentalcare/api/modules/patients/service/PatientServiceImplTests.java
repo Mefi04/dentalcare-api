@@ -19,6 +19,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Clock;
@@ -246,6 +248,61 @@ class PatientServiceImplTests {
 
         assertThat(service.findCurrentPatient(userId).id()).isEqualTo(patient.getId());
         verify(patientRepository).findByUser_Id(userId);
+    }
+
+    @Test
+    void searchWithoutValueUsesFindAll() {
+        PageRequest pageable = PageRequest.of(0, 8);
+        when(patientRepository.findAll(pageable)).thenReturn(Page.empty(pageable));
+
+        service.search(0, 8, null);
+
+        verify(patientRepository).findAll(pageable);
+        verify(patientRepository, never()).search(any(), any());
+    }
+
+    @Test
+    void searchWithEmptyValueUsesFindAll() {
+        PageRequest pageable = PageRequest.of(0, 8);
+        when(patientRepository.findAll(pageable)).thenReturn(Page.empty(pageable));
+
+        service.search(0, 8, "");
+
+        verify(patientRepository).findAll(pageable);
+        verify(patientRepository, never()).search(any(), any());
+    }
+
+    @Test
+    void searchWithWhitespaceOnlyUsesFindAll() {
+        PageRequest pageable = PageRequest.of(0, 8);
+        when(patientRepository.findAll(pageable)).thenReturn(Page.empty(pageable));
+
+        service.search(0, 8, "   ");
+
+        verify(patientRepository).findAll(pageable);
+        verify(patientRepository, never()).search(any(), any());
+    }
+
+    @Test
+    void searchWithTextUsesCustomSearch() {
+        PageRequest pageable = PageRequest.of(0, 8);
+        when(patientRepository.search("Diego", pageable)).thenReturn(Page.empty(pageable));
+
+        service.search(0, 8, "  Diego  ");
+
+        verify(patientRepository).search("Diego", pageable);
+        verify(patientRepository, never()).findAll(any(PageRequest.class));
+    }
+
+    @Test
+    void searchWithSpacedDpiRemovesSpacesBeforeCustomSearch() {
+        PageRequest pageable = PageRequest.of(0, 8);
+        when(patientRepository.search("2987451200101", pageable)).thenReturn(Page.empty(pageable));
+
+        service.search(0, 8, "2987 45120 0101");
+
+        verify(patientRepository).search("2987451200101", pageable);
+        verify(patientRepository, never()).findAll(any(PageRequest.class));
     }
 
     private CreatePatientRequest createRequest(LocalDate birthDate, String dpi, String guardianName,
