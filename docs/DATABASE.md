@@ -134,6 +134,14 @@ Use PostgreSQL database constraints whenever possible:
 
 Do not rely exclusively on application-level validation.
 
+## Patient portal identity
+
+Patient portal accounts reuse the `users` table. `patients.user_id` is nullable for patients without portal access and is a unique foreign key to `users.id`, enforcing a one-to-zero-or-one relationship in both directions.
+
+`users.email` is nullable only at the persistence level so a patient account can be created without inventing an email address. The administrative contact email remains `patients.email`. The staff-user service and initial-administrator bootstrap continue to require a valid, unique email address; the database unique constraint remains in place for non-null email values.
+
+After a patient is linked to a user, their `dpi` must not change through the administrative patient update flow. This preserves the identity invariant `patients.dpi = users.cui`.
+
 ## Credentials & Environment Variables
 
 Database credentials must come exclusively from environment variables:

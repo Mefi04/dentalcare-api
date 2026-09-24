@@ -248,6 +248,14 @@ Requires a Bearer access token. Success returns `200 OK` with the current user's
 7. Atomically persist changes in a single transaction.
 8. Return activation confirmation without issuing any access or refresh tokens.
 
+### Patient portal access flow
+
+A patient portal account is an ordinary `User`; no parallel authentication model exists. An administrator creates access with `POST /api/v1/patients/{id}/access`. The operation locks the patient row, creates a `PENDING_ACTIVATION` user with only the persisted `PATIENT` role, and returns a cryptographically generated temporary password exactly once. Only its BCrypt hash is persisted.
+
+The patient uses their existing DPI as `User.cui` to activate through `POST /api/v1/auth/activate`, then signs in through the normal login endpoint. The established authority is `ROLE_PATIENT`; it does not grant administrative patient permissions. `GET /api/v1/patients/me` requires that role and resolves the profile only from the JWT user ID, never from a browser-supplied patient ID.
+
+Patient contact email remains separate administrative data in `patients.email`. A portal user may have a null `users.email`; staff users and the initial administrator must still supply a valid email. To preserve the identity link, a patient DPI cannot be changed after portal access has been created.
+
 ### Login flow
 
 1. Validate and normalize the 13-digit CUI.

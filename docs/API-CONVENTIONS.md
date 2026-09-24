@@ -128,6 +128,15 @@ Authentication uses `/api/v1/auth`. Detailed token, cookie, rotation, and sessio
 
 Successful access-token responses use `tokenType: "Bearer"` and `expiresIn: 1800` by default. Login additionally returns `user` with `id`, `username`, `email`, `status`, `roles`, and `permissions`. Refresh tokens never appear in JSON responses.
 
+## Patient portal endpoints
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `POST` | `/api/v1/patients/{id}/access` | `ROLE_ADMINISTRATOR` | `201 Created` | Creates one linked `PENDING_ACTIVATION` user with only role `PATIENT`; returns its temporary password once. A second creation request returns `409 Conflict`. |
+| `GET` | `/api/v1/patients/me` | `ROLE_PATIENT` | `200 OK` | Resolves the associated patient solely from the JWT principal. It neither accepts nor trusts a patient ID supplied by the client. |
+
+The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data.
+
 ## Pagination
 
 Large collections should support pagination where necessary.

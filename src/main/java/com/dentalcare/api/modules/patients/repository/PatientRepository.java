@@ -7,13 +7,22 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface PatientRepository extends JpaRepository<Patient, UUID> {
 
     boolean existsByDpi(String dpi);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Patient p WHERE p.id = :id")
+    Optional<Patient> findByIdForUpdate(@Param("id") UUID id);
+
+    Optional<Patient> findByUser_Id(UUID userId);
 
     @Query(value = "SELECT nextval('patient_code_seq')", nativeQuery = true)
     long nextPatientCodeSequence();

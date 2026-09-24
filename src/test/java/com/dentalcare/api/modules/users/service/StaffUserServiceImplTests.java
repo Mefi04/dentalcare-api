@@ -1,5 +1,6 @@
 package com.dentalcare.api.modules.users.service;
 
+import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.users.dto.request.CreateStaffUserRequest;
@@ -84,6 +85,11 @@ class StaffUserServiceImplTests {
         secretary.setActive(false);
         when(roles.findByCode("SECRETARY")).thenReturn(Optional.of(secretary));
         assertThatThrownBy(() -> service.create(request())).isInstanceOf(ConflictException.class).hasMessage("Role is inactive");
+    }
+
+    @Test void staffEmailRemainsRequiredWhenPatientAccountsAllowNullEmail() {
+        assertThatThrownBy(() -> service.create(new CreateStaffUserRequest("Laura", "1234567890123", null, "SECRETARY")))
+                .isInstanceOf(BadRequestException.class).hasMessage("Email must be valid");
     }
 
     @Test void searchDelegatesAllFiltersToRepositoryAndCapsPageSize() {

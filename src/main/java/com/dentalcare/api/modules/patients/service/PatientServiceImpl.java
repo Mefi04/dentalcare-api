@@ -6,38 +6,70 @@ import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
+import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
 import com.dentalcare.api.modules.patients.mapper.PatientMapper;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.users.model.Role;
+import com.dentalcare.api.modules.users.model.User;
+import com.dentalcare.api.modules.users.model.UserStatus;
+import com.dentalcare.api.modules.users.repository.RoleRepository;
+import com.dentalcare.api.modules.users.repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.beans.factory.annotation.Autowired;
 
+import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.UUID;
+import java.util.Set;
 
 @Service
 public class PatientServiceImpl implements PatientService {
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final String DUPLICATE_DPI_MESSAGE = "A patient with this DPI already exists";
+    private static final String PATIENT_ROLE = "PATIENT";
+    private static final int TEMPORARY_PASSWORD_LENGTH = 16;
+    private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
 
     private final PatientRepository patientRepository;
     private final PatientMapper patientMapper;
     private final PatientCodeGenerator patientCodeGenerator;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final SecureRandom secureRandom;
 
+    @Autowired
     public PatientServiceImpl(PatientRepository patientRepository, PatientMapper patientMapper,
-                              PatientCodeGenerator patientCodeGenerator, Clock clock) {
+                              PatientCodeGenerator patientCodeGenerator, UserRepository userRepository,
+                              RoleRepository roleRepository, PasswordEncoder passwordEncoder, Clock clock) {
+        this(patientRepository, patientMapper, patientCodeGenerator, userRepository, roleRepository, passwordEncoder,
+                clock, new SecureRandom());
+    }
+
+    PatientServiceImpl(PatientRepository patientRepository, PatientMapper patientMapper,
+                       PatientCodeGenerator patientCodeGenerator, UserRepository userRepository,
+                       RoleRepository roleRepository, PasswordEncoder passwordEncoder, Clock clock,
+                       SecureRandom secureRandom) {
         this.patientRepository = patientRepository;
         this.patientMapper = patientMapper;
         this.patientCodeGenerator = patientCodeGenerator;
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.passwordEncoder = passwordEncoder;
         this.clock = clock;
+        this.secureRandom = secureRandom;
     }
 
     @Override
@@ -82,10 +114,56 @@ public class PatientServiceImpl implements PatientService {
 
         patientMapper.updateEntity(patient, request);
         normalizeAndValidate(patient);
+        if (patient.getUser() != null && !patient.getDpi().equals(currentDpi)) {
+            throw new ConflictException("DPI cannot be changed after patient portal access has been created");
+        }
         ensureDpiIsAvailable(patient.getDpi(), currentDpi);
         patient.setUpdatedAt(clock.instant());
 
         return patientMapper.toResponse(savePatient(patient));
+    }
+
+    @Override
+    @Transactional
+    public CreatePatientAccessResponse createAccess(UUID patientId) {
+        Patient patient = patientRepository.findByIdForUpdate(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
+        if (patient.getUser() != null) {
+            throw new ConflictException("Patient already has portal access");
+        }
+        Role patientRole = roleRepository.findByCode(PATIENT_ROLE)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient role is not configured"));
+        if (!patientRole.isActive()) {
+            throw new ConflictException("Patient role is inactive");
+        }
+        if (userRepository.existsByCui(patient.getDpi())) {
+            throw new ConflictException("A user with this CUI already exists");
+        }
+
+        String temporaryPassword = generateTemporaryPassword();
+        Instant now = clock.instant();
+        User user = new User(UUID.randomUUID(), generateUsername(), patient.getName(), null, patient.getDpi(),
+                passwordEncoder.encode(temporaryPassword), UserStatus.PENDING_ACTIVATION, now, now);
+        user.setRoles(Set.of(patientRole));
+
+        try {
+            User savedUser = userRepository.saveAndFlush(user);
+            patient.setUser(savedUser);
+            patient.setUpdatedAt(now);
+            patientRepository.saveAndFlush(patient);
+            return new CreatePatientAccessResponse(patient.getId(), savedUser.getId(), savedUser.getUsername(),
+                    savedUser.getStatus(), temporaryPassword);
+        } catch (DataIntegrityViolationException exception) {
+            throw new ConflictException("Patient portal access conflicts with an existing account");
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PatientResponse findCurrentPatient(UUID authenticatedUserId) {
+        return patientRepository.findByUser_Id(authenticatedUserId)
+                .map(patientMapper::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
     }
 
     private Patient findPatient(UUID id) {
@@ -185,5 +263,21 @@ public class PatientServiceImpl implements PatientService {
             return value.replace(" ", "");
         }
         return value;
+    }
+
+    private String generateUsername() {
+        String username;
+        do {
+            username = "patient-" + UUID.randomUUID();
+        } while (userRepository.existsByUsername(username));
+        return username;
+    }
+
+    private String generateTemporaryPassword() {
+        StringBuilder password = new StringBuilder(TEMPORARY_PASSWORD_LENGTH);
+        for (int index = 0; index < TEMPORARY_PASSWORD_LENGTH; index++) {
+            password.append(PASSWORD_CHARS.charAt(secureRandom.nextInt(PASSWORD_CHARS.length())));
+        }
+        return password.toString();
     }
 }
