@@ -3,8 +3,10 @@ package com.dentalcare.api.modules.patients.controller;
 import com.dentalcare.api.config.CorsConfig;
 import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
+import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.service.PatientService;
+import com.dentalcare.api.modules.users.model.UserStatus;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
 import com.dentalcare.api.security.handler.RestAccessDeniedHandler;
 import com.dentalcare.api.security.handler.RestAuthenticationEntryPoint;
@@ -72,6 +74,51 @@ class PatientControllerSecurityTests {
                                 """))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    void currentPatientUsesJwtUserIdAndRequiresPatientRole() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        token("patient-token", userId, "ROLE_PATIENT");
+        when(patientService.findCurrentPatient(userId)).thenReturn(response(patientId));
+
+        mockMvc.perform(get("/api/v1/patients/me").header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(patientId.toString()));
+
+        verify(patientService).findCurrentPatient(userId);
+        mockMvc.perform(get("/api/v1/patients/me"))
+                .andExpect(status().isUnauthorized());
+        token("staff-token", UUID.randomUUID(), "ROLE_SECRETARY");
+        mockMvc.perform(get("/api/v1/patients/me").header("Authorization", "Bearer staff-token"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void portalAccessCreationRequiresAdministratorRole() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        mockMvc.perform(post("/api/v1/patients/{id}/access", patientId))
+                .andExpect(status().isUnauthorized());
+
+        token("patient-token", UUID.randomUUID(), "ROLE_PATIENT");
+        mockMvc.perform(post("/api/v1/patients/{id}/access", patientId)
+                        .header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isForbidden());
+
+        UUID administratorId = UUID.randomUUID();
+        token("administrator-token", administratorId, "ROLE_ADMINISTRATOR");
+        when(patientService.createAccess(patientId)).thenReturn(new CreatePatientAccessResponse(patientId,
+                UUID.randomUUID(), "patient-" + UUID.randomUUID(), UserStatus.PENDING_ACTIVATION, "temporary"));
+        mockMvc.perform(post("/api/v1/patients/{id}/access", patientId)
+                        .header("Authorization", "Bearer administrator-token"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING_ACTIVATION"));
+    }
+
+    private void token(String token, UUID userId, String... authorities) {
+        when(jwtService.parseAccessToken(token))
+                .thenReturn(new JwtService.AccessTokenClaims(userId, List.of(authorities)));
     }
 
     private PatientResponse response(UUID id) {

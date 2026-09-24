@@ -3,6 +3,7 @@ package com.dentalcare.api.modules.patients.service;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
+import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
 import org.springframework.data.domain.Page;
 
 import java.util.UUID;
@@ -16,4 +17,8 @@ public interface PatientService {
     Page<PatientResponse> search(int page, int size, String search);
 
     PatientResponse update(UUID id, UpdatePatientRequest request);
+
+    CreatePatientAccessResponse createAccess(UUID patientId);
+
+    PatientResponse findCurrentPatient(UUID authenticatedUserId);
 }

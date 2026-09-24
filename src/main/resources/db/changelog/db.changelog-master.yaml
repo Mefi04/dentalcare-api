@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/changes/003-add-users-cui.sql
   - include:
       file: db/changelog/changes/004-add-staff-user-management.sql
+  - include:
+      file: db/changelog/changes/005-add-patient-portal-access.sql

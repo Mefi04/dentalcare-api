@@ -4,8 +4,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import com.dentalcare.api.modules.users.model.User;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -28,6 +32,10 @@ public class Patient {
 
     @Column(name = "dpi", nullable = false, unique = true, length = 13)
     private String dpi;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", unique = true)
+    private User user;
 
     @Column(name = "birth_date", nullable = false)
     private LocalDate birthDate;
@@ -89,6 +97,8 @@ public class Patient {
     public void setName(String name) { this.name = name; }
     public String getDpi() { return dpi; }
     public void setDpi(String dpi) { this.dpi = dpi; }
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
     public LocalDate getBirthDate() { return birthDate; }
     public void setBirthDate(LocalDate birthDate) { this.birthDate = birthDate; }
     public Gender getGender() { return gender; }

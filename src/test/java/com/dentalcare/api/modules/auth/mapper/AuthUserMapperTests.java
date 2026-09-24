@@ -37,6 +37,15 @@ class AuthUserMapperTests {
         assertThat(response.permissions()).containsExactly("PATIENT_READ");
     }
 
+    @Test
+    void patientRoleProducesOnlyPatientJwtAuthorityWithoutAdministrativePermissions() {
+        User patient = userWithRoles(role("PATIENT", true, Set.of()));
+
+        assertThat(mapper.authorities(patient)).containsExactly("ROLE_PATIENT");
+        assertThat(mapper.toResponse(patient).roles()).containsExactly("PATIENT");
+        assertThat(mapper.toResponse(patient).permissions()).isEmpty();
+    }
+
     private static User userWithRoles(Role... roles) {
         User user = new User(UUID.randomUUID(), "user", "user@example.com", "1234567890123", "hash", UserStatus.ACTIVE,
                 Instant.now(), Instant.now());

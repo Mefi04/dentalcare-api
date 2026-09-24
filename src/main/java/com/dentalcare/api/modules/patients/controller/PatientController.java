@@ -3,13 +3,16 @@ package com.dentalcare.api.modules.patients.controller;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
+import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
 import com.dentalcare.api.modules.patients.service.PatientService;
+import com.dentalcare.api.security.service.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,6 +64,22 @@ public class PatientController {
     @PreAuthorize("hasAuthority('PATIENT_READ')")
     public ResponseEntity<PatientResponse> findById(@PathVariable UUID id) {
         return ResponseEntity.ok(patientService.findById(id));
+    }
+
+    @Operation(summary = "Create portal access for a patient")
+    @PostMapping("/{id}/access")
+    @PreAuthorize("hasRole('ADMINISTRATOR')")
+    public ResponseEntity<CreatePatientAccessResponse> createAccess(@PathVariable UUID id) {
+        CreatePatientAccessResponse response = patientService.createAccess(id);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
+        return ResponseEntity.created(location).body(response);
+    }
+
+    @Operation(summary = "Get the authenticated patient's profile")
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<PatientResponse> findCurrentPatient(@AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(patientService.findCurrentPatient(principal.userId()));
     }
 
     @Operation(summary = "Update a patient's administrative information")
