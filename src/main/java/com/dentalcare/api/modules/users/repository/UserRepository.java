@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -47,16 +48,18 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @EntityGraph(attributePaths = "roles")
     @Query("""
             SELECT DISTINCT u FROM User u LEFT JOIN u.roles r
-            WHERE (:search IS NULL
-                OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))
+            WHERE r.code IN :staffRoles
+              AND (CAST(:search AS string) IS NULL
+                OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(u.username) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
               AND (:status IS NULL OR u.status = :status)
               AND (:role IS NULL OR r.code = :role)
             """)
     Page<User> searchStaffUsers(@Param("search") String search,
                                 @Param("status") UserStatus status,
                                 @Param("role") String role,
+                                @Param("staffRoles") Set<String> staffRoles,
                                 Pageable pageable);
 
     @EntityGraph(attributePaths = "roles")

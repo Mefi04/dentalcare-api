@@ -93,11 +93,45 @@ class StaffUserServiceImplTests {
     }
 
     @Test void searchDelegatesAllFiltersToRepositoryAndCapsPageSize() {
-        when(users.searchStaffUsers(eq("laura"), eq(UserStatus.ACTIVE), eq("SECRETARY"), any()))
+        when(users.searchStaffUsers(eq("laura"), eq(UserStatus.ACTIVE), eq("SECRETARY"),
+                eq(StaffUserServiceImpl.OFFICIAL_ROLES), any()))
                 .thenReturn(new PageImpl<>(List.of()));
         service.search(1, 500, " laura ", UserStatus.ACTIVE, "secretary");
         verify(users).searchStaffUsers(eq("laura"), eq(UserStatus.ACTIVE), eq("SECRETARY"),
+                eq(StaffUserServiceImpl.OFFICIAL_ROLES),
                 argThat(page -> page.getPageNumber() == 1 && page.getPageSize() == 100));
+    }
+
+    @Test void patientRoleIsInvalidAsSearchFilter() {
+        assertThatThrownBy(() -> service.search(0, 20, null, null, "PATIENT"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Invalid role filter");
+        verifyNoInteractions(users);
+    }
+
+    @Test void findByIdTreatsPatientAsUnavailable() {
+        User patient = patient();
+        when(users.findWithRolesById(patient.getId())).thenReturn(Optional.of(patient));
+
+        assertThatThrownBy(() -> service.findById(patient.getId()))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("User not found");
+    }
+
+    @Test void findByIdReturnsStaffUser() {
+        User staff = user(UserStatus.ACTIVE);
+        when(users.findWithRolesById(staff.getId())).thenReturn(Optional.of(staff));
+
+        assertThat(service.findById(staff.getId()).id()).isEqualTo(staff.getId());
+    }
+
+    @Test void findByIdTreatsUnknownUserAsUnavailable() {
+        UUID id = UUID.randomUUID();
+        when(users.findWithRolesById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findById(id))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("User not found");
     }
 
     @Test void updateChangesOnlyEditableFields() {
@@ -117,6 +151,24 @@ class StaffUserServiceImplTests {
         assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
     }
 
+    @Test void updateRejectsPatientWithoutChangingData() {
+        User patient = patient();
+        String originalName = patient.getFullName();
+        String originalEmail = patient.getEmail();
+        Set<Role> originalRoles = patient.getRoles();
+        when(users.findWithRolesById(patient.getId())).thenReturn(Optional.of(patient));
+
+        assertThatThrownBy(() -> service.update(patient.getId(),
+                new UpdateStaffUserRequest("Changed", "changed@example.com", "DENTIST")))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("User not found");
+        assertThat(patient.getFullName()).isEqualTo(originalName);
+        assertThat(patient.getEmail()).isEqualTo(originalEmail);
+        assertThat(patient.getRoles()).isSameAs(originalRoles);
+        verify(users, never()).saveAndFlush(any());
+        verifyNoInteractions(roles);
+    }
+
     @Test void statusTransitionsWorkButPendingCannotBeActivated() {
         User user = user(UserStatus.ACTIVE);
         when(users.findWithRolesById(user.getId())).thenReturn(Optional.of(user));
@@ -134,6 +186,19 @@ class StaffUserServiceImplTests {
                 .isInstanceOf(ConflictException.class);
     }
 
+    @Test void statusUpdateRejectsPatientWithoutChangingStatus() {
+        User patient = patient();
+        UserStatus originalStatus = patient.getStatus();
+        when(users.findWithRolesById(patient.getId())).thenReturn(Optional.of(patient));
+
+        assertThatThrownBy(() -> service.updateStatus(patient.getId(),
+                new UpdateUserStatusRequest(UserStatus.INACTIVE)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("User not found");
+        assertThat(patient.getStatus()).isEqualTo(originalStatus);
+        verify(users, never()).saveAndFlush(any());
+    }
+
     @Test void activeRoleCatalogExcludesUnknownCodesDefensively() {
         Role invented = new Role(UUID.randomUUID(), "INVENTED", "Inventado", null, true);
         when(roles.findAllByActiveTrueOrderByNameAsc()).thenReturn(List.of(secretary, invented));
@@ -147,5 +212,12 @@ class StaffUserServiceImplTests {
         User u = new User(UUID.randomUUID(), "staff-" + UUID.randomUUID(), "Laura", "laura@dentalcare.gt",
                 "1234567890123", "hash", status, NOW.minusSeconds(10), NOW.minusSeconds(10));
         u.setRoles(Set.of(secretary)); return u;
+    }
+
+    private User patient() {
+        User patient = new User(UUID.randomUUID(), "patient-" + UUID.randomUUID(), "Patient", null,
+                "9876543210123", "hash", UserStatus.ACTIVE, NOW.minusSeconds(10), NOW.minusSeconds(10));
+        patient.setRoles(Set.of(new Role(UUID.randomUUID(), "PATIENT", "Paciente", null, true)));
+        return patient;
     }
 }

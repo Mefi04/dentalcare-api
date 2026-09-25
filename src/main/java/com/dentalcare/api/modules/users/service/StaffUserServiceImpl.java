@@ -85,7 +85,7 @@ public class StaffUserServiceImpl implements StaffUserService {
         if (size < 1) throw new BadRequestException("Size must be at least 1");
         String roleCode = optionalUpper(role);
         if (roleCode != null && !OFFICIAL_ROLES.contains(roleCode)) throw new BadRequestException("Invalid role filter");
-        return userRepository.searchStaffUsers(optional(search), status, roleCode,
+        return userRepository.searchStaffUsers(optional(search), status, roleCode, OFFICIAL_ROLES,
                 PageRequest.of(page, Math.min(size, MAX_PAGE_SIZE))).map(mapper::toResponse);
     }
 
@@ -136,8 +136,12 @@ public class StaffUserServiceImpl implements StaffUserService {
     }
 
     private User findUser(UUID id) {
-        return userRepository.findWithRolesById(id)
+        User user = userRepository.findWithRolesById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        if (user.getRoles().stream().noneMatch(role -> OFFICIAL_ROLES.contains(role.getCode()))) {
+            throw new ResourceNotFoundException("User not found");
+        }
+        return user;
     }
 
     private Role resolveActiveRole(String input) {
