@@ -2,8 +2,10 @@ package com.dentalcare.api.modules.patients.controller;
 
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
-import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientHealthResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientProfileResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.service.PatientService;
 import com.dentalcare.api.security.service.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,6 +61,32 @@ public class PatientController {
         return ResponseEntity.ok(patientService.search(page, size, search));
     }
 
+    @Operation(summary = "Get the authenticated patient's profile",
+            description = "Resolves identity strictly from the JWT principal. Requires ROLE_PATIENT.")
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<PatientResponse> findCurrentPatient(@AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(patientService.findCurrentPatient(principal.userId()));
+    }
+
+    @Operation(summary = "Get the authenticated patient's profile details",
+            description = "Returns masked DPI and profile data from authenticated patient. Requires ROLE_PATIENT.")
+    @GetMapping("/me/profile")
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<PatientProfileResponse> findCurrentPatientProfile(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(patientService.findCurrentPatientProfile(principal.userId()));
+    }
+
+    @Operation(summary = "Get the authenticated patient's health summary",
+            description = "Returns health summary for authenticated patient. Requires ROLE_PATIENT.")
+    @GetMapping("/me/health")
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<PatientHealthResponse> findCurrentPatientHealth(
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(patientService.findCurrentPatientHealth(principal.userId()));
+    }
+
     @Operation(summary = "Get a patient by id")
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('PATIENT_READ')")
@@ -73,13 +101,6 @@ public class PatientController {
         CreatePatientAccessResponse response = patientService.createAccess(id);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
         return ResponseEntity.created(location).body(response);
-    }
-
-    @Operation(summary = "Get the authenticated patient's profile")
-    @GetMapping("/me")
-    @PreAuthorize("hasRole('PATIENT')")
-    public ResponseEntity<PatientResponse> findCurrentPatient(@AuthenticationPrincipal AuthenticatedUser principal) {
-        return ResponseEntity.ok(patientService.findCurrentPatient(principal.userId()));
     }
 
     @Operation(summary = "Update a patient's administrative information")

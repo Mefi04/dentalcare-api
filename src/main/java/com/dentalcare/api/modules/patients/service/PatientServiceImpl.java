@@ -5,8 +5,10 @@ import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
-import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientHealthResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientProfileResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.mapper.PatientMapper;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
@@ -165,8 +167,23 @@ public class PatientServiceImpl implements PatientService {
     @Override
     @Transactional(readOnly = true)
     public PatientResponse findCurrentPatient(UUID authenticatedUserId) {
+        return patientMapper.toResponse(findPatientByAuthenticatedUser(authenticatedUserId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PatientProfileResponse findCurrentPatientProfile(UUID authenticatedUserId) {
+        return patientMapper.toProfileResponse(findPatientByAuthenticatedUser(authenticatedUserId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PatientHealthResponse findCurrentPatientHealth(UUID authenticatedUserId) {
+        return patientMapper.toHealthResponse(findPatientByAuthenticatedUser(authenticatedUserId));
+    }
+
+    private Patient findPatientByAuthenticatedUser(UUID authenticatedUserId) {
         return patientRepository.findByUser_Id(authenticatedUserId)
-                .map(patientMapper::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
     }
 

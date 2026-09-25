@@ -2,8 +2,10 @@ package com.dentalcare.api.modules.patients.service;
 
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
+import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
+import com.dentalcare.api.modules.patients.dto.response.PatientHealthStatus;
 import com.dentalcare.api.modules.patients.mapper.PatientMapper;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
@@ -248,6 +250,135 @@ class PatientServiceImplTests {
 
         assertThat(service.findCurrentPatient(userId).id()).isEqualTo(patient.getId());
         verify(patientRepository).findByUser_Id(userId);
+    }
+
+    @Test
+    void findCurrentPatientThrowsNotFoundWhenUserHasNoLinkedPatient() {
+        UUID userId = UUID.randomUUID();
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findCurrentPatient(userId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Patient not found");
+    }
+
+    @Test
+    void findCurrentPatientProfileReturnsMaskedDpiAndPatientData() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        patient.setEmail("paciente@example.com");
+        patient.setAddress("Ciudad de Guatemala");
+        patient.setEmergencyContact("Contacto Familiar");
+        patient.setEmergencyPhone("5555-4321");
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        var response = service.findCurrentPatientProfile(userId);
+
+        assertThat(response.fullName()).isEqualTo("Original Name");
+        assertThat(response.maskedDpi()).isEqualTo("*********0101");
+        assertThat(response.maskedDpi()).doesNotContain("298745120");
+        assertThat(response.birthDate()).isEqualTo(LocalDate.of(1990, 1, 1));
+        assertThat(response.phone()).isEqualTo("5555-0000");
+        assertThat(response.email()).isEqualTo("paciente@example.com");
+        assertThat(response.address()).isEqualTo("Ciudad de Guatemala");
+        assertThat(response.emergencyContact()).isNotNull();
+        assertThat(response.emergencyContact().name()).isEqualTo("Contacto Familiar");
+        assertThat(response.emergencyContact().phone()).isEqualTo("5555-4321");
+        assertThat(response.emergencyContact().relationship()).isNull();
+    }
+
+    @Test
+    void findCurrentPatientProfileLeavesOptionalFieldsNullWithoutFictionalStrings() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "1234567890123");
+        patient.setEmail(null);
+        patient.setAddress(null);
+        patient.setEmergencyContact(null);
+        patient.setEmergencyPhone(null);
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        var response = service.findCurrentPatientProfile(userId);
+
+        assertThat(response.fullName()).isEqualTo("Original Name");
+        assertThat(response.maskedDpi()).isEqualTo("*********0123");
+        assertThat(response.email()).isNull();
+        assertThat(response.address()).isNull();
+        assertThat(response.emergencyContact()).isNull();
+    }
+
+    @Test
+    void findCurrentPatientProfileThrowsNotFoundWhenUserHasNoLinkedPatient() {
+        UUID userId = UUID.randomUUID();
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findCurrentPatientProfile(userId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Patient not found");
+    }
+
+    @Test
+    void findCurrentPatientHealthResolvesAssociatedPatientAndReturnsEmptyClinicalState() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        var response = service.findCurrentPatientHealth(userId);
+
+        assertThat(response.allergies()).isEmpty();
+        assertThat(response.currentMedications()).isEmpty();
+        assertThat(response.relevantConditions()).isEmpty();
+        assertThat(response.recentChanges()).isEmpty();
+        assertThat(response.observations()).isNull();
+        assertThat(response.lastUpdated()).isNull();
+        assertThat(response.status()).isEqualTo(PatientHealthStatus.EMPTY);
+        verify(patientRepository).findByUser_Id(userId);
+    }
+
+    @Test
+    void findCurrentPatientHealthThrowsNotFoundWhenUserHasNoLinkedPatient() {
+        UUID userId = UUID.randomUUID();
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findCurrentPatientHealth(userId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Patient not found");
+    }
+
+    @Test
+    void twoPatientsRetrieveOnlyTheirOwnProfileAndHealthIsolatedByUserId() {
+        UUID userIdA = UUID.randomUUID();
+        UUID userIdB = UUID.randomUUID();
+
+        Patient patientA = existingPatient(UUID.randomUUID(), "2987451200101");
+        patientA.setName("Paciente A");
+        patientA.setEmail("pacienteA@example.com");
+
+        Patient patientB = existingPatient(UUID.randomUUID(), "1234567890123");
+        patientB.setName("Paciente B");
+        patientB.setEmail("pacienteB@example.com");
+
+        when(patientRepository.findByUser_Id(userIdA)).thenReturn(Optional.of(patientA));
+        when(patientRepository.findByUser_Id(userIdB)).thenReturn(Optional.of(patientB));
+
+        var profileA = service.findCurrentPatientProfile(userIdA);
+        var profileB = service.findCurrentPatientProfile(userIdB);
+
+        assertThat(profileA.fullName()).isEqualTo("Paciente A");
+        assertThat(profileA.maskedDpi()).isEqualTo("*********0101");
+        assertThat(profileA.email()).isEqualTo("pacienteA@example.com");
+
+        assertThat(profileB.fullName()).isEqualTo("Paciente B");
+        assertThat(profileB.maskedDpi()).isEqualTo("*********0123");
+        assertThat(profileB.email()).isEqualTo("pacienteB@example.com");
+
+        var healthA = service.findCurrentPatientHealth(userIdA);
+        var healthB = service.findCurrentPatientHealth(userIdB);
+
+        assertThat(healthA.status()).isEqualTo(PatientHealthStatus.EMPTY);
+        assertThat(healthB.status()).isEqualTo(PatientHealthStatus.EMPTY);
+
+        verify(patientRepository, times(2)).findByUser_Id(userIdA);
+        verify(patientRepository, times(2)).findByUser_Id(userIdB);
     }
 
     @Test

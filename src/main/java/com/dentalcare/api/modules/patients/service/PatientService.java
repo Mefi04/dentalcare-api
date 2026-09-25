@@ -2,8 +2,10 @@ package com.dentalcare.api.modules.patients.service;
 
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
-import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientHealthResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientProfileResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import org.springframework.data.domain.Page;
 
 import java.util.UUID;
@@ -21,4 +23,8 @@ public interface PatientService {
     CreatePatientAccessResponse createAccess(UUID patientId);
 
     PatientResponse findCurrentPatient(UUID authenticatedUserId);
+
+    PatientProfileResponse findCurrentPatientProfile(UUID authenticatedUserId);
+
+    PatientHealthResponse findCurrentPatientHealth(UUID authenticatedUserId);
 }

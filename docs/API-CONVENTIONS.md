@@ -134,8 +134,28 @@ Successful access-token responses use `tokenType: "Bearer"` and `expiresIn: 1800
 |---|---|---|---|---|
 | `POST` | `/api/v1/patients/{id}/access` | `ROLE_ADMINISTRATOR` | `201 Created` | Creates one linked `PENDING_ACTIVATION` user with only role `PATIENT`; returns its temporary password once. A second creation request returns `409 Conflict`. |
 | `GET` | `/api/v1/patients/me` | `ROLE_PATIENT` | `200 OK` | Resolves the associated patient solely from the JWT principal. It neither accepts nor trusts a patient ID supplied by the client. |
+| `GET` | `/api/v1/patients/me/profile` | `ROLE_PATIENT` | `200 OK` | Returns `PatientProfileResponse` with personal details and a masked DPI (`*********XXXX`). Identity resolved solely from JWT principal. |
+| `GET` | `/api/v1/patients/me/health` | `ROLE_PATIENT` | `200 OK` | Returns `PatientHealthResponse` representing the patient's health summary (`EMPTY` status until clinical persistence models are implemented). Identity resolved solely from JWT principal. |
 
 The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data.
+
+`/patients/me/profile` returns:
+- `fullName`: patient full name.
+- `maskedDpi`: 13-digit DPI with only the last 4 digits visible (`*********XXXX`).
+- `birthDate`: ISO-8601 date (`YYYY-MM-DD`).
+- `phone`: patient phone.
+- `email`: patient contact email (nullable).
+- `address`: patient physical address (nullable).
+- `emergencyContact`: nested object with `name`, `phone`, and `relationship: null` (nullable if no emergency contact details exist).
+
+`/patients/me/health` returns:
+- `allergies`: list of allergies (currently empty list `[]`).
+- `currentMedications`: list of medications (currently empty list `[]`).
+- `relevantConditions`: list of conditions (currently empty list `[]`).
+- `recentChanges`: list of changes (currently empty list `[]`).
+- `observations`: clinical observations (`null`).
+- `lastUpdated`: timestamp of medical record update (`null`, never using administrative `patient.updatedAt`).
+- `status`: `EMPTY` (valid domain representation for absent clinical records).
 
 ## Pagination
 

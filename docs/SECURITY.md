@@ -256,6 +256,21 @@ The patient uses their existing DPI as `User.cui` to activate through `POST /api
 
 Patient contact email remains separate administrative data in `patients.email`. A portal user may have a null `users.email`; staff users and the initial administrator must still supply a valid email. To preserve the identity link, a patient DPI cannot be changed after portal access has been created.
 
+### Patient portal self-service flow
+
+Patient self-service endpoints enable authenticated patients to inspect their own identity, profile details, and health summary:
+
+- `GET /api/v1/patients/me`: Returns the basic administrative identity (`PatientResponse`).
+- `GET /api/v1/patients/me/profile`: Returns personal contact and identity details with a masked DPI (`PatientProfileResponse`).
+- `GET /api/v1/patients/me/health`: Returns the patient's health summary (`PatientHealthResponse`), currently returning an empty state (`status = EMPTY`) because the clinical domain remains to be implemented.
+
+Security and authorization rules:
+1. **Identity resolution authority**: The backend is the sole authority for identifying the patient. Identity is resolved exclusively via `JWT` → `AuthenticatedUser.userId()` → `PatientRepository.findByUser_Id(userId)`.
+2. **Strict prohibition of client-supplied identifiers**: No self-service endpoint accepts or trusts `patientId`, `userId`, `dpi`, `cui`, or any identity parameter via path or query parameters. This eliminates IDOR and horizontal privilege escalation.
+3. **Role requirement**: All self-service endpoints require `ROLE_PATIENT` enforced via `@PreAuthorize("hasRole('PATIENT')")`. Staff roles (`ADMINISTRATOR`, `SECRETARY`, `DENTIST`, `ASSISTANT`, `CASHIER`) receive `403 Forbidden`. Requests without valid authentication receive `401 Unauthorized`.
+4. **Data protection and minimal exposure**: The `/me/profile` response exposes only the last four digits of the DPI (`*********XXXX`) and excludes sensitive administrative and user credentials (such as passwords, internal identifiers, billing tax IDs, or audit stamps).
+5. **Accurate semantics**: In `/me/health`, `lastUpdated` is `null` (not derived from `Patient.updatedAt`), and no fictional clinical data is returned until persistence models for allergies, medications, and conditions are implemented in future issues.
+
 ### Login flow
 
 1. Validate and normalize the 13-digit CUI.
