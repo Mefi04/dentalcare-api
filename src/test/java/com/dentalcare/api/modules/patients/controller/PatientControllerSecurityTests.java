@@ -2,8 +2,14 @@ package com.dentalcare.api.modules.patients.controller;
 
 import com.dentalcare.api.config.CorsConfig;
 import com.dentalcare.api.config.SecurityConfig;
-import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
+import com.dentalcare.api.exception.GlobalExceptionHandler;
+import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientEmergencyContactResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientHealthResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientHealthStatus;
+import com.dentalcare.api.modules.patients.dto.response.PatientProfileResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.service.PatientService;
 import com.dentalcare.api.modules.users.model.UserStatus;
@@ -24,6 +30,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -33,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = PatientController.class, properties = "FRONTEND_URL=http://localhost:3000")
 @Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
-        RestAccessDeniedHandler.class})
+        RestAccessDeniedHandler.class, GlobalExceptionHandler.class})
 class PatientControllerSecurityTests {
 
     @Autowired
@@ -88,11 +96,156 @@ class PatientControllerSecurityTests {
                 .andExpect(jsonPath("$.id").value(patientId.toString()));
 
         verify(patientService).findCurrentPatient(userId);
+
         mockMvc.perform(get("/api/v1/patients/me"))
                 .andExpect(status().isUnauthorized());
+
         token("staff-token", UUID.randomUUID(), "ROLE_SECRETARY");
         mockMvc.perform(get("/api/v1/patients/me").header("Authorization", "Bearer staff-token"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void currentPatientProfileUsesJwtUserIdAndRequiresPatientRole() throws Exception {
+        UUID userId = UUID.randomUUID();
+        token("patient-token", userId, "ROLE_PATIENT");
+        when(patientService.findCurrentPatientProfile(userId)).thenReturn(profileResponse("Maria Perez", "*********0101"));
+
+        mockMvc.perform(get("/api/v1/patients/me/profile").header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Maria Perez"))
+                .andExpect(jsonPath("$.maskedDpi").value("*********0101"))
+                .andExpect(jsonPath("$.birthDate").value("1990-01-01"))
+                .andExpect(jsonPath("$.phone").value("5555-1234"))
+                .andExpect(jsonPath("$.email").value("paciente@example.com"))
+                .andExpect(jsonPath("$.address").value("Ciudad de Guatemala"))
+                .andExpect(jsonPath("$.emergencyContact.name").value("Contacto Emergencia"))
+                .andExpect(jsonPath("$.emergencyContact.phone").value("5555-9876"))
+                .andExpect(jsonPath("$.emergencyContact.relationship").value(nullValue()));
+
+        verify(patientService).findCurrentPatientProfile(userId);
+
+        mockMvc.perform(get("/api/v1/patients/me/profile"))
+                .andExpect(status().isUnauthorized());
+
+        for (String role : List.of("ROLE_SECRETARY", "ROLE_ADMINISTRATOR", "ROLE_DENTIST", "ROLE_ASSISTANT", "ROLE_CASHIER")) {
+            token("staff-" + role, UUID.randomUUID(), role);
+            mockMvc.perform(get("/api/v1/patients/me/profile").header("Authorization", "Bearer staff-" + role))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void currentPatientHealthUsesJwtUserIdAndRequiresPatientRole() throws Exception {
+        UUID userId = UUID.randomUUID();
+        token("patient-token", userId, "ROLE_PATIENT");
+        when(patientService.findCurrentPatientHealth(userId)).thenReturn(healthResponse());
+
+        mockMvc.perform(get("/api/v1/patients/me/health").header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allergies", empty()))
+                .andExpect(jsonPath("$.currentMedications", empty()))
+                .andExpect(jsonPath("$.relevantConditions", empty()))
+                .andExpect(jsonPath("$.recentChanges", empty()))
+                .andExpect(jsonPath("$.observations").value(nullValue()))
+                .andExpect(jsonPath("$.lastUpdated").value(nullValue()))
+                .andExpect(jsonPath("$.status").value("EMPTY"));
+
+        verify(patientService).findCurrentPatientHealth(userId);
+
+        mockMvc.perform(get("/api/v1/patients/me/health"))
+                .andExpect(status().isUnauthorized());
+
+        for (String role : List.of("ROLE_SECRETARY", "ROLE_ADMINISTRATOR", "ROLE_DENTIST", "ROLE_ASSISTANT", "ROLE_CASHIER")) {
+            token("staff-" + role, UUID.randomUUID(), role);
+            mockMvc.perform(get("/api/v1/patients/me/health").header("Authorization", "Bearer staff-" + role))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void routesMeProfileAndHealthDoNotConflictWithFindById() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        token("patient-token", userId, "ROLE_PATIENT");
+        when(patientService.findCurrentPatient(userId)).thenReturn(response(patientId));
+        when(patientService.findCurrentPatientProfile(userId)).thenReturn(profileResponse("Test", "*********1234"));
+        when(patientService.findCurrentPatientHealth(userId)).thenReturn(healthResponse());
+
+        mockMvc.perform(get("/api/v1/patients/me").header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/patients/me/profile").header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/patients/me/health").header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk());
+
+        token("read-token", UUID.randomUUID(), "PATIENT_READ");
+        when(patientService.findById(patientId)).thenReturn(response(patientId));
+        mockMvc.perform(get("/api/v1/patients/{id}", patientId).header("Authorization", "Bearer read-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(patientId.toString()));
+    }
+
+    @Test
+    void twoPatientsRetrieveOnlyTheirOwnProfileAndHealthIsolatedByJwt() throws Exception {
+        UUID userIdA = UUID.randomUUID();
+        UUID userIdB = UUID.randomUUID();
+
+        token("token-a", userIdA, "ROLE_PATIENT");
+        token("token-b", userIdB, "ROLE_PATIENT");
+
+        when(patientService.findCurrentPatientProfile(userIdA)).thenReturn(profileResponse("Paciente A", "*********0001"));
+        when(patientService.findCurrentPatientProfile(userIdB)).thenReturn(profileResponse("Paciente B", "*********0002"));
+        when(patientService.findCurrentPatientHealth(userIdA)).thenReturn(healthResponse());
+        when(patientService.findCurrentPatientHealth(userIdB)).thenReturn(healthResponse());
+
+        mockMvc.perform(get("/api/v1/patients/me/profile?patientId=" + UUID.randomUUID())
+                        .header("Authorization", "Bearer token-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Paciente A"))
+                .andExpect(jsonPath("$.maskedDpi").value("*********0001"));
+
+        mockMvc.perform(get("/api/v1/patients/me/profile")
+                        .header("Authorization", "Bearer token-b"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Paciente B"))
+                .andExpect(jsonPath("$.maskedDpi").value("*********0002"));
+
+        mockMvc.perform(get("/api/v1/patients/me/health")
+                        .header("Authorization", "Bearer token-a"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/patients/me/health")
+                        .header("Authorization", "Bearer token-b"))
+                .andExpect(status().isOk());
+
+        verify(patientService).findCurrentPatientProfile(userIdA);
+        verify(patientService).findCurrentPatientProfile(userIdB);
+        verify(patientService).findCurrentPatientHealth(userIdA);
+        verify(patientService).findCurrentPatientHealth(userIdB);
+    }
+
+    @Test
+    void currentPatientProfileAndHealthReturnNotFoundWhenUserHasNoLinkedPatient() throws Exception {
+        UUID userId = UUID.randomUUID();
+        token("patient-token", userId, "ROLE_PATIENT");
+
+        when(patientService.findCurrentPatientProfile(userId))
+                .thenThrow(new ResourceNotFoundException("Patient not found"));
+        when(patientService.findCurrentPatientHealth(userId))
+                .thenThrow(new ResourceNotFoundException("Patient not found"));
+
+        mockMvc.perform(get("/api/v1/patients/me/profile").header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Patient not found"));
+
+        mockMvc.perform(get("/api/v1/patients/me/health").header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Patient not found"));
     }
 
     @Test
@@ -126,5 +279,27 @@ class PatientControllerSecurityTests {
         return new PatientResponse(id, "PAC-00001", "Maria Perez", "2987451200101", LocalDate.of(1990, 1, 1),
                 Gender.FEMALE, "5555-1234", null, null, null, null, null, "Maria Perez", "CF", null,
                 null, null, null, now, now);
+    }
+
+    private PatientProfileResponse profileResponse(String fullName, String maskedDpi) {
+        return new PatientProfileResponse(
+                fullName,
+                maskedDpi,
+                LocalDate.of(1990, 1, 1),
+                "5555-1234",
+                "paciente@example.com",
+                "Ciudad de Guatemala",
+                new PatientEmergencyContactResponse("Contacto Emergencia", "5555-9876", null));
+    }
+
+    private PatientHealthResponse healthResponse() {
+        return new PatientHealthResponse(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                null,
+                null,
+                PatientHealthStatus.EMPTY);
     }
 }
