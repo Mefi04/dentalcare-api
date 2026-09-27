@@ -2,17 +2,21 @@ package com.dentalcare.api.modules.appointments.service;
 
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentProfessionalResponse;
 import com.dentalcare.api.modules.appointments.dto.response.PatientAppointmentResponse;
 import com.dentalcare.api.modules.appointments.mapper.AppointmentMapper;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.users.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -24,13 +28,19 @@ public class PatientAppointmentServiceImpl implements PatientAppointmentService 
     private final AppointmentRepository appointmentRepository;
     private final PatientRepository patientRepository;
     private final AppointmentMapper appointmentMapper;
+    private final AppointmentService appointmentService;
+    private final UserRepository userRepository;
 
     public PatientAppointmentServiceImpl(AppointmentRepository appointmentRepository,
                                          PatientRepository patientRepository,
-                                         AppointmentMapper appointmentMapper) {
+                                         AppointmentMapper appointmentMapper,
+                                         AppointmentService appointmentService,
+                                         UserRepository userRepository) {
         this.appointmentRepository = appointmentRepository;
         this.patientRepository = patientRepository;
         this.appointmentMapper = appointmentMapper;
+        this.appointmentService = appointmentService;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -55,6 +65,23 @@ public class PatientAppointmentServiceImpl implements PatientAppointmentService 
         return appointmentRepository.findByIdAndPatient_Id(appointmentId, patient.getId())
                 .map(appointmentMapper::toPatientResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+    }
+
+    @Override
+    @Transactional
+    public PatientAppointmentResponse createCurrentPatientAppointment(
+            UUID authenticatedUserId, UUID professionalId, Instant scheduledAt) {
+        Patient patient = findPatientByAuthenticatedUser(authenticatedUserId);
+        return appointmentMapper.toPatientResponse(
+                appointmentService.create(patient.getId(), professionalId, scheduledAt));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AppointmentProfessionalResponse> findAvailableProfessionals() {
+        return userRepository.findActiveDentists().stream()
+                .map(appointmentMapper::toProfessionalResponse)
+                .toList();
     }
 
     private Patient findPatientByAuthenticatedUser(UUID authenticatedUserId) {

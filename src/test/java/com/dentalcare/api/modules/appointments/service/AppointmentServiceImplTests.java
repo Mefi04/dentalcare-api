@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -125,6 +126,41 @@ class AppointmentServiceImplTests {
                 .isInstanceOf(BadRequestException.class).hasMessage("Professional id is required");
         assertThatThrownBy(() -> service.create(patient.getId(), dentist.getId(), null))
                 .isInstanceOf(BadRequestException.class).hasMessage("Appointment date and time are required");
+    }
+
+    @Test
+    void rejectsPastOrCurrentAppointmentTime() {
+        assertThatThrownBy(() -> service.create(patient.getId(), dentist.getId(), NOW.minusSeconds(1)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Appointment date and time must be in the future");
+        assertThatThrownBy(() -> service.create(patient.getId(), dentist.getId(), NOW))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Appointment date and time must be in the future");
+        verify(patients, never()).findById(any());
+    }
+
+    @Test
+    void rejectsExistingScheduledCollision() {
+        when(patients.findById(patient.getId())).thenReturn(Optional.of(patient));
+        when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(dentist));
+        when(appointments.existsByProfessional_IdAndScheduledAtAndStatus(
+                dentist.getId(), SCHEDULED_AT, AppointmentStatus.SCHEDULED)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.create(patient.getId(), dentist.getId(), SCHEDULED_AT))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Appointment time is not available");
+        verify(appointments, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void translatesDatabaseCollisionWithoutLeakingSqlDetails() {
+        when(patients.findById(patient.getId())).thenReturn(Optional.of(patient));
+        when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(dentist));
+        when(appointments.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("constraint details"));
+
+        assertThatThrownBy(() -> service.create(patient.getId(), dentist.getId(), SCHEDULED_AT))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Appointment time is not available");
     }
 
     @Test

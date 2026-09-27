@@ -44,12 +44,19 @@ public class AppointmentServiceImpl implements AppointmentService {
         if (patientId == null) throw new BadRequestException("Patient id is required");
         if (professionalId == null) throw new BadRequestException("Professional id is required");
         if (scheduledAt == null) throw new BadRequestException("Appointment date and time are required");
+        if (!scheduledAt.isAfter(clock.instant())) {
+            throw new BadRequestException("Appointment date and time must be in the future");
+        }
 
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
         User professional = userRepository.findWithRolesById(professionalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Professional not found"));
         validateDentist(professional);
+        if (appointmentRepository.existsByProfessional_IdAndScheduledAtAndStatus(
+                professionalId, scheduledAt, AppointmentStatus.SCHEDULED)) {
+            throw new ConflictException("Appointment time is not available");
+        }
 
         Instant now = clock.instant();
         Appointment appointment = new Appointment(UUID.randomUUID(), patient, professional, scheduledAt,
@@ -57,7 +64,7 @@ public class AppointmentServiceImpl implements AppointmentService {
         try {
             return appointmentRepository.saveAndFlush(appointment);
         } catch (DataIntegrityViolationException exception) {
-            throw new ConflictException("Appointment data conflicts with existing records");
+            throw new ConflictException("Appointment time is not available");
         }
     }
 

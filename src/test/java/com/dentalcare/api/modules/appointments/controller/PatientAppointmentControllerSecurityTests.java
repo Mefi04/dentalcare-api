@@ -8,9 +8,11 @@ import com.dentalcare.api.modules.appointments.model.Appointment;
 import com.dentalcare.api.modules.appointments.model.AppointmentStatus;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
 import com.dentalcare.api.modules.appointments.service.PatientAppointmentServiceImpl;
+import com.dentalcare.api.modules.appointments.service.AppointmentService;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.users.model.User;
+import com.dentalcare.api.modules.users.repository.UserRepository;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
 import com.dentalcare.api.security.handler.RestAccessDeniedHandler;
 import com.dentalcare.api.security.handler.RestAuthenticationEntryPoint;
@@ -34,6 +36,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,6 +49,8 @@ class PatientAppointmentControllerSecurityTests {
     @MockitoBean JwtService jwtService;
     @MockitoBean PatientRepository patients;
     @MockitoBean AppointmentRepository appointments;
+    @MockitoBean AppointmentService appointmentService;
+    @MockitoBean UserRepository users;
 
     private UUID userId;
     private Patient patient;
@@ -118,6 +123,85 @@ class PatientAppointmentControllerSecurityTests {
         mockMvc.perform(get("/api/v1/patients/me/appointments")
                         .header("Authorization", "Bearer staff-token"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void patientCreatesAppointmentFromJwtIdentityAndCannotSelectPatientId() throws Exception {
+        UUID attackerSuppliedPatientId = UUID.randomUUID();
+        patientToken("patient-token", userId);
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(appointmentService.create(patient.getId(), appointment.getProfessional().getId(),
+                appointment.getScheduledAt())).thenReturn(appointment);
+
+        mockMvc.perform(post("/api/v1/patients/me/appointments")
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "patientId": "%s",
+                                  "professionalId": "%s",
+                                  "scheduledAt": "%s"
+                                }
+                                """.formatted(attackerSuppliedPatientId,
+                                appointment.getProfessional().getId(), appointment.getScheduledAt())))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(appointment.getId().toString()))
+                .andExpect(jsonPath("$.status").value("SCHEDULED"));
+
+        verify(appointmentService).create(
+                patient.getId(), appointment.getProfessional().getId(), appointment.getScheduledAt());
+    }
+
+    @Test
+    void createAndProfessionalCatalogRequirePatientRole() throws Exception {
+        String body = """
+                {"professionalId":"%s","scheduledAt":"%s"}
+                """.formatted(appointment.getProfessional().getId(), appointment.getScheduledAt());
+
+        mockMvc.perform(post("/api/v1/patients/me/appointments")
+                        .contentType("application/json").content(body))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/v1/patients/me/appointments/professionals"))
+                .andExpect(status().isUnauthorized());
+
+        when(jwtService.parseAccessToken("staff-token"))
+                .thenReturn(new JwtService.AccessTokenClaims(UUID.randomUUID(), List.of("ROLE_SECRETARY")));
+        mockMvc.perform(post("/api/v1/patients/me/appointments")
+                        .header("Authorization", "Bearer staff-token")
+                        .contentType("application/json").content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/patients/me/appointments/professionals")
+                        .header("Authorization", "Bearer staff-token"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void patientGetsMinimalProfessionalCatalog() throws Exception {
+        User dentist = appointment.getProfessional();
+        dentist.setEmail("private@example.test");
+        dentist.setPasswordHash("secret-hash");
+        patientToken("patient-token", userId);
+        when(users.findActiveDentists()).thenReturn(List.of(dentist));
+
+        mockMvc.perform(get("/api/v1/patients/me/appointments/professionals")
+                        .header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(dentist.getId().toString()))
+                .andExpect(jsonPath("$[0].fullName").value("Dra. Ana López"))
+                .andExpect(jsonPath("$[0].email").doesNotExist())
+                .andExpect(jsonPath("$[0].passwordHash").doesNotExist())
+                .andExpect(jsonPath("$[0].roles").doesNotExist());
+    }
+
+    @Test
+    void createValidatesRequiredFields() throws Exception {
+        patientToken("patient-token", userId);
+        mockMvc.perform(post("/api/v1/patients/me/appointments")
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.professionalId").value("Professional id is required"))
+                .andExpect(jsonPath("$.fieldErrors.scheduledAt").value("Appointment date and time are required"));
     }
 
     private void patientToken(String token, UUID id) {

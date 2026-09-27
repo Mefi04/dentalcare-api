@@ -137,6 +137,57 @@ class AppointmentRepositoryIntegrationTests {
                 .isPresent();
     }
 
+    @Test
+    void postgresRejectsTwoScheduledAppointmentsForSameProfessionalAndInstant() {
+        appointments.saveAndFlush(appointment(patient, SCHEDULED_AT));
+
+        assertThatThrownBy(() -> appointments.saveAndFlush(appointment(patient, SCHEDULED_AT)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void cancelledAppointmentDoesNotBlockScheduledAppointmentAtSameInstant() {
+        Appointment cancelled = new Appointment(UUID.randomUUID(), patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.CANCELLED, NOW, NOW);
+        Appointment scheduled = appointment(patient, SCHEDULED_AT);
+
+        appointments.saveAllAndFlush(Set.of(cancelled, scheduled));
+
+        assertThat(appointments.findById(cancelled.getId())).isPresent();
+        assertThat(appointments.findById(scheduled.getId())).isPresent();
+    }
+
+    @Test
+    void differentProfessionalsCanBeScheduledAtSameInstant() {
+        Role dentistRole = roles.findByCode("DENTIST").orElseThrow();
+        User otherDentist = users.save(user(dentistRole, "2000000000004"));
+
+        appointments.saveAllAndFlush(Set.of(
+                appointment(patient, SCHEDULED_AT),
+                new Appointment(UUID.randomUUID(), patient, otherDentist, SCHEDULED_AT,
+                        AppointmentStatus.SCHEDULED, NOW, NOW)));
+
+        assertThat(appointments.count()).isEqualTo(2);
+    }
+
+    @Test
+    void activeDentistCatalogExcludesInactiveUsersAndInactiveRoles() {
+        Role dentistRole = roles.findByCode("DENTIST").orElseThrow();
+        assertThat(users.findActiveDentists()).extracting(User::getId)
+                .containsExactly(dentist.getId());
+
+        User inactiveUser = user(dentistRole, "2000000000004");
+        inactiveUser.setStatus(UserStatus.INACTIVE);
+        users.saveAndFlush(inactiveUser);
+
+        assertThat(users.findActiveDentists()).extracting(User::getId)
+                .containsExactly(dentist.getId());
+
+        dentistRole.setActive(false);
+        roles.saveAndFlush(dentistRole);
+        assertThat(users.findActiveDentists()).isEmpty();
+    }
+
     private Patient patient() {
         return patient("2000000000001");
     }
@@ -161,8 +212,12 @@ class AppointmentRepositoryIntegrationTests {
     }
 
     private User user(Role role) {
+        return user(role, "2000000000002");
+    }
+
+    private User user(Role role, String cui) {
         User result = new User(UUID.randomUUID(), "dentist-" + UUID.randomUUID(), "Dentist",
-                "dentist-" + UUID.randomUUID() + "@example.test", "2000000000002", "hash",
+                "dentist-" + UUID.randomUUID() + "@example.test", cui, "hash",
                 UserStatus.ACTIVE, NOW, NOW);
         result.setRoles(Set.of(role));
         return result;
