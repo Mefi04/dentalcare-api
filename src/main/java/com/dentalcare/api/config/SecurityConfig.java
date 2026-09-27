@@ -43,7 +43,10 @@ public class SecurityConfig {
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",
                             "/api/v1/auth/logout",
-                            "/api/v1/auth/activate").permitAll();
+                            "/api/v1/auth/activate",
+                            "/api/v1/auth/mobile/login",
+                            "/api/v1/auth/mobile/refresh",
+                            "/api/v1/auth/mobile/logout").permitAll();
                     authorize.requestMatchers("/actuator/health").permitAll();
                     if (openApiPublicAccess) {
                         authorize.requestMatchers(OPENAPI_ENDPOINTS).permitAll();
