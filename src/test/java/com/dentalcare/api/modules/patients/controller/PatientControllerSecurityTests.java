@@ -32,10 +32,13 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -58,12 +61,13 @@ class PatientControllerSecurityTests {
         UUID id = UUID.randomUUID();
         when(jwtService.parseAccessToken("read-token"))
                 .thenReturn(new JwtService.AccessTokenClaims(UUID.randomUUID(), List.of("PATIENT_READ")));
-        when(patientService.search(0, 20, null)).thenReturn(new PageImpl<>(List.of(response(id))));
+        when(patientService.search(0, 20, null)).thenReturn(new PageImpl<>(List.of(response(id, UserStatus.ACTIVE))));
 
         mockMvc.perform(get("/api/v1/patients").header("Authorization", "Bearer read-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(id.toString()))
-                .andExpect(jsonPath("$.content[0].code").value("PAC-00001"));
+                .andExpect(jsonPath("$.content[0].code").value("PAC-00001"))
+                .andExpect(jsonPath("$.content[0].portalAccessStatus").value("ACTIVE"));
 
         verify(patientService).search(0, 20, null);
     }
@@ -85,15 +89,54 @@ class PatientControllerSecurityTests {
     }
 
     @Test
+    void createWithPermissionReturnsCreatedWithPortalAccessStatus() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(jwtService.parseAccessToken("create-token"))
+                .thenReturn(new JwtService.AccessTokenClaims(UUID.randomUUID(), List.of("PATIENT_CREATE")));
+        when(patientService.create(any())).thenReturn(response(id, null));
+
+        mockMvc.perform(post("/api/v1/patients")
+                        .header("Authorization", "Bearer create-token")
+                        .contentType("application/json")
+                        .content("""
+                                {"name":"Maria Perez","dpi":"2987451200101","birthDate":"1990-01-01",
+                                 "gender":"FEMALE","phone":"5555-1234"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.portalAccessStatus").value(nullValue()));
+    }
+
+    @Test
+    void updateWithPermissionReturnsOkWithPortalAccessStatus() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(jwtService.parseAccessToken("update-token"))
+                .thenReturn(new JwtService.AccessTokenClaims(UUID.randomUUID(), List.of("PATIENT_UPDATE")));
+        when(patientService.update(eq(id), any())).thenReturn(response(id, UserStatus.ACTIVE));
+
+        mockMvc.perform(put("/api/v1/patients/{id}", id)
+                        .header("Authorization", "Bearer update-token")
+                        .contentType("application/json")
+                        .content("""
+                                {"name":"Maria Perez","dpi":"2987451200101","birthDate":"1990-01-01",
+                                 "gender":"FEMALE","phone":"5555-1234"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.portalAccessStatus").value("ACTIVE"));
+    }
+
+    @Test
     void currentPatientUsesJwtUserIdAndRequiresPatientRole() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID patientId = UUID.randomUUID();
         token("patient-token", userId, "ROLE_PATIENT");
-        when(patientService.findCurrentPatient(userId)).thenReturn(response(patientId));
+        when(patientService.findCurrentPatient(userId)).thenReturn(response(patientId, UserStatus.ACTIVE));
 
         mockMvc.perform(get("/api/v1/patients/me").header("Authorization", "Bearer patient-token"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(patientId.toString()));
+                .andExpect(jsonPath("$.id").value(patientId.toString()))
+                .andExpect(jsonPath("$.portalAccessStatus").value("ACTIVE"));
 
         verify(patientService).findCurrentPatient(userId);
 
@@ -182,10 +225,11 @@ class PatientControllerSecurityTests {
                 .andExpect(status().isOk());
 
         token("read-token", UUID.randomUUID(), "PATIENT_READ");
-        when(patientService.findById(patientId)).thenReturn(response(patientId));
+        when(patientService.findById(patientId)).thenReturn(response(patientId, UserStatus.PENDING_ACTIVATION));
         mockMvc.perform(get("/api/v1/patients/{id}", patientId).header("Authorization", "Bearer read-token"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(patientId.toString()));
+                .andExpect(jsonPath("$.id").value(patientId.toString()))
+                .andExpect(jsonPath("$.portalAccessStatus").value("PENDING_ACTIVATION"));
     }
 
     @Test
@@ -275,10 +319,14 @@ class PatientControllerSecurityTests {
     }
 
     private PatientResponse response(UUID id) {
+        return response(id, null);
+    }
+
+    private PatientResponse response(UUID id, UserStatus portalAccessStatus) {
         Instant now = Instant.parse("2026-09-22T12:00:00Z");
         return new PatientResponse(id, "PAC-00001", "Maria Perez", "2987451200101", LocalDate.of(1990, 1, 1),
                 Gender.FEMALE, "5555-1234", null, null, null, null, null, "Maria Perez", "CF", null,
-                null, null, null, now, now);
+                null, null, null, portalAccessStatus, now, now);
     }
 
     private PatientProfileResponse profileResponse(String fullName, String maskedDpi) {

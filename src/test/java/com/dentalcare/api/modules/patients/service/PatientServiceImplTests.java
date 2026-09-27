@@ -6,6 +6,7 @@ import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.response.PatientHealthStatus;
+import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.mapper.PatientMapper;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
@@ -22,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -29,6 +31,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -74,6 +77,7 @@ class PatientServiceImplTests {
         assertThat(response.billingName()).isEqualTo("Maria Perez");
         assertThat(response.nit()).isEqualTo("CF");
         assertThat(response.billingAddress()).isEqualTo("Guatemala City");
+        assertThat(response.portalAccessStatus()).isNull();
         assertThat(response.createdAt()).isEqualTo(NOW);
         assertThat(response.updatedAt()).isEqualTo(NOW);
         verify(patientRepository).existsByDpi("2987451200101");
@@ -151,9 +155,55 @@ class PatientServiceImplTests {
 
         assertThat(response.id()).isEqualTo(id);
         assertThat(response.code()).isEqualTo("PAC-00001");
+        assertThat(response.portalAccessStatus()).isNull();
         assertThat(response.createdAt()).isEqualTo(NOW.minusSeconds(60));
         assertThat(response.updatedAt()).isEqualTo(NOW);
         verify(patientRepository, never()).existsByDpi(any());
+    }
+
+    @Test
+    void updatePreservesPortalAccessStatusWhenPatientHasLinkedUser() {
+        UUID id = UUID.randomUUID();
+        Patient patient = existingPatient(id, "2987451200101");
+        User user = new User();
+        user.setStatus(UserStatus.ACTIVE);
+        patient.setUser(user);
+        when(patientRepository.findById(id)).thenReturn(Optional.of(patient));
+        saveReturnsPatient();
+
+        var response = service.update(id, updateRequest(LocalDate.of(1990, 1, 1), "2987451200101"));
+
+        assertThat(response.id()).isEqualTo(id);
+        assertThat(response.portalAccessStatus()).isEqualTo(UserStatus.ACTIVE);
+    }
+
+    @Test
+    void findByIdReturnsPatientWithNullPortalAccessStatusWhenNoUserLinked() {
+        UUID id = UUID.randomUUID();
+        Patient patient = existingPatient(id, "2987451200101");
+        when(patientRepository.findById(id)).thenReturn(Optional.of(patient));
+
+        var response = service.findById(id);
+
+        assertThat(response.id()).isEqualTo(id);
+        assertThat(response.portalAccessStatus()).isNull();
+        verify(patientRepository).findById(id);
+    }
+
+    @Test
+    void findByIdReturnsPatientWithPortalAccessStatusWhenUserLinked() {
+        UUID id = UUID.randomUUID();
+        Patient patient = existingPatient(id, "2987451200101");
+        User user = new User();
+        user.setStatus(UserStatus.PENDING_ACTIVATION);
+        patient.setUser(user);
+        when(patientRepository.findById(id)).thenReturn(Optional.of(patient));
+
+        var response = service.findById(id);
+
+        assertThat(response.id()).isEqualTo(id);
+        assertThat(response.portalAccessStatus()).isEqualTo(UserStatus.PENDING_ACTIVATION);
+        verify(patientRepository).findById(id);
     }
 
     @Test
@@ -246,9 +296,14 @@ class PatientServiceImplTests {
     void resolvesCurrentPatientFromAssociatedUserOnly() {
         UUID userId = UUID.randomUUID();
         Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        User user = new User();
+        user.setStatus(UserStatus.ACTIVE);
+        patient.setUser(user);
         when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
 
-        assertThat(service.findCurrentPatient(userId).id()).isEqualTo(patient.getId());
+        PatientResponse response = service.findCurrentPatient(userId);
+        assertThat(response.id()).isEqualTo(patient.getId());
+        assertThat(response.portalAccessStatus()).isEqualTo(UserStatus.ACTIVE);
         verify(patientRepository).findByUser_Id(userId);
     }
 
@@ -434,6 +489,66 @@ class PatientServiceImplTests {
 
         verify(patientRepository).search("2987451200101", pageable);
         verify(patientRepository, never()).findAll(any(PageRequest.class));
+    }
+
+    @Test
+    void searchPreservesPortalAccessStatusInPaginatedResults() {
+        PageRequest pageable = PageRequest.of(0, 3);
+
+        Patient patient1 = existingPatient(UUID.randomUUID(), "1111111110101");
+        patient1.setUser(null);
+
+        Patient patient2 = existingPatient(UUID.randomUUID(), "2222222220101");
+        User user2 = new User();
+        user2.setStatus(UserStatus.PENDING_ACTIVATION);
+        patient2.setUser(user2);
+
+        Patient patient3 = existingPatient(UUID.randomUUID(), "3333333330101");
+        User user3 = new User();
+        user3.setStatus(UserStatus.ACTIVE);
+        patient3.setUser(user3);
+
+        Page<Patient> patientPage = new PageImpl<>(
+                List.of(patient1, patient2, patient3), pageable, 3);
+        when(patientRepository.findAll(pageable)).thenReturn(patientPage);
+
+        Page<PatientResponse> responsePage = service.search(0, 3, null);
+
+        assertThat(responsePage.getTotalElements()).isEqualTo(3);
+        assertThat(responsePage.getTotalPages()).isEqualTo(1);
+        assertThat(responsePage.getContent()).hasSize(3);
+        assertThat(responsePage.getContent().get(0).portalAccessStatus()).isNull();
+        assertThat(responsePage.getContent().get(1).portalAccessStatus()).isEqualTo(UserStatus.PENDING_ACTIVATION);
+        assertThat(responsePage.getContent().get(2).portalAccessStatus()).isEqualTo(UserStatus.ACTIVE);
+        verify(patientRepository).findAll(pageable);
+    }
+
+    @Test
+    void searchWithTextPreservesPortalAccessStatusInPaginatedResults() {
+        PageRequest pageable = PageRequest.of(0, 2);
+
+        Patient patient1 = existingPatient(UUID.randomUUID(), "4444444440101");
+        User user1 = new User();
+        user1.setStatus(UserStatus.INACTIVE);
+        patient1.setUser(user1);
+
+        Patient patient2 = existingPatient(UUID.randomUUID(), "5555555550101");
+        User user2 = new User();
+        user2.setStatus(UserStatus.LOCKED);
+        patient2.setUser(user2);
+
+        Page<Patient> patientPage = new PageImpl<>(
+                List.of(patient1, patient2), pageable, 2);
+        when(patientRepository.search("Carlos", pageable)).thenReturn(patientPage);
+
+        Page<PatientResponse> responsePage = service.search(0, 2, "Carlos");
+
+        assertThat(responsePage.getTotalElements()).isEqualTo(2);
+        assertThat(responsePage.getTotalPages()).isEqualTo(1);
+        assertThat(responsePage.getContent()).hasSize(2);
+        assertThat(responsePage.getContent().get(0).portalAccessStatus()).isEqualTo(UserStatus.INACTIVE);
+        assertThat(responsePage.getContent().get(1).portalAccessStatus()).isEqualTo(UserStatus.LOCKED);
+        verify(patientRepository).search("Carlos", pageable);
     }
 
     private CreatePatientRequest createRequest(LocalDate birthDate, String dpi, String guardianName,
