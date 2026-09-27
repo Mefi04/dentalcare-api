@@ -12,6 +12,7 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -65,4 +66,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @EntityGraph(attributePaths = "roles")
     @Query("SELECT u FROM User u WHERE u.id = :id")
     Optional<User> findWithRolesById(@Param("id") UUID id);
+
+    @Query("""
+            SELECT u FROM User u JOIN u.roles r
+            WHERE u.status = com.dentalcare.api.modules.users.model.UserStatus.ACTIVE
+              AND r.code = 'DENTIST'
+              AND r.active = true
+            ORDER BY LOWER(u.fullName), u.id
+            """)
+    List<User> findActiveDentists();
 }

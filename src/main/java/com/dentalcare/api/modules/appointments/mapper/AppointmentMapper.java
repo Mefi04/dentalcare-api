@@ -10,11 +10,14 @@ import org.springframework.stereotype.Component;
 public class AppointmentMapper {
 
     public PatientAppointmentResponse toPatientResponse(Appointment appointment) {
-        User professional = appointment.getProfessional();
         return new PatientAppointmentResponse(
                 appointment.getId(),
                 appointment.getScheduledAt(),
                 appointment.getStatus(),
-                new AppointmentProfessionalResponse(professional.getId(), professional.getFullName()));
+                toProfessionalResponse(appointment.getProfessional()));
+    }
+
+    public AppointmentProfessionalResponse toProfessionalResponse(User professional) {
+        return new AppointmentProfessionalResponse(professional.getId(), professional.getFullName());
     }
 }

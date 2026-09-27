@@ -10,6 +10,7 @@ import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.users.model.User;
+import com.dentalcare.api.modules.users.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +37,8 @@ import static org.mockito.Mockito.when;
 class PatientAppointmentServiceImplTests {
     @Mock AppointmentRepository appointments;
     @Mock PatientRepository patients;
+    @Mock AppointmentService appointmentService;
+    @Mock UserRepository users;
 
     private PatientAppointmentServiceImpl service;
     private UUID userId;
@@ -43,7 +46,8 @@ class PatientAppointmentServiceImplTests {
 
     @BeforeEach
     void setUp() {
-        service = new PatientAppointmentServiceImpl(appointments, patients, new AppointmentMapper());
+        service = new PatientAppointmentServiceImpl(
+                appointments, patients, new AppointmentMapper(), appointmentService, users);
         userId = UUID.randomUUID();
         patient = new Patient();
         patient.setId(UUID.randomUUID());
@@ -115,6 +119,36 @@ class PatientAppointmentServiceImplTests {
         verify(appointments, never()).findByPatient_Id(any(), any());
     }
 
+    @Test
+    void createsAppointmentForPatientResolvedFromAuthenticatedUser() {
+        Appointment appointment = appointment(patient.getId());
+        UUID professionalId = appointment.getProfessional().getId();
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(appointmentService.create(patient.getId(), professionalId, appointment.getScheduledAt()))
+                .thenReturn(appointment);
+
+        PatientAppointmentResponse result = service.createCurrentPatientAppointment(
+                userId, professionalId, appointment.getScheduledAt());
+
+        assertThat(result.id()).isEqualTo(appointment.getId());
+        assertThat(result.status()).isEqualTo(AppointmentStatus.SCHEDULED);
+        verify(appointmentService).create(patient.getId(), professionalId, appointment.getScheduledAt());
+    }
+
+    @Test
+    void catalogMapsOnlySafeProfessionalFieldsInRepositoryOrder() {
+        User first = professional("Dra. Ana López");
+        User second = professional("Dr. Carlos Ruiz");
+        when(users.findActiveDentists()).thenReturn(List.of(first, second));
+
+        var result = service.findAvailableProfessionals();
+
+        assertThat(result).extracting(value -> value.fullName())
+                .containsExactly("Dra. Ana López", "Dr. Carlos Ruiz");
+        assertThat(result).extracting(value -> value.id())
+                .containsExactly(first.getId(), second.getId());
+    }
+
     private Appointment appointment(UUID patientId) {
         Patient owner = new Patient();
         owner.setId(patientId);
@@ -124,5 +158,14 @@ class PatientAppointmentServiceImplTests {
         Instant scheduledAt = Instant.parse("2026-10-10T15:00:00Z");
         return new Appointment(UUID.randomUUID(), owner, professional, scheduledAt,
                 AppointmentStatus.SCHEDULED, scheduledAt.minusSeconds(3600), scheduledAt.minusSeconds(3600));
+    }
+
+    private User professional(String fullName) {
+        User professional = new User();
+        professional.setId(UUID.randomUUID());
+        professional.setFullName(fullName);
+        professional.setEmail("private@example.test");
+        professional.setPasswordHash("secret-hash");
+        return professional;
     }
 }
