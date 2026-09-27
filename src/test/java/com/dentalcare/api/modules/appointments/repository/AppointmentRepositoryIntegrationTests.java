@@ -17,6 +17,8 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -26,6 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.sql.Timestamp;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -104,18 +107,57 @@ class AppointmentRepositoryIntegrationTests {
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
+    @Test
+    void listsOnlyRequestedPatientsAppointmentsInDeterministicOrder() {
+        Patient otherPatient = patients.save(patient("2000000000003"));
+        Appointment older = appointment(patient, Instant.parse("2026-10-01T10:00:00Z"));
+        Appointment newer = appointment(patient, Instant.parse("2026-10-02T10:00:00Z"));
+        appointments.saveAllAndFlush(Set.of(older, newer, appointment(otherPatient,
+                Instant.parse("2026-10-03T10:00:00Z"))));
+
+        var result = appointments.findByPatient_Id(patient.getId(), PageRequest.of(0, 10,
+                Sort.by(Sort.Order.desc("scheduledAt"), Sort.Order.desc("id"))));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).extracting(Appointment::getId)
+                .containsExactly(newer.getId(), older.getId());
+        assertThat(result.getContent()).allMatch(value -> value.getPatient().getId().equals(patient.getId()));
+    }
+
+    @Test
+    void detailQueryDoesNotReturnAnotherPatientsAppointment() {
+        Patient otherPatient = patients.save(patient("2000000000003"));
+        Appointment foreignAppointment = appointments.saveAndFlush(appointment(otherPatient, SCHEDULED_AT));
+
+        Optional<Appointment> result = appointments.findByIdAndPatient_Id(
+                foreignAppointment.getId(), patient.getId());
+
+        assertThat(result).isEmpty();
+        assertThat(appointments.findByIdAndPatient_Id(foreignAppointment.getId(), otherPatient.getId()))
+                .isPresent();
+    }
+
     private Patient patient() {
+        return patient("2000000000001");
+    }
+
+    private Patient patient(String dpi) {
         Patient result = new Patient();
         result.setId(UUID.randomUUID());
         result.setCode("PAT-" + UUID.randomUUID().toString().substring(0, 8));
         result.setName("Appointment Patient");
-        result.setDpi("2000000000001");
+        result.setDpi(dpi);
         result.setBirthDate(LocalDate.of(1990, 1, 1));
         result.setGender(Gender.OTHER);
         result.setPhone("55550000");
         result.setCreatedAt(NOW);
         result.setUpdatedAt(NOW);
         return result;
+    }
+
+    private Appointment appointment(Patient owner, Instant scheduledAt) {
+        return new Appointment(UUID.randomUUID(), owner, dentist, scheduledAt,
+                AppointmentStatus.SCHEDULED, NOW, NOW);
     }
 
     private User user(Role role) {
