@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import com.dentalcare.api.security.jwt.JwtService;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
 import com.dentalcare.api.modules.users.repository.UserRepository;
 import com.dentalcare.api.modules.users.repository.RoleRepository;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -28,6 +29,9 @@ class DentalCareApplicationTests {
 
     @MockitoBean
     PatientRepository patientRepository;
+
+    @MockitoBean
+    AppointmentRepository appointmentRepository;
 
     @MockitoBean
     com.dentalcare.api.modules.auth.repository.RefreshSessionRepository refreshSessionRepository;
