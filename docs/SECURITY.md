@@ -235,6 +235,112 @@ The backend identifies the current refresh session from the cookie, revokes it, 
 
 Requires a Bearer access token. Success returns `200 OK` with the current user's `id`, `username`, `email`, `status`, roles, and permissions. It never includes password hashes, refresh tokens, or refresh-session data.
 
+## Mobile authentication and session renewal
+
+Mobile applications developed with Expo / React Native operate under different architectural constraints than browser applications:
+
+- **No browser cookie jar**: Native HTTP engines (OkHttp on Android, NSURLSession on iOS) do not automatically provide the cookie lifecycle guarantees that browsers provide, especially during background tasks, headless execution, or across app restarts.
+- **Hardware-backed secure storage**: Mobile platforms provide native hardware-backed encrypted storage (`expo-secure-store`, Android Keystore, iOS Keychain). Following RFC 8252 and OWASP MASVS recommendations, mobile clients securely store opaque refresh tokens in device secure storage.
+- **Dedicated endpoints (`/api/v1/auth/mobile/*`)**: To prevent any accidental weakening or modification of the web authentication contracts (which strictly forbid refresh tokens in JSON and require `HttpOnly` cookies), the backend exposes dedicated mobile endpoints sharing 100% of the underlying identity, domain, and session models.
+
+### Shared security invariants between Web and Mobile
+
+Both web and mobile authentication share the exact same security foundation:
+- Single source of truth: `users` and `refresh_sessions` tables.
+- Cryptographic hashing: Refresh tokens are generated as 32-byte cryptographically secure random values and stored only as SHA-256 hashes.
+- Token family tracking: Every session rotation maintains the initial `familyId`.
+- Reuse detection: If a rotated or superseded token is presented, the entire family is immediately revoked, and the request is rejected with `401 Unauthorized`.
+- Expiration rules: Both absolute expiration (default 7 days) and sliding inactivity expiration (default 24 hours) apply equally to mobile sessions.
+- Account eligibility: Account must remain in `ACTIVE` status; deactivated (`INACTIVE`), locked, or unactivated (`PENDING_ACTIVATION`) accounts are rejected.
+
+### Mobile login
+
+`POST /api/v1/auth/mobile/login`
+
+Request:
+
+```json
+{
+  "cui": "1234567890123",
+  "password": "raw-password"
+}
+```
+
+Success: `200 OK`, creates a refresh session, sets no cookies, and returns:
+
+```json
+{
+  "accessToken": "signed-jwt",
+  "refreshToken": "opaque-refresh-token",
+  "tokenType": "Bearer",
+  "expiresIn": 1800,
+  "user": {
+    "id": "uuid",
+    "username": "username",
+    "email": "user@example.com",
+    "status": "ACTIVE",
+    "roles": [],
+    "permissions": []
+  }
+}
+```
+
+Key rules:
+- Returns the initial opaque refresh token directly in the response payload for storage in `expo-secure-store`.
+- No `Set-Cookie` header is emitted.
+- Invalid credentials return generic `401 Unauthorized`; validation errors return `400 Bad Request`.
+
+### Mobile refresh
+
+`POST /api/v1/auth/mobile/refresh`
+
+Request:
+
+```json
+{
+  "refreshToken": "opaque-refresh-token"
+}
+```
+
+Success: `200 OK`, rotates the session in the database, sets no cookies, and returns:
+
+```json
+{
+  "accessToken": "new-signed-jwt",
+  "refreshToken": "new-rotated-opaque-refresh-token",
+  "tokenType": "Bearer",
+  "expiresIn": 1800
+}
+```
+
+Key rules:
+- Performs mandatory rotation: generates a new refresh token, atomically replaces the presented session, and invalidates the previous token.
+- Returns the newly rotated refresh token in the response payload; the mobile client must overwrite its stored token in `expo-secure-store`.
+- Token reuse detection: presenting an already-rotated token revokes all sessions in the token family and returns `401 Unauthorized`.
+- A missing, blank, or invalid format token returns `400 Bad Request`; an expired, inactive, revoked, or non-existent token returns `401 Unauthorized`.
+- No `Set-Cookie` header is emitted.
+
+### Mobile logout
+
+`POST /api/v1/auth/mobile/logout`
+
+Request:
+
+```json
+{
+  "refreshToken": "opaque-refresh-token"
+}
+```
+
+Success: `204 No Content`.
+
+Key rules:
+- The backend identifies the session matching the SHA-256 hash of `refreshToken` and sets `revokedAt`.
+- Subsequent attempts to use the revoked token return `401 Unauthorized`.
+- Operation is idempotent: calling with an empty payload `{}` or an already revoked/unknown token returns `204 No Content`.
+- The mobile client must remove the stored refresh token from `expo-secure-store`.
+- No cookies are set or cleared.
+
 ## Security flows
 
 ### Account activation flow

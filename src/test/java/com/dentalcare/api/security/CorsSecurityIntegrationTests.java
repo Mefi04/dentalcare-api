@@ -37,7 +37,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {AuthController.class, TestSecurityController.class}, properties = "FRONTEND_URL=http://localhost:3000")
+import com.dentalcare.api.modules.auth.controller.MobileAuthController;
+
+@WebMvcTest(controllers = {AuthController.class, TestSecurityController.class, MobileAuthController.class}, properties = "FRONTEND_URL=http://localhost:3000")
 @Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class, AuthCookieManager.class})
 class CorsSecurityIntegrationTests {
@@ -174,6 +176,22 @@ class CorsSecurityIntegrationTests {
                         .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
                         .cookie(new Cookie("refreshToken", "token-to-logout")))
                 .andExpect(status().isNoContent())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/auth/mobile/refresh with allowed origin receives CORS approval")
+    void mobileRefreshEndpointSupportsAllowedOrigin() throws Exception {
+        RefreshResponse refreshResponse = new RefreshResponse("new-token", "Bearer", 1800L);
+        AuthService.RefreshResult refreshResult = new AuthService.RefreshResult(refreshResponse, "new-mobile-token", Duration.ofDays(7));
+        when(authService.refresh("valid-mobile-token")).thenReturn(refreshResult);
+
+        mockMvc.perform(post("/api/v1/auth/mobile/refresh")
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"valid-mobile-token\"}"))
+                .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
     }

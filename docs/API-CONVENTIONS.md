@@ -126,7 +126,17 @@ Authentication uses `/api/v1/auth`. Detailed token, cookie, rotation, and sessio
 | `POST` | `/api/v1/auth/logout` | Refresh cookie | `204 No Content` | Revokes the identified session and clears the cookie; idempotent where practical. |
 | `GET` | `/api/v1/auth/me` | Bearer access token | `200 OK` with the current user view | Never returns password hashes, token material, or session data. |
 
-Successful access-token responses use `tokenType: "Bearer"` and `expiresIn: 1800` by default. Login additionally returns `user` with `id`, `username`, `email`, `status`, `roles`, and `permissions`. Refresh tokens never appear in JSON responses.
+Successful access-token responses use `tokenType: "Bearer"` and `expiresIn: 1800` by default. Login additionally returns `user` with `id`, `username`, `email`, `status`, `roles`, and `permissions`. For web endpoints (`/api/v1/auth/*`), refresh tokens are transported exclusively via `HttpOnly` cookies and never appear in JSON responses.
+
+### Mobile authentication endpoints
+
+Mobile clients (Expo / React Native) use dedicated endpoints under `/api/v1/auth/mobile`. Because native mobile clients do not have browser cookie jars and instead store tokens in hardware-backed storage (`expo-secure-store`), refresh tokens are transported directly in request and response JSON payloads.
+
+| Method | Path | Authentication input | Success | Notes |
+|---|---|---|---|---|
+| `POST` | `/api/v1/auth/mobile/login` | JSON `cui` (exactly 13 digits) and `password` | `200 OK` with `accessToken`, `refreshToken`, `tokenType`, `expiresIn`, and `user` | Emits no cookies. Refresh token is returned in JSON for device secure storage. Invalid credentials return generic `401`; validation errors return `400`. |
+| `POST` | `/api/v1/auth/mobile/refresh` | JSON `refreshToken` (opaque token) | `200 OK` with `accessToken`, rotated `refreshToken`, `tokenType`, and `expiresIn` | Rotates the refresh token. Invalid, expired, inactive, or revoked tokens return generic `401`. Token reuse revokes the entire token family and returns generic `401`. Emits no cookies. |
+| `POST` | `/api/v1/auth/mobile/logout` | JSON `refreshToken` (opaque token, optional) | `204 No Content` | Revokes the identified session in database; idempotent. Emits no cookies. |
 
 ## Patient portal endpoints
 
