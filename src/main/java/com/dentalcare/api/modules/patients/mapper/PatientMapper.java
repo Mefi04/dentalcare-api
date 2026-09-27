@@ -9,6 +9,7 @@ import com.dentalcare.api.modules.patients.dto.response.PatientProfileResponse;
 import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.util.DpiMasker;
+import com.dentalcare.api.modules.users.model.UserStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -31,11 +32,12 @@ public class PatientMapper {
     }
 
     public PatientResponse toResponse(Patient patient) {
+        UserStatus portalAccessStatus = patient.getUser() == null ? null : patient.getUser().getStatus();
         return new PatientResponse(patient.getId(), patient.getCode(), patient.getName(), patient.getDpi(), patient.getBirthDate(),
                 patient.getGender(), patient.getPhone(), patient.getEmail(), patient.getCity(), patient.getAddress(),
                 patient.getEmergencyContact(), patient.getEmergencyPhone(), patient.getBillingName(), patient.getNit(),
                 patient.getBillingAddress(), patient.getGuardianName(), patient.getGuardianRelationship(), patient.getGuardianPhone(),
-                patient.getCreatedAt(), patient.getUpdatedAt());
+                portalAccessStatus, patient.getCreatedAt(), patient.getUpdatedAt());
     }
 
     public PatientProfileResponse toProfileResponse(Patient patient) {

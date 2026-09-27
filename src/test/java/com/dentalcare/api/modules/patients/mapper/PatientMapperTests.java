@@ -3,8 +3,11 @@ package com.dentalcare.api.modules.patients.mapper;
 import com.dentalcare.api.modules.patients.dto.response.PatientHealthResponse;
 import com.dentalcare.api.modules.patients.dto.response.PatientHealthStatus;
 import com.dentalcare.api.modules.patients.dto.response.PatientProfileResponse;
+import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
+import com.dentalcare.api.modules.users.model.User;
+import com.dentalcare.api.modules.users.model.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -113,5 +116,108 @@ class PatientMapperTests {
         assertThat(response.observations()).isNull();
         assertThat(response.lastUpdated()).isNull();
         assertThat(response.status()).isEqualTo(PatientHealthStatus.EMPTY);
+    }
+
+    @Test
+    void toResponseMapsPatientWithoutUserWithNullPortalAccessStatus() {
+        Patient patient = completePatient();
+        patient.setUser(null);
+
+        PatientResponse response = mapper.toResponse(patient);
+
+        assertThat(response.id()).isEqualTo(patient.getId());
+        assertThat(response.code()).isEqualTo("PAC-00001");
+        assertThat(response.name()).isEqualTo("Carlos Gomez");
+        assertThat(response.dpi()).isEqualTo("2987451200101");
+        assertThat(response.birthDate()).isEqualTo(LocalDate.of(1994, 3, 14));
+        assertThat(response.gender()).isEqualTo(Gender.MALE);
+        assertThat(response.phone()).isEqualTo("5555-1234");
+        assertThat(response.email()).isEqualTo("carlos@example.com");
+        assertThat(response.city()).isEqualTo("Guatemala");
+        assertThat(response.address()).isEqualTo("Calle 1 2-34 Zona 10");
+        assertThat(response.emergencyContact()).isEqualTo("Maria Gomez");
+        assertThat(response.emergencyPhone()).isEqualTo("5555-9876");
+        assertThat(response.billingName()).isEqualTo("Carlos Gomez");
+        assertThat(response.nit()).isEqualTo("123456-7");
+        assertThat(response.billingAddress()).isEqualTo("Calle 1 2-34 Zona 10");
+        assertThat(response.guardianName()).isEqualTo("Tutor Legal");
+        assertThat(response.guardianRelationship()).isEqualTo("Padre");
+        assertThat(response.guardianPhone()).isEqualTo("5555-0000");
+        assertThat(response.portalAccessStatus()).isNull();
+        assertThat(response.createdAt()).isEqualTo(patient.getCreatedAt());
+        assertThat(response.updatedAt()).isEqualTo(patient.getUpdatedAt());
+    }
+
+    @Test
+    void toResponseMapsPatientWithPendingActivationUser() {
+        Patient patient = completePatient();
+        User user = new User();
+        user.setStatus(UserStatus.PENDING_ACTIVATION);
+        patient.setUser(user);
+
+        PatientResponse response = mapper.toResponse(patient);
+
+        assertThat(response.portalAccessStatus()).isEqualTo(UserStatus.PENDING_ACTIVATION);
+    }
+
+    @Test
+    void toResponseMapsPatientWithActiveUser() {
+        Patient patient = completePatient();
+        User user = new User();
+        user.setStatus(UserStatus.ACTIVE);
+        patient.setUser(user);
+
+        PatientResponse response = mapper.toResponse(patient);
+
+        assertThat(response.portalAccessStatus()).isEqualTo(UserStatus.ACTIVE);
+    }
+
+    @Test
+    void toResponseMapsPatientWithInactiveUser() {
+        Patient patient = completePatient();
+        User user = new User();
+        user.setStatus(UserStatus.INACTIVE);
+        patient.setUser(user);
+
+        PatientResponse response = mapper.toResponse(patient);
+
+        assertThat(response.portalAccessStatus()).isEqualTo(UserStatus.INACTIVE);
+    }
+
+    @Test
+    void toResponseMapsPatientWithLockedUser() {
+        Patient patient = completePatient();
+        User user = new User();
+        user.setStatus(UserStatus.LOCKED);
+        patient.setUser(user);
+
+        PatientResponse response = mapper.toResponse(patient);
+
+        assertThat(response.portalAccessStatus()).isEqualTo(UserStatus.LOCKED);
+    }
+
+    private Patient completePatient() {
+        Patient patient = new Patient();
+        patient.setId(UUID.randomUUID());
+        patient.setCode("PAC-00001");
+        patient.setName("Carlos Gomez");
+        patient.setDpi("2987451200101");
+        patient.setBirthDate(LocalDate.of(1994, 3, 14));
+        patient.setGender(Gender.MALE);
+        patient.setPhone("5555-1234");
+        patient.setEmail("carlos@example.com");
+        patient.setCity("Guatemala");
+        patient.setAddress("Calle 1 2-34 Zona 10");
+        patient.setEmergencyContact("Maria Gomez");
+        patient.setEmergencyPhone("5555-9876");
+        patient.setBillingName("Carlos Gomez");
+        patient.setNit("123456-7");
+        patient.setBillingAddress("Calle 1 2-34 Zona 10");
+        patient.setGuardianName("Tutor Legal");
+        patient.setGuardianRelationship("Padre");
+        patient.setGuardianPhone("5555-0000");
+        patient.setCreatedAt(Instant.parse("2026-09-20T10:00:00Z"));
+        patient.setUpdatedAt(Instant.parse("2026-09-21T10:00:00Z"));
+        return patient;
     }
 }

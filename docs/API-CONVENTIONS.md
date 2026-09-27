@@ -137,7 +137,7 @@ Successful access-token responses use `tokenType: "Bearer"` and `expiresIn: 1800
 | `GET` | `/api/v1/patients/me/profile` | `ROLE_PATIENT` | `200 OK` | Returns `PatientProfileResponse` with personal details and a masked DPI (`*********XXXX`). Identity resolved solely from JWT principal. |
 | `GET` | `/api/v1/patients/me/health` | `ROLE_PATIENT` | `200 OK` | Returns `PatientHealthResponse` representing the patient's health summary (`EMPTY` status until clinical persistence models are implemented). Identity resolved solely from JWT principal. |
 
-The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data.
+The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data. It exposes `portalAccessStatus` (`PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE`, `LOCKED`, or `null` if no portal account exists) derived directly from the linked user.
 
 `/patients/me/profile` returns:
 - `fullName`: patient full name.

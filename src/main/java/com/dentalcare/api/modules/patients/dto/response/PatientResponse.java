@@ -1,6 +1,7 @@
 package com.dentalcare.api.modules.patients.dto.response;
 
 import com.dentalcare.api.modules.patients.model.Gender;
+import com.dentalcare.api.modules.users.model.UserStatus;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -25,6 +26,7 @@ public record PatientResponse(
         String guardianName,
         String guardianRelationship,
         String guardianPhone,
+        UserStatus portalAccessStatus,
         Instant createdAt,
         Instant updatedAt) {
 }
