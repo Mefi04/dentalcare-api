@@ -190,6 +190,40 @@ class PatientRepositoryIntegrationTests {
         assertThat(loaded4.getUser().getStatus()).isEqualTo(UserStatus.LOCKED);
     }
 
+    @Test
+    void patientProfileContactFieldsCanBeUpdatedAndPersistedCleanly() {
+        User user = createUser("9000000000109", UserStatus.ACTIVE);
+        Patient patient = createPatient("PAC-PROF-01", "9000000000109", "Perfil Paciente", user);
+        entityManager.flush();
+        entityManager.clear();
+
+        Patient loaded = patientRepository.findByUser_Id(user.getId()).orElseThrow();
+        loaded.setPhone("55559999");
+        loaded.setEmail("perfil.nuevo@example.com");
+        loaded.setAddress("Nueva Direccion 123");
+        loaded.setEmergencyContact("Contacto Familiar");
+        loaded.setEmergencyPhone("55550000");
+        Instant updateInstant = NOW.plusSeconds(3600);
+        loaded.setUpdatedAt(updateInstant);
+
+        patientRepository.saveAndFlush(loaded);
+        entityManager.clear();
+
+        Patient reloaded = patientRepository.findByUser_Id(user.getId()).orElseThrow();
+        assertThat(reloaded.getPhone()).isEqualTo("55559999");
+        assertThat(reloaded.getEmail()).isEqualTo("perfil.nuevo@example.com");
+        assertThat(reloaded.getAddress()).isEqualTo("Nueva Direccion 123");
+        assertThat(reloaded.getEmergencyContact()).isEqualTo("Contacto Familiar");
+        assertThat(reloaded.getEmergencyPhone()).isEqualTo("55550000");
+        assertThat(reloaded.getUpdatedAt()).isEqualTo(updateInstant);
+
+        // Invariants
+        assertThat(reloaded.getName()).isEqualTo("Perfil Paciente");
+        assertThat(reloaded.getDpi()).isEqualTo("9000000000109");
+        assertThat(reloaded.getCode()).isEqualTo("PAC-PROF-01");
+        assertThat(reloaded.getUser().getId()).isEqualTo(user.getId());
+    }
+
     private Patient createPatient(String code, String dpi, String name, User user) {
         Patient patient = new Patient();
         patient.setId(UUID.randomUUID());

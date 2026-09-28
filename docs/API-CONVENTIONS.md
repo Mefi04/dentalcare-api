@@ -145,6 +145,7 @@ Mobile clients (Expo / React Native) use dedicated endpoints under `/api/v1/auth
 | `POST` | `/api/v1/patients/{id}/access` | `ROLE_ADMINISTRATOR` | `201 Created` | Creates one linked `PENDING_ACTIVATION` user with only role `PATIENT`; returns its temporary password once. A second creation request returns `409 Conflict`. |
 | `GET` | `/api/v1/patients/me` | `ROLE_PATIENT` | `200 OK` | Resolves the associated patient solely from the JWT principal. It neither accepts nor trusts a patient ID supplied by the client. |
 | `GET` | `/api/v1/patients/me/profile` | `ROLE_PATIENT` | `200 OK` | Returns `PatientProfileResponse` with personal details and a masked DPI (`*********XXXX`). Identity resolved solely from JWT principal. |
+| `PATCH` | `/api/v1/patients/me/profile` | `ROLE_PATIENT` | `200 OK` | Partially updates editable contact details (`phone`, `email`, `address`, `emergencyContact`, `emergencyPhone`) for the authenticated patient. Identity resolved solely from JWT principal. Returns updated `PatientProfileResponse`. |
 | `GET` | `/api/v1/patients/me/health` | `ROLE_PATIENT` | `200 OK` | Returns `PatientHealthResponse` representing the patient's health summary (`EMPTY` status until clinical persistence models are implemented). Identity resolved solely from JWT principal. |
 
 The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data. It exposes `portalAccessStatus` (`PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE`, `LOCKED`, or `null` if no portal account exists) derived directly from the linked user.
@@ -157,6 +158,13 @@ The standard `PatientResponse` is used for `/patients/me`; it never embeds user 
 - `email`: patient contact email (nullable).
 - `address`: patient physical address (nullable).
 - `emergencyContact`: nested object with `name`, `phone`, and `relationship: null` (nullable if no emergency contact details exist).
+
+`PATCH /patients/me/profile`:
+- Editable fields: `phone` (required, max 30 chars), `email` (optional, valid email regex, max 255 chars), `address` (optional, max 255 chars), `emergencyContact` (optional, max 150 chars), `emergencyPhone` (optional, max 30 chars).
+- Semantics: Fields omitted from request JSON are preserved unchanged. Optional fields explicitly passed as `null` or blank strings are cleared on the entity; `phone` is required and cannot be null or blank. The request body must include at least one field.
+- Read-only fields: Identity, clinical, and administrative fields (`fullName` / `name`, `dpi`, `code`, `birthDate`, `gender`, `billingName`, `nit`, `billingAddress`, `guardianName`, `guardianRelationship`, `guardianPhone`, `user`, portal credentials, timestamps) are strictly immutable through this endpoint.
+- Security: Identity is derived solely from the authenticated JWT principal (`principal.userId()`), preventing IDOR vulnerabilities. Mass assignment is prevented via a dedicated DTO.
+- Status codes: `200 OK` on success with `PatientProfileResponse`; `400 Bad Request` on invalid email, blank phone, exceeded field lengths, or empty request payload; `401 Unauthorized` when unauthenticated; `403 Forbidden` for non-patient roles; `404 Not Found` if no patient is linked to the authenticated user account.
 
 `/patients/me/health` returns:
 - `allergies`: list of allergies (currently empty list `[]`).

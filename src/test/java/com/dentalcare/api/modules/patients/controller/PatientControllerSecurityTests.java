@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import com.dentalcare.api.modules.patients.dto.request.UpdatePatientProfileRequest;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,6 +38,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -287,6 +289,98 @@ class PatientControllerSecurityTests {
                 .andExpect(jsonPath("$.message").value("Patient not found"));
 
         mockMvc.perform(get("/api/v1/patients/me/health").header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message").value("Patient not found"));
+    }
+
+    @Test
+    void updateCurrentPatientProfileRequiresPatientRole() throws Exception {
+        mockMvc.perform(patch("/api/v1/patients/me/profile")
+                        .contentType("application/json")
+                        .content("""
+                                {"phone": "5555-4321"}
+                                """))
+                .andExpect(status().isUnauthorized());
+
+        token("admin-token", UUID.randomUUID(), "ROLE_ADMINISTRATOR");
+        mockMvc.perform(patch("/api/v1/patients/me/profile")
+                        .header("Authorization", "Bearer admin-token")
+                        .contentType("application/json")
+                        .content("""
+                                {"phone": "5555-4321"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        token("staff-token", UUID.randomUUID(), "PATIENT_UPDATE");
+        mockMvc.perform(patch("/api/v1/patients/me/profile")
+                        .header("Authorization", "Bearer staff-token")
+                        .contentType("application/json")
+                        .content("""
+                                {"phone": "5555-4321"}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void updateCurrentPatientProfileAcceptsPatientRoleAndResolvesUserFromJwtPrincipal() throws Exception {
+        UUID userId = UUID.randomUUID();
+        token("patient-token", userId, "ROLE_PATIENT");
+
+        when(patientService.updateCurrentPatientProfile(eq(userId), any(UpdatePatientProfileRequest.class)))
+                .thenReturn(profileResponse("Maria Perez", "*********0101"));
+
+        mockMvc.perform(patch("/api/v1/patients/me/profile?patientId=" + UUID.randomUUID() + "&dpi=1234567890123")
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json")
+                        .content("""
+                                {"phone": "5555-4321", "address": "Zona 10", "email": "updated@example.com"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("Maria Perez"))
+                .andExpect(jsonPath("$.maskedDpi").value("*********0101"));
+
+        verify(patientService).updateCurrentPatientProfile(eq(userId), any(UpdatePatientProfileRequest.class));
+    }
+
+    @Test
+    void updateCurrentPatientProfileRejectsValidationErrors() throws Exception {
+        UUID userId = UUID.randomUUID();
+        token("patient-token", userId, "ROLE_PATIENT");
+
+        mockMvc.perform(patch("/api/v1/patients/me/profile")
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json")
+                        .content("""
+                                {"email": "invalid-email-address"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+
+        mockMvc.perform(patch("/api/v1/patients/me/profile")
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json")
+                        .content("""
+                                {"phone": "12345678901234567890123456789012345"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void updateCurrentPatientProfileReturnsNotFoundWhenUserHasNoLinkedPatient() throws Exception {
+        UUID userId = UUID.randomUUID();
+        token("patient-token", userId, "ROLE_PATIENT");
+
+        when(patientService.updateCurrentPatientProfile(eq(userId), any(UpdatePatientProfileRequest.class)))
+                .thenThrow(new ResourceNotFoundException("Patient not found"));
+
+        mockMvc.perform(patch("/api/v1/patients/me/profile")
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json")
+                        .content("""
+                                {"phone": "5555-4321"}
+                                """))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("Patient not found"));
