@@ -1,6 +1,7 @@
 package com.dentalcare.api.modules.patients.service;
 
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
+import com.dentalcare.api.modules.patients.dto.request.UpdatePatientProfileRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
 import com.dentalcare.api.modules.patients.dto.response.PatientHealthResponse;
@@ -25,6 +26,8 @@ public interface PatientService {
     PatientResponse findCurrentPatient(UUID authenticatedUserId);
 
     PatientProfileResponse findCurrentPatientProfile(UUID authenticatedUserId);
+
+    PatientProfileResponse updateCurrentPatientProfile(UUID authenticatedUserId, UpdatePatientProfileRequest request);
 
     PatientHealthResponse findCurrentPatientHealth(UUID authenticatedUserId);
 }

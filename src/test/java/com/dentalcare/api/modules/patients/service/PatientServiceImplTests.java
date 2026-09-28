@@ -4,8 +4,10 @@ import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
+import com.dentalcare.api.modules.patients.dto.request.UpdatePatientProfileRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.response.PatientHealthStatus;
+import com.dentalcare.api.modules.patients.dto.response.PatientProfileResponse;
 import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.mapper.PatientMapper;
 import com.dentalcare.api.modules.patients.model.Gender;
@@ -434,6 +436,283 @@ class PatientServiceImplTests {
 
         verify(patientRepository, times(2)).findByUser_Id(userIdA);
         verify(patientRepository, times(2)).findByUser_Id(userIdB);
+    }
+
+    @Test
+    void updateCurrentPatientProfileUpdatesAllowedContactFieldsAndPreservesIdentityFields() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        patient.setBillingName("Billing Corp");
+        patient.setNit("12345-6");
+        patient.setBillingAddress("Billing St 123");
+        patient.setGuardianName("Guardian Name");
+        patient.setGuardianRelationship("Father");
+        patient.setGuardianPhone("5555-7777");
+
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        saveReturnsPatient();
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest(
+                "5555-4321", "nuevo@example.com", "Zona 10", "Carlos Perez", "5555-8888");
+
+        PatientProfileResponse response = service.updateCurrentPatientProfile(userId, request);
+
+        assertThat(response.fullName()).isEqualTo("Original Name");
+        assertThat(response.maskedDpi()).isEqualTo("*********0101");
+        assertThat(response.birthDate()).isEqualTo(LocalDate.of(1990, 1, 1));
+        assertThat(response.phone()).isEqualTo("5555-4321");
+        assertThat(response.email()).isEqualTo("nuevo@example.com");
+        assertThat(response.address()).isEqualTo("Zona 10");
+        assertThat(response.emergencyContact()).isNotNull();
+        assertThat(response.emergencyContact().name()).isEqualTo("Carlos Perez");
+        assertThat(response.emergencyContact().phone()).isEqualTo("5555-8888");
+
+        // Verify entity fields
+        assertThat(patient.getPhone()).isEqualTo("5555-4321");
+        assertThat(patient.getEmail()).isEqualTo("nuevo@example.com");
+        assertThat(patient.getAddress()).isEqualTo("Zona 10");
+        assertThat(patient.getEmergencyContact()).isEqualTo("Carlos Perez");
+        assertThat(patient.getEmergencyPhone()).isEqualTo("5555-8888");
+        assertThat(patient.getUpdatedAt()).isEqualTo(NOW);
+
+        // Verify administrative fields were NOT touched (mass assignment protection)
+        assertThat(patient.getName()).isEqualTo("Original Name");
+        assertThat(patient.getDpi()).isEqualTo("2987451200101");
+        assertThat(patient.getCode()).isEqualTo("PAC-00001");
+        assertThat(patient.getBirthDate()).isEqualTo(LocalDate.of(1990, 1, 1));
+        assertThat(patient.getGender()).isEqualTo(Gender.FEMALE);
+        assertThat(patient.getBillingName()).isEqualTo("Billing Corp");
+        assertThat(patient.getNit()).isEqualTo("12345-6");
+        assertThat(patient.getBillingAddress()).isEqualTo("Billing St 123");
+        assertThat(patient.getGuardianName()).isEqualTo("Guardian Name");
+        assertThat(patient.getGuardianRelationship()).isEqualTo("Father");
+        assertThat(patient.getGuardianPhone()).isEqualTo("5555-7777");
+
+        verify(patientRepository).findByUser_Id(userId);
+        verify(patientRepository).saveAndFlush(patient);
+    }
+
+    @Test
+    void updateCurrentPatientProfilePreservesOmittedFields() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        patient.setPhone("5555-0000");
+        patient.setEmail("original@example.com");
+        patient.setAddress("Calle Antigua");
+        patient.setEmergencyContact("Contacto Previo");
+        patient.setEmergencyPhone("5555-9999");
+
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        saveReturnsPatient();
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setPhone("5555-1111");
+
+        PatientProfileResponse response = service.updateCurrentPatientProfile(userId, request);
+
+        assertThat(response.phone()).isEqualTo("5555-1111");
+        assertThat(response.email()).isEqualTo("original@example.com");
+        assertThat(response.address()).isEqualTo("Calle Antigua");
+        assertThat(response.emergencyContact()).isNotNull();
+        assertThat(response.emergencyContact().name()).isEqualTo("Contacto Previo");
+        assertThat(response.emergencyContact().phone()).isEqualTo("5555-9999");
+
+        assertThat(patient.getPhone()).isEqualTo("5555-1111");
+        assertThat(patient.getEmail()).isEqualTo("original@example.com");
+        assertThat(patient.getAddress()).isEqualTo("Calle Antigua");
+        assertThat(patient.getEmergencyContact()).isEqualTo("Contacto Previo");
+        assertThat(patient.getEmergencyPhone()).isEqualTo("5555-9999");
+    }
+
+    @Test
+    void updateCurrentPatientProfileClearsFieldsWhenExplicitlyNullOrBlank() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        patient.setEmail("borrar@example.com");
+        patient.setAddress("Borrar Direccion");
+        patient.setEmergencyContact("Borrar Contacto");
+        patient.setEmergencyPhone("5555-0000");
+
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        saveReturnsPatient();
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setEmail(null);
+        request.setAddress("   ");
+        request.setEmergencyContact(null);
+        request.setEmergencyPhone("");
+
+        PatientProfileResponse response = service.updateCurrentPatientProfile(userId, request);
+
+        assertThat(response.email()).isNull();
+        assertThat(response.address()).isNull();
+        assertThat(response.emergencyContact()).isNull();
+
+        assertThat(patient.getEmail()).isNull();
+        assertThat(patient.getAddress()).isNull();
+        assertThat(patient.getEmergencyContact()).isNull();
+        assertThat(patient.getEmergencyPhone()).isNull();
+    }
+
+    @Test
+    void updateCurrentPatientProfileRejectsEmptyRequest() {
+        UUID userId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, new UpdatePatientProfileRequest()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("At least one field must be provided for update");
+
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, null))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("At least one field must be provided for update");
+
+        verify(patientRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateCurrentPatientProfileRejectsBlankOrNullPhone() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        UpdatePatientProfileRequest nullPhone = new UpdatePatientProfileRequest();
+        nullPhone.setPhone(null);
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, nullPhone))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Phone is required");
+
+        UpdatePatientProfileRequest blankPhone = new UpdatePatientProfileRequest();
+        blankPhone.setPhone("   ");
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, blankPhone))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Phone is required");
+
+        verify(patientRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void updateCurrentPatientProfileRejectsPhoneExceedingMax30() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setPhone("1".repeat(31));
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Phone must not exceed 30 characters");
+    }
+
+    @Test
+    void updateCurrentPatientProfileRejectsInvalidEmail() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setEmail("correo-invalido");
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Email must be valid");
+    }
+
+    @Test
+    void updateCurrentPatientProfileRejectsEmailExceedingMax255() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setEmail("a".repeat(250) + "@test.com");
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Email must not exceed 255 characters");
+    }
+
+    @Test
+    void updateCurrentPatientProfileRejectsAddressExceedingMax255() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setAddress("a".repeat(256));
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Address must not exceed 255 characters");
+    }
+
+    @Test
+    void updateCurrentPatientProfileRejectsEmergencyContactExceedingMax150() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setEmergencyContact("a".repeat(151));
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Emergency contact must not exceed 150 characters");
+    }
+
+    @Test
+    void updateCurrentPatientProfileRejectsEmergencyPhoneExceedingMax30() {
+        UUID userId = UUID.randomUUID();
+        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setEmergencyPhone("a".repeat(31));
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Emergency phone must not exceed 30 characters");
+    }
+
+    @Test
+    void updateCurrentPatientProfileThrowsNotFoundWhenUserHasNoLinkedPatient() {
+        UUID userId = UUID.randomUUID();
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setPhone("5555-1234");
+
+        assertThatThrownBy(() -> service.updateCurrentPatientProfile(userId, request))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Patient not found");
+    }
+
+    @Test
+    void updateCurrentPatientProfilePreventsIdorBetweenPatients() {
+        UUID userIdA = UUID.randomUUID();
+        UUID userIdB = UUID.randomUUID();
+
+        Patient patientA = existingPatient(UUID.randomUUID(), "1111111110101");
+        patientA.setPhone("5555-0001");
+        patientA.setAddress("Direccion A");
+
+        Patient patientB = existingPatient(UUID.randomUUID(), "2222222220101");
+        patientB.setPhone("5555-0002");
+        patientB.setAddress("Direccion B");
+
+        when(patientRepository.findByUser_Id(userIdA)).thenReturn(Optional.of(patientA));
+        saveReturnsPatient();
+
+        UpdatePatientProfileRequest request = new UpdatePatientProfileRequest();
+        request.setPhone("5555-9999");
+        request.setAddress("Nueva Direccion A");
+
+        service.updateCurrentPatientProfile(userIdA, request);
+
+        // Patient A is updated
+        assertThat(patientA.getPhone()).isEqualTo("5555-9999");
+        assertThat(patientA.getAddress()).isEqualTo("Nueva Direccion A");
+
+        // Patient B is completely untouched
+        assertThat(patientB.getPhone()).isEqualTo("5555-0002");
+        assertThat(patientB.getAddress()).isEqualTo("Direccion B");
+
+        verify(patientRepository).findByUser_Id(userIdA);
+        verify(patientRepository, never()).findByUser_Id(userIdB);
     }
 
     @Test

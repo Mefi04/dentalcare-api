@@ -4,6 +4,7 @@ import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
+import com.dentalcare.api.modules.patients.dto.request.UpdatePatientProfileRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
 import com.dentalcare.api.modules.patients.dto.response.PatientHealthResponse;
@@ -177,6 +178,19 @@ public class PatientServiceImpl implements PatientService {
     }
 
     @Override
+    @Transactional
+    public PatientProfileResponse updateCurrentPatientProfile(UUID authenticatedUserId, UpdatePatientProfileRequest request) {
+        if (request == null || request.getPresentFields().isEmpty()) {
+            throw new BadRequestException("At least one field must be provided for update");
+        }
+
+        Patient patient = findPatientByAuthenticatedUser(authenticatedUserId);
+        applyProfileUpdates(patient, request);
+        patient.setUpdatedAt(clock.instant());
+        return patientMapper.toProfileResponse(savePatient(patient));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PatientHealthResponse findCurrentPatientHealth(UUID authenticatedUserId) {
         return patientMapper.toHealthResponse(findPatientByAuthenticatedUser(authenticatedUserId));
@@ -204,6 +218,49 @@ public class PatientServiceImpl implements PatientService {
     private void ensureDpiIsAvailable(String dpi, String currentDpi) {
         if (!dpi.equals(currentDpi) && patientRepository.existsByDpi(dpi)) {
             throw new ConflictException(DUPLICATE_DPI_MESSAGE);
+        }
+    }
+
+    private void applyProfileUpdates(Patient patient, UpdatePatientProfileRequest request) {
+        if (request.isPhonePresent()) {
+            String phone = required(request.getPhone(), "Phone is required");
+            if (phone.length() > 30) {
+                throw new BadRequestException("Phone must not exceed 30 characters");
+            }
+            patient.setPhone(phone);
+        }
+        if (request.isEmailPresent()) {
+            String email = optional(request.getEmail());
+            if (email != null) {
+                if (email.length() > 255) {
+                    throw new BadRequestException("Email must not exceed 255 characters");
+                }
+                if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+                    throw new BadRequestException("Email must be valid");
+                }
+            }
+            patient.setEmail(email);
+        }
+        if (request.isAddressPresent()) {
+            String address = optional(request.getAddress());
+            if (address != null && address.length() > 255) {
+                throw new BadRequestException("Address must not exceed 255 characters");
+            }
+            patient.setAddress(address);
+        }
+        if (request.isEmergencyContactPresent()) {
+            String emergencyContact = optional(request.getEmergencyContact());
+            if (emergencyContact != null && emergencyContact.length() > 150) {
+                throw new BadRequestException("Emergency contact must not exceed 150 characters");
+            }
+            patient.setEmergencyContact(emergencyContact);
+        }
+        if (request.isEmergencyPhonePresent()) {
+            String emergencyPhone = optional(request.getEmergencyPhone());
+            if (emergencyPhone != null && emergencyPhone.length() > 30) {
+                throw new BadRequestException("Emergency phone must not exceed 30 characters");
+            }
+            patient.setEmergencyPhone(emergencyPhone);
         }
     }
 

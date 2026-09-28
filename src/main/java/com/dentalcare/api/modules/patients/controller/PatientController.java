@@ -1,6 +1,7 @@
 package com.dentalcare.api.modules.patients.controller;
 
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
+import com.dentalcare.api.modules.patients.dto.request.UpdatePatientProfileRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.response.CreatePatientAccessResponse;
 import com.dentalcare.api.modules.patients.dto.response.PatientHealthResponse;
@@ -16,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -76,6 +78,16 @@ public class PatientController {
     public ResponseEntity<PatientProfileResponse> findCurrentPatientProfile(
             @AuthenticationPrincipal AuthenticatedUser principal) {
         return ResponseEntity.ok(patientService.findCurrentPatientProfile(principal.userId()));
+    }
+
+    @Operation(summary = "Update the authenticated patient's profile details",
+            description = "Updates only allowed contact fields for the authenticated patient. Resolves identity strictly from the JWT principal. Requires ROLE_PATIENT.")
+    @PatchMapping("/me/profile")
+    @PreAuthorize("hasRole('PATIENT')")
+    public ResponseEntity<PatientProfileResponse> updateCurrentPatientProfile(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody UpdatePatientProfileRequest request) {
+        return ResponseEntity.ok(patientService.updateCurrentPatientProfile(principal.userId(), request));
     }
 
     @Operation(summary = "Get the authenticated patient's health summary",
