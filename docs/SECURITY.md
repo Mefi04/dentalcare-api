@@ -368,14 +368,16 @@ Patient self-service endpoints enable authenticated patients to inspect their ow
 
 - `GET /api/v1/patients/me`: Returns the basic administrative identity (`PatientResponse`).
 - `GET /api/v1/patients/me/profile`: Returns personal contact and identity details with a masked DPI (`PatientProfileResponse`).
-- `GET /api/v1/patients/me/health`: Returns the patient's health summary (`PatientHealthResponse`), currently returning an empty state (`status = EMPTY`) because the clinical domain remains to be implemented.
+- `GET /api/v1/patients/me/health`: Returns the patient's persisted health summary (`PatientHealthResponse`), or an `EMPTY` state when no clinical information exists.
 
 Security and authorization rules:
 1. **Identity resolution authority**: The backend is the sole authority for identifying the patient. Identity is resolved exclusively via `JWT` → `AuthenticatedUser.userId()` → `PatientRepository.findByUser_Id(userId)`.
 2. **Strict prohibition of client-supplied identifiers**: No self-service endpoint accepts or trusts `patientId`, `userId`, `dpi`, `cui`, or any identity parameter via path or query parameters. This eliminates IDOR and horizontal privilege escalation.
 3. **Role requirement**: All self-service endpoints require `ROLE_PATIENT` enforced via `@PreAuthorize("hasRole('PATIENT')")`. Staff roles (`ADMINISTRATOR`, `SECRETARY`, `DENTIST`, `ASSISTANT`, `CASHIER`) receive `403 Forbidden`. Requests without valid authentication receive `401 Unauthorized`.
 4. **Data protection and minimal exposure**: The `/me/profile` response exposes only the last four digits of the DPI (`*********XXXX`) and excludes sensitive administrative and user credentials (such as passwords, internal identifiers, billing tax IDs, or audit stamps).
-5. **Accurate semantics**: In `/me/health`, `lastUpdated` is `null` (not derived from `Patient.updatedAt`), and no fictional clinical data is returned until persistence models for allergies, medications, and conditions are implemented in future issues.
+5. **Accurate semantics**: In `/me/health`, `lastUpdated` comes only from the persisted medical history and remains `null` when none exists. It is never derived from `Patient.updatedAt`, and no fictional clinical data is returned.
+
+Administrative medical-history operations require explicit clinical authorities. `MEDICAL_HISTORY_READ` permits reading the subresource and `MEDICAL_HISTORY_UPDATE` permits creating or replacing it. Secretary, cashier, patient, or other roles without those authorities cannot use administrative clinical endpoints. Patient self-service remains read-only and resolves identity exclusively from the JWT principal.
 
 ### Login flow
 

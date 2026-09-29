@@ -3,9 +3,11 @@ package com.dentalcare.api.modules.patients.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.medicalhistory.service.MedicalHistoryService;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientProfileRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
+import com.dentalcare.api.modules.patients.dto.response.PatientHealthResponse;
 import com.dentalcare.api.modules.patients.dto.response.PatientHealthStatus;
 import com.dentalcare.api.modules.patients.dto.response.PatientProfileResponse;
 import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
@@ -50,6 +52,8 @@ class PatientServiceImplTests {
     @Mock
     private PatientRepository patientRepository;
     @Mock
+    private MedicalHistoryService medicalHistoryService;
+    @Mock
     private PatientCodeGenerator patientCodeGenerator;
     @Mock
     private UserRepository userRepository;
@@ -62,7 +66,7 @@ class PatientServiceImplTests {
 
     @BeforeEach
     void setUp() {
-        service = new PatientServiceImpl(patientRepository, new PatientMapper(), patientCodeGenerator,
+        service = new PatientServiceImpl(patientRepository, new PatientMapper(), medicalHistoryService, patientCodeGenerator,
                 userRepository, roleRepository, passwordEncoder, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -376,8 +380,7 @@ class PatientServiceImplTests {
     @Test
     void findCurrentPatientHealthResolvesAssociatedPatientAndReturnsEmptyClinicalState() {
         UUID userId = UUID.randomUUID();
-        Patient patient = existingPatient(UUID.randomUUID(), "2987451200101");
-        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(medicalHistoryService.findForAuthenticatedPatient(userId)).thenReturn(emptyHealthResponse());
 
         var response = service.findCurrentPatientHealth(userId);
 
@@ -388,13 +391,14 @@ class PatientServiceImplTests {
         assertThat(response.observations()).isNull();
         assertThat(response.lastUpdated()).isNull();
         assertThat(response.status()).isEqualTo(PatientHealthStatus.EMPTY);
-        verify(patientRepository).findByUser_Id(userId);
+        verify(medicalHistoryService).findForAuthenticatedPatient(userId);
     }
 
     @Test
     void findCurrentPatientHealthThrowsNotFoundWhenUserHasNoLinkedPatient() {
         UUID userId = UUID.randomUUID();
-        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.empty());
+        when(medicalHistoryService.findForAuthenticatedPatient(userId))
+                .thenThrow(new ResourceNotFoundException("Patient not found"));
 
         assertThatThrownBy(() -> service.findCurrentPatientHealth(userId))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -416,6 +420,8 @@ class PatientServiceImplTests {
 
         when(patientRepository.findByUser_Id(userIdA)).thenReturn(Optional.of(patientA));
         when(patientRepository.findByUser_Id(userIdB)).thenReturn(Optional.of(patientB));
+        when(medicalHistoryService.findForAuthenticatedPatient(userIdA)).thenReturn(emptyHealthResponse());
+        when(medicalHistoryService.findForAuthenticatedPatient(userIdB)).thenReturn(emptyHealthResponse());
 
         var profileA = service.findCurrentPatientProfile(userIdA);
         var profileB = service.findCurrentPatientProfile(userIdB);
@@ -434,8 +440,10 @@ class PatientServiceImplTests {
         assertThat(healthA.status()).isEqualTo(PatientHealthStatus.EMPTY);
         assertThat(healthB.status()).isEqualTo(PatientHealthStatus.EMPTY);
 
-        verify(patientRepository, times(2)).findByUser_Id(userIdA);
-        verify(patientRepository, times(2)).findByUser_Id(userIdB);
+        verify(patientRepository).findByUser_Id(userIdA);
+        verify(patientRepository).findByUser_Id(userIdB);
+        verify(medicalHistoryService).findForAuthenticatedPatient(userIdA);
+        verify(medicalHistoryService).findForAuthenticatedPatient(userIdB);
     }
 
     @Test
@@ -854,6 +862,11 @@ class PatientServiceImplTests {
         patient.setCreatedAt(NOW.minusSeconds(60));
         patient.setUpdatedAt(NOW.minusSeconds(60));
         return patient;
+    }
+
+    private PatientHealthResponse emptyHealthResponse() {
+        return new PatientHealthResponse(List.of(), List.of(), List.of(), List.of(), null, null,
+                PatientHealthStatus.EMPTY);
     }
 
     private void saveReturnsPatient() {

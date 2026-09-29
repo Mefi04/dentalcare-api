@@ -3,6 +3,7 @@ package com.dentalcare.api.modules.patients.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.medicalhistory.service.MedicalHistoryService;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientProfileRequest;
 import com.dentalcare.api.modules.patients.dto.request.UpdatePatientRequest;
@@ -46,6 +47,7 @@ public class PatientServiceImpl implements PatientService {
 
     private final PatientRepository patientRepository;
     private final PatientMapper patientMapper;
+    private final MedicalHistoryService medicalHistoryService;
     private final PatientCodeGenerator patientCodeGenerator;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -55,18 +57,21 @@ public class PatientServiceImpl implements PatientService {
 
     @Autowired
     public PatientServiceImpl(PatientRepository patientRepository, PatientMapper patientMapper,
+                              MedicalHistoryService medicalHistoryService,
                               PatientCodeGenerator patientCodeGenerator, UserRepository userRepository,
                               RoleRepository roleRepository, PasswordEncoder passwordEncoder, Clock clock) {
-        this(patientRepository, patientMapper, patientCodeGenerator, userRepository, roleRepository, passwordEncoder,
+        this(patientRepository, patientMapper, medicalHistoryService, patientCodeGenerator, userRepository, roleRepository, passwordEncoder,
                 clock, new SecureRandom());
     }
 
     PatientServiceImpl(PatientRepository patientRepository, PatientMapper patientMapper,
+                       MedicalHistoryService medicalHistoryService,
                        PatientCodeGenerator patientCodeGenerator, UserRepository userRepository,
                        RoleRepository roleRepository, PasswordEncoder passwordEncoder, Clock clock,
                        SecureRandom secureRandom) {
         this.patientRepository = patientRepository;
         this.patientMapper = patientMapper;
+        this.medicalHistoryService = medicalHistoryService;
         this.patientCodeGenerator = patientCodeGenerator;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -193,7 +198,7 @@ public class PatientServiceImpl implements PatientService {
     @Override
     @Transactional(readOnly = true)
     public PatientHealthResponse findCurrentPatientHealth(UUID authenticatedUserId) {
-        return patientMapper.toHealthResponse(findPatientByAuthenticatedUser(authenticatedUserId));
+        return medicalHistoryService.findForAuthenticatedPatient(authenticatedUserId);
     }
 
     private Patient findPatientByAuthenticatedUser(UUID authenticatedUserId) {
