@@ -146,7 +146,7 @@ Mobile clients (Expo / React Native) use dedicated endpoints under `/api/v1/auth
 | `GET` | `/api/v1/patients/me` | `ROLE_PATIENT` | `200 OK` | Resolves the associated patient solely from the JWT principal. It neither accepts nor trusts a patient ID supplied by the client. |
 | `GET` | `/api/v1/patients/me/profile` | `ROLE_PATIENT` | `200 OK` | Returns `PatientProfileResponse` with personal details and a masked DPI (`*********XXXX`). Identity resolved solely from JWT principal. |
 | `PATCH` | `/api/v1/patients/me/profile` | `ROLE_PATIENT` | `200 OK` | Partially updates editable contact details (`phone`, `email`, `address`, `emergencyContact`, `emergencyPhone`) for the authenticated patient. Identity resolved solely from JWT principal. Returns updated `PatientProfileResponse`. |
-| `GET` | `/api/v1/patients/me/health` | `ROLE_PATIENT` | `200 OK` | Returns `PatientHealthResponse` representing the patient's health summary (`EMPTY` status until clinical persistence models are implemented). Identity resolved solely from JWT principal. |
+| `GET` | `/api/v1/patients/me/health` | `ROLE_PATIENT` | `200 OK` | Returns the authenticated patient's persisted health summary. Identity is resolved solely from the JWT principal. |
 
 The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data. It exposes `portalAccessStatus` (`PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE`, `LOCKED`, or `null` if no portal account exists) derived directly from the linked user.
 
@@ -167,13 +167,22 @@ The standard `PatientResponse` is used for `/patients/me`; it never embeds user 
 - Status codes: `200 OK` on success with `PatientProfileResponse`; `400 Bad Request` on invalid email, blank phone, exceeded field lengths, or empty request payload; `401 Unauthorized` when unauthenticated; `403 Forbidden` for non-patient roles; `404 Not Found` if no patient is linked to the authenticated user account.
 
 `/patients/me/health` returns:
-- `allergies`: list of allergies (currently empty list `[]`).
-- `currentMedications`: list of medications (currently empty list `[]`).
-- `relevantConditions`: list of conditions (currently empty list `[]`).
-- `recentChanges`: list of changes (currently empty list `[]`).
-- `observations`: clinical observations (`null`).
-- `lastUpdated`: timestamp of medical record update (`null`, never using administrative `patient.updatedAt`).
-- `status`: `EMPTY` (valid domain representation for absent clinical records).
+- `allergies`: persisted allergies, or `[]` when none are recorded.
+- `currentMedications`: persisted current medications, or `[]` when none are recorded.
+- `relevantConditions`: persisted relevant medical conditions, or `[]` when none are recorded.
+- `recentChanges`: reserved for a future clinical audit feed and currently returned as `[]`.
+- `observations`: persisted general clinical observations, or `null`.
+- `lastUpdated`: medical-history update timestamp, or `null` when no record exists. It never uses administrative `patient.updatedAt`.
+- `status`: `EMPTY` when no clinical information exists, otherwise `UPDATED`.
+
+## Medical history endpoints
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/patients/{patientId}/medical-history` | `MEDICAL_HISTORY_READ` | `200 OK` | Returns the clinical background for an existing patient. An existing patient without a record receives an `EMPTY` response. |
+| `PUT` | `/api/v1/patients/{patientId}/medical-history` | `MEDICAL_HISTORY_UPDATE` | `200 OK` | Creates or fully replaces allergies, current medications, relevant conditions, and general observations for the patient. |
+
+The administrative medical-history request uses complete replacement semantics and requires all three collection fields. Each collection accepts at most 100 non-blank values of at most 200 characters; observations accept at most 4000 characters. Duplicate list values are normalized case-insensitively. Entities are never exposed directly.
 
 ## Pagination
 

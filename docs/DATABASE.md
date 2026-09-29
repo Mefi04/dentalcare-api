@@ -142,6 +142,13 @@ Patient portal accounts reuse the `users` table. `patients.user_id` is nullable 
 
 After a patient is linked to a user, their `dpi` must not change through the administrative patient update flow. This preserves the identity invariant `patients.dpi = users.cui`.
 
+## Medical history core
+
+Each patient may have at most one row in `medical_histories`, enforced by a unique foreign key to `patients.id`.
+Allergies, current medications, and relevant conditions are persisted in separate child tables rather than as delimited strings. This keeps individual values queryable and prevents coupling clinical collections to a presentation format. General observations and medical-history timestamps belong to `medical_histories`; administrative patient timestamps remain independent.
+
+Deleting a patient cascades to its medical-history core and collection rows. Clinical access is controlled by the backend permissions `MEDICAL_HISTORY_READ` and `MEDICAL_HISTORY_UPDATE`.
+
 ## Credentials & Environment Variables
 
 Database credentials must come exclusively from environment variables:
