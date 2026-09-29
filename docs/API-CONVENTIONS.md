@@ -150,6 +150,20 @@ Mobile clients (Expo / React Native) use dedicated endpoints under `/api/v1/auth
 
 The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data. It exposes `portalAccessStatus` (`PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE`, `LOCKED`, or `null` if no portal account exists) derived directly from the linked user.
 
+## Administrative appointment endpoints
+
+Administrative agenda operations use `/api/v1/appointments` and remain separate from patient self-service under `/api/v1/patients/me/appointments`.
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/appointments` | `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, or `ASSISTANT` | `200 OK` | Lists persisted appointments. Optional filters: `from`, `to`, `patientId`, `professionalId`, and `status`; supports `page` and `size`. |
+| `GET` | `/api/v1/appointments/{appointmentId}` | `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, or `ASSISTANT` | `200 OK` | Returns patient and professional summaries plus schedule, status, and audit timestamps. |
+| `POST` | `/api/v1/appointments` | `ADMINISTRATOR` or `SECRETARY` | `201 Created` | Creates a `SCHEDULED` appointment for an existing patient and active dentist. |
+| `PATCH` | `/api/v1/appointments/{appointmentId}/schedule` | `ADMINISTRATOR` or `SECRETARY` | `200 OK` | Reschedules an existing `SCHEDULED` appointment to a future instant. |
+| `PATCH` | `/api/v1/appointments/{appointmentId}/status` | `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, or `ASSISTANT` | `200 OK` | Moves a `SCHEDULED` appointment to `COMPLETED` or `CANCELLED`; terminal appointments cannot transition again. |
+
+`from` and `to` are inclusive ISO-8601 instants. When both are provided, `from` must not be after `to`. Pagination is zero-based and the service caps page size at 100. A scheduled appointment cannot share the same dentist and instant with another scheduled appointment. Cancellation changes status and never deletes the row.
+
 `/patients/me/profile` returns:
 - `fullName`: patient full name.
 - `maskedDpi`: 13-digit DPI with only the last 4 digits visible (`*********XXXX`).
