@@ -147,6 +147,11 @@ Mobile clients (Expo / React Native) use dedicated endpoints under `/api/v1/auth
 | `GET` | `/api/v1/patients/me/profile` | `ROLE_PATIENT` | `200 OK` | Returns `PatientProfileResponse` with personal details and a masked DPI (`*********XXXX`). Identity resolved solely from JWT principal. |
 | `PATCH` | `/api/v1/patients/me/profile` | `ROLE_PATIENT` | `200 OK` | Partially updates editable contact details (`phone`, `email`, `address`, `emergencyContact`, `emergencyPhone`) for the authenticated patient. Identity resolved solely from JWT principal. Returns updated `PatientProfileResponse`. |
 | `GET` | `/api/v1/patients/me/health` | `ROLE_PATIENT` | `200 OK` | Returns the authenticated patient's persisted health summary. Identity is resolved solely from the JWT principal. |
+| `GET` | `/api/v1/patients/me/appointments` | `ROLE_PATIENT` | `200 OK` | Lists paginated appointments owned by the authenticated patient in deterministic order (`scheduledAt DESC, id DESC`). Identity is resolved solely from the JWT principal. |
+| `GET` | `/api/v1/patients/me/appointments/{appointmentId}` | `ROLE_PATIENT` | `200 OK` | Retrieves detail of an appointment owned by the authenticated patient. Returns generic `404 Not Found` if missing or foreign. |
+| `POST` | `/api/v1/patients/me/appointments` | `ROLE_PATIENT` | `201 Created` | Schedules a new appointment for the authenticated patient with an active dentist. Time slot conflicts return `409 Conflict`. |
+| `GET` | `/api/v1/patients/me/appointments/professionals` | `ROLE_PATIENT` | `200 OK` | Lists active dentists available for patient self-service booking. Excludes sensitive staff fields. |
+| `PATCH` | `/api/v1/patients/me/appointments/{appointmentId}/cancel` | `ROLE_PATIENT` | `200 OK` | Cancels an appointment owned by the authenticated patient. Transitions status from `SCHEDULED` to `CANCELLED`. Rejects invalid transitions (`COMPLETED`, `CANCELLED`) with `409 Conflict`. Non-existent or foreign appointments return `404 Not Found`. Does not accept request body or patient ID parameter. |
 
 The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data. It exposes `portalAccessStatus` (`PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE`, `LOCKED`, or `null` if no portal account exists) derived directly from the linked user.
 
@@ -188,6 +193,16 @@ Administrative agenda operations use `/api/v1/appointments` and remain separate 
 - `observations`: persisted general clinical observations, or `null`.
 - `lastUpdated`: medical-history update timestamp, or `null` when no record exists. It never uses administrative `patient.updatedAt`.
 - `status`: `EMPTY` when no clinical information exists, otherwise `UPDATED`.
+
+### Patient appointment cancellation
+
+`PATCH /api/v1/patients/me/appointments/{appointmentId}/cancel`:
+- Authorization: Requires authenticated user with `ROLE_PATIENT`. Unauthenticated callers receive `401 Unauthorized`. Users without `ROLE_PATIENT` receive `403 Forbidden`.
+- Identity & Ownership: The patient is resolved exclusively from the JWT principal (`principal.userId()`). The appointment is queried strictly using `appointmentRepository.findByIdAndPatient_Id(appointmentId, patient.getId())`. An appointment that does not exist or belongs to another patient always returns `404 Not Found` with message `"Appointment not found"`, completely preventing IDOR and identifier enumeration.
+- Request payload: Does not accept a request body or any caller-supplied `patientId`, `userId`, or status parameter.
+- Transition rule: Only appointments in `SCHEDULED` status may be cancelled (`SCHEDULED -> CANCELLED`). Attempting to cancel an appointment in `COMPLETED` or `CANCELLED` status returns `409 Conflict` with message `"Only scheduled appointments can be cancelled"`.
+- Persistence & Audit: The cancellation is a state update, not a physical delete (`delete` / `deleteById` are never called). `appointment.status` is set to `CANCELLED` and `appointment.updatedAt` is updated with the current clock instant. The cancelled appointment row remains in the database and subsequent calls to list and detail reflect the `CANCELLED` status. Because the partial unique scheduling constraint covers only `WHERE status = 'SCHEDULED'`, cancelling frees the professional's time slot for new bookings.
+- Success response: `200 OK` returning `PatientAppointmentResponse` with updated `status: "CANCELLED"` and professional summary (`id`, `fullName`).
 
 ## Medical history endpoints
 

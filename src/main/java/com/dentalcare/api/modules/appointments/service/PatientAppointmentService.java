@@ -17,5 +17,8 @@ public interface PatientAppointmentService {
     PatientAppointmentResponse createCurrentPatientAppointment(
             UUID authenticatedUserId, UUID professionalId, Instant scheduledAt);
 
+    PatientAppointmentResponse cancelCurrentPatientAppointment(
+            UUID authenticatedUserId, UUID appointmentId);
+
     List<AppointmentProfessionalResponse> findAvailableProfessionals();
 }

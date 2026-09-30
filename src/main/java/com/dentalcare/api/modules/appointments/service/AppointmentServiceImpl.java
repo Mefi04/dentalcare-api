@@ -76,6 +76,18 @@ public class AppointmentServiceImpl implements AppointmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
     }
 
+    @Override
+    @Transactional
+    public Appointment cancel(Appointment appointment) {
+        if (appointment == null) throw new BadRequestException("Appointment is required");
+        if (appointment.getStatus() != AppointmentStatus.SCHEDULED) {
+            throw new ConflictException("Only scheduled appointments can be cancelled");
+        }
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        appointment.setUpdatedAt(clock.instant());
+        return appointmentRepository.saveAndFlush(appointment);
+    }
+
     private void validateDentist(User professional) {
         boolean activeDentist = professional.getStatus() == UserStatus.ACTIVE
                 && professional.getRoles().stream()
