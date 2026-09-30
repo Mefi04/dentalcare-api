@@ -390,6 +390,8 @@ Administrative billing operations require explicit billing authorities, assigned
 
 `DENTIST`, `ASSISTANT`, `PATIENT`, and any caller without the required authority receive `403 Forbidden` on administrative billing endpoints; unauthenticated requests receive `401 Unauthorized`. Patients read only their own statement through `GET /api/v1/patients/me/account-statement`, which is read-only, requires `ROLE_PATIENT`, and returns `403 Forbidden` to staff roles. Clients never send the payment kind, paid amounts, or balances; the backend derives them from persisted data.
 
+Administrative appointment endpoints are isolated under `/api/v1/appointments`. `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, and `ASSISTANT` may read the agenda and update appointment status. Creating and rescheduling appointments is limited to `ADMINISTRATOR` and `SECRETARY`. `PATIENT` and `CASHIER` cannot use the administrative contract. Patient-owned appointment operations remain under `/api/v1/patients/me/appointments` and continue to derive ownership exclusively from the JWT principal.
+
 ### Login flow
 
 1. Validate and normalize the 13-digit CUI.

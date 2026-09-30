@@ -5,6 +5,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import com.dentalcare.api.security.jwt.JwtService;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
+import com.dentalcare.api.modules.appointments.repository.AdministrativeAppointmentRepository;
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.medicalhistory.repository.MedicalHistoryRepository;
@@ -35,6 +36,9 @@ class DentalCareApplicationTests {
 
     @MockitoBean
     AppointmentRepository appointmentRepository;
+
+    @MockitoBean
+    AdministrativeAppointmentRepository administrativeAppointmentRepository;
 
     @MockitoBean
     MedicalHistoryRepository medicalHistoryRepository;
