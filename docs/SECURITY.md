@@ -379,6 +379,8 @@ Security and authorization rules:
 
 Administrative medical-history operations require explicit clinical authorities. `MEDICAL_HISTORY_READ` permits reading the subresource and `MEDICAL_HISTORY_UPDATE` permits creating or replacing it. Secretary, cashier, patient, or other roles without those authorities cannot use administrative clinical endpoints. Patient self-service remains read-only and resolves identity exclusively from the JWT principal.
 
+Administrative appointment endpoints are isolated under `/api/v1/appointments`. `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, and `ASSISTANT` may read the agenda and update appointment status. Creating and rescheduling appointments is limited to `ADMINISTRATOR` and `SECRETARY`. `PATIENT` and `CASHIER` cannot use the administrative contract. Patient-owned appointment operations remain under `/api/v1/patients/me/appointments` and continue to derive ownership exclusively from the JWT principal.
+
 ### Login flow
 
 1. Validate and normalize the 13-digit CUI.
