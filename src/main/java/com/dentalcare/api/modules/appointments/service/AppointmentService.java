@@ -9,4 +9,5 @@ public interface AppointmentService {
     Appointment create(UUID patientId, UUID professionalId, Instant scheduledAt);
     Appointment findById(UUID id);
     Appointment cancel(Appointment appointment);
+    Appointment reschedule(Appointment appointment, Instant scheduledAt);
 }

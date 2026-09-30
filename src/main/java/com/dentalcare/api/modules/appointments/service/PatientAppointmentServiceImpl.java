@@ -90,6 +90,18 @@ public class PatientAppointmentServiceImpl implements PatientAppointmentService 
     }
 
     @Override
+    @Transactional
+    public PatientAppointmentResponse rescheduleCurrentPatientAppointment(
+            UUID authenticatedUserId, UUID appointmentId, Instant scheduledAt) {
+        if (appointmentId == null) throw new BadRequestException("Appointment id is required");
+        Patient patient = findPatientByAuthenticatedUser(authenticatedUserId);
+        Appointment appointment = appointmentRepository
+                .findByIdAndPatient_IdForUpdate(appointmentId, patient.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+        return appointmentMapper.toPatientResponse(appointmentService.reschedule(appointment, scheduledAt));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<AppointmentProfessionalResponse> findAvailableProfessionals() {
         return userRepository.findActiveDentists().stream()

@@ -88,6 +88,37 @@ public class AppointmentServiceImpl implements AppointmentService {
         return appointmentRepository.saveAndFlush(appointment);
     }
 
+    @Override
+    @Transactional
+    public Appointment reschedule(Appointment appointment, Instant scheduledAt) {
+        if (appointment == null) throw new BadRequestException("Appointment is required");
+        if (scheduledAt == null) {
+            throw new BadRequestException("Appointment date and time are required");
+        }
+        if (!scheduledAt.isAfter(clock.instant())) {
+            throw new BadRequestException("Appointment date and time must be in the future");
+        }
+        if (appointment.getStatus() != AppointmentStatus.SCHEDULED) {
+            throw new ConflictException("Only scheduled appointments can be rescheduled");
+        }
+        if (scheduledAt.equals(appointment.getScheduledAt())) {
+            return appointment;
+        }
+        if (appointmentRepository.existsByProfessional_IdAndScheduledAtAndStatusAndIdNot(
+                appointment.getProfessional().getId(), scheduledAt,
+                AppointmentStatus.SCHEDULED, appointment.getId())) {
+            throw new ConflictException("Appointment time is not available");
+        }
+
+        appointment.setScheduledAt(scheduledAt);
+        appointment.setUpdatedAt(clock.instant());
+        try {
+            return appointmentRepository.saveAndFlush(appointment);
+        } catch (DataIntegrityViolationException exception) {
+            throw new ConflictException("Appointment time is not available");
+        }
+    }
+
     private void validateDentist(User professional) {
         boolean activeDentist = professional.getStatus() == UserStatus.ACTIVE
                 && professional.getRoles().stream()

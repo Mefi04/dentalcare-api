@@ -20,5 +20,8 @@ public interface PatientAppointmentService {
     PatientAppointmentResponse cancelCurrentPatientAppointment(
             UUID authenticatedUserId, UUID appointmentId);
 
+    PatientAppointmentResponse rescheduleCurrentPatientAppointment(
+            UUID authenticatedUserId, UUID appointmentId, Instant scheduledAt);
+
     List<AppointmentProfessionalResponse> findAvailableProfessionals();
 }
