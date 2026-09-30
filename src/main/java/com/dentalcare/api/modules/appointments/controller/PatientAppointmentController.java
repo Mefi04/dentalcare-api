@@ -1,6 +1,7 @@
 package com.dentalcare.api.modules.appointments.controller;
 
 import com.dentalcare.api.modules.appointments.dto.request.CreatePatientAppointmentRequest;
+import com.dentalcare.api.modules.appointments.dto.request.RescheduleAppointmentRequest;
 import com.dentalcare.api.modules.appointments.dto.response.AppointmentProfessionalResponse;
 import com.dentalcare.api.modules.appointments.dto.response.PatientAppointmentResponse;
 import com.dentalcare.api.modules.appointments.service.PatientAppointmentService;
@@ -72,6 +73,16 @@ public class PatientAppointmentController {
             @PathVariable UUID appointmentId) {
         return ResponseEntity.ok(patientAppointmentService.cancelCurrentPatientAppointment(
                 principal.userId(), appointmentId));
+    }
+
+    @Operation(summary = "Reschedule an appointment owned by the authenticated patient")
+    @PatchMapping("/{appointmentId}/schedule")
+    public ResponseEntity<PatientAppointmentResponse> rescheduleCurrentPatientAppointment(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @PathVariable UUID appointmentId,
+            @Valid @RequestBody RescheduleAppointmentRequest request) {
+        return ResponseEntity.ok(patientAppointmentService.rescheduleCurrentPatientAppointment(
+                principal.userId(), appointmentId, request.scheduledAt()));
     }
 
     @Operation(summary = "List dentists available for patient appointment booking")

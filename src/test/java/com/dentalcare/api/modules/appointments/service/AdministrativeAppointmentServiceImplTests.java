@@ -153,17 +153,17 @@ class AdministrativeAppointmentServiceImplTests {
         Instant newDate = FUTURE.plusSeconds(7200);
         when(administrativeAppointmentRepository.findDetailedByIdForUpdate(appointment.getId()))
                 .thenReturn(Optional.of(appointment));
-        when(administrativeAppointmentRepository
-                .existsByProfessional_IdAndScheduledAtAndStatusAndIdNot(
-                        appointment.getProfessional().getId(), newDate,
-                        AppointmentStatus.SCHEDULED, appointment.getId()))
-                .thenReturn(false);
-        when(administrativeAppointmentRepository.saveAndFlush(appointment)).thenReturn(appointment);
+        when(appointmentService.reschedule(appointment, newDate)).thenAnswer(invocation -> {
+            appointment.setScheduledAt(newDate);
+            appointment.setUpdatedAt(NOW);
+            return appointment;
+        });
 
         var response = service.reschedule(appointment.getId(), newDate);
 
         assertThat(response.scheduledAt()).isEqualTo(newDate);
         assertThat(response.updatedAt()).isEqualTo(NOW);
+        verify(appointmentService).reschedule(appointment, newDate);
     }
 
     @Test
@@ -172,6 +172,8 @@ class AdministrativeAppointmentServiceImplTests {
                 FUTURE, AppointmentStatus.COMPLETED);
         when(administrativeAppointmentRepository.findDetailedByIdForUpdate(completed.getId()))
                 .thenReturn(Optional.of(completed));
+        when(appointmentService.reschedule(completed, FUTURE.plusSeconds(1)))
+                .thenThrow(new ConflictException("Only scheduled appointments can be rescheduled"));
 
         assertThatThrownBy(() -> service.reschedule(completed.getId(), FUTURE.plusSeconds(1)))
                 .isInstanceOf(ConflictException.class)
@@ -182,11 +184,8 @@ class AdministrativeAppointmentServiceImplTests {
         Instant occupiedDate = FUTURE.plusSeconds(7200);
         when(administrativeAppointmentRepository.findDetailedByIdForUpdate(scheduled.getId()))
                 .thenReturn(Optional.of(scheduled));
-        when(administrativeAppointmentRepository
-                .existsByProfessional_IdAndScheduledAtAndStatusAndIdNot(
-                        scheduled.getProfessional().getId(), occupiedDate,
-                        AppointmentStatus.SCHEDULED, scheduled.getId()))
-                .thenReturn(true);
+        when(appointmentService.reschedule(scheduled, occupiedDate))
+                .thenThrow(new ConflictException("Appointment time is not available"));
 
         assertThatThrownBy(() -> service.reschedule(scheduled.getId(), occupiedDate))
                 .isInstanceOf(ConflictException.class)

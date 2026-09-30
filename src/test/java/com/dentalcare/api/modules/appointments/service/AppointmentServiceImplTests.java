@@ -226,6 +226,64 @@ class AppointmentServiceImplTests {
         verify(appointments, never()).saveAndFlush(any());
     }
 
+    @Test
+    void reschedulesScheduledAppointmentAndUpdatesTimestamp() {
+        Appointment appointment = new Appointment(UUID.randomUUID(), patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.SCHEDULED, NOW.minusSeconds(3600), NOW.minusSeconds(3600));
+        Instant newDate = SCHEDULED_AT.plusSeconds(7200);
+        when(appointments.saveAndFlush(appointment)).thenReturn(appointment);
+
+        Appointment result = service.reschedule(appointment, newDate);
+
+        assertThat(result.getScheduledAt()).isEqualTo(newDate);
+        assertThat(result.getUpdatedAt()).isEqualTo(NOW);
+        verify(appointments).existsByProfessional_IdAndScheduledAtAndStatusAndIdNot(
+                dentist.getId(), newDate, AppointmentStatus.SCHEDULED, appointment.getId());
+        verify(appointments).saveAndFlush(appointment);
+    }
+
+    @Test
+    void rescheduleRejectsInvalidDateAndNonScheduledStates() {
+        Appointment completed = new Appointment(UUID.randomUUID(), patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.COMPLETED, NOW, NOW);
+        Appointment cancelled = new Appointment(UUID.randomUUID(), patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.CANCELLED, NOW, NOW);
+
+        assertThatThrownBy(() -> service.reschedule(completed, SCHEDULED_AT.plusSeconds(1)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Only scheduled appointments can be rescheduled");
+        assertThatThrownBy(() -> service.reschedule(cancelled, SCHEDULED_AT.plusSeconds(1)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Only scheduled appointments can be rescheduled");
+        assertThatThrownBy(() -> service.reschedule(completed, NOW))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Appointment date and time must be in the future");
+        assertThatThrownBy(() -> service.reschedule(completed, null))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Appointment date and time are required");
+    }
+
+    @Test
+    void rescheduleRejectsDetectedAndDatabaseScheduleConflicts() {
+        Appointment appointment = new Appointment(UUID.randomUUID(), patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.SCHEDULED, NOW, NOW);
+        Instant newDate = SCHEDULED_AT.plusSeconds(7200);
+        when(appointments.existsByProfessional_IdAndScheduledAtAndStatusAndIdNot(
+                dentist.getId(), newDate, AppointmentStatus.SCHEDULED, appointment.getId()))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> service.reschedule(appointment, newDate))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Appointment time is not available");
+
+        Instant anotherDate = newDate.plusSeconds(3600);
+        when(appointments.saveAndFlush(appointment))
+                .thenThrow(new DataIntegrityViolationException("constraint details"));
+        assertThatThrownBy(() -> service.reschedule(appointment, anotherDate))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Appointment time is not available");
+    }
+
     private User userWithRole(String roleCode, boolean roleActive, UserStatus status) {
         User user = new User(UUID.randomUUID(), "staff-" + UUID.randomUUID(), "Professional",
                 "professional@example.test", "1234567890123", "hash", status, NOW, NOW);

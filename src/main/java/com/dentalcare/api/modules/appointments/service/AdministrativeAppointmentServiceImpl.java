@@ -103,30 +103,9 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
     @Transactional
     public AdministrativeAppointmentResponse reschedule(UUID appointmentId, Instant scheduledAt) {
         requireAppointmentId(appointmentId);
-        if (scheduledAt == null) {
-            throw new BadRequestException("Appointment date and time are required");
-        }
-        if (!scheduledAt.isAfter(clock.instant())) {
-            throw new BadRequestException("Appointment date and time must be in the future");
-        }
-
         Appointment appointment = findForUpdate(appointmentId);
-        if (appointment.getStatus() != AppointmentStatus.SCHEDULED) {
-            throw new ConflictException("Only scheduled appointments can be rescheduled");
-        }
-        if (scheduledAt.equals(appointment.getScheduledAt())) {
-            return administrativeAppointmentMapper.toResponse(appointment);
-        }
-        if (administrativeAppointmentRepository
-                .existsByProfessional_IdAndScheduledAtAndStatusAndIdNot(
-                        appointment.getProfessional().getId(), scheduledAt,
-                        AppointmentStatus.SCHEDULED, appointmentId)) {
-            throw new ConflictException("Appointment time is not available");
-        }
-
-        appointment.setScheduledAt(scheduledAt);
-        appointment.setUpdatedAt(clock.instant());
-        return save(appointment);
+        return administrativeAppointmentMapper.toResponse(
+                appointmentService.reschedule(appointment, scheduledAt));
     }
 
     @Override

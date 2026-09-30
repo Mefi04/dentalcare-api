@@ -55,6 +55,41 @@ class PatientAppointmentServiceImplTests {
     }
 
     @Test
+    void reschedulesOnlyOwnedAppointmentUsingLockedOwnershipQuery() {
+        Appointment appointment = appointment(patient.getId());
+        Instant newDate = appointment.getScheduledAt().plusSeconds(7200);
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(appointments.findByIdAndPatient_IdForUpdate(appointment.getId(), patient.getId()))
+                .thenReturn(Optional.of(appointment));
+        when(appointmentService.reschedule(appointment, newDate)).thenAnswer(invocation -> {
+            appointment.setScheduledAt(newDate);
+            return appointment;
+        });
+
+        PatientAppointmentResponse result = service.rescheduleCurrentPatientAppointment(
+                userId, appointment.getId(), newDate);
+
+        assertThat(result.scheduledAt()).isEqualTo(newDate);
+        verify(appointments).findByIdAndPatient_IdForUpdate(appointment.getId(), patient.getId());
+        verify(appointmentService).reschedule(appointment, newDate);
+    }
+
+    @Test
+    void foreignAndUnknownRescheduleUseSameNotFoundResult() {
+        UUID foreignOrUnknownId = UUID.randomUUID();
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(appointments.findByIdAndPatient_IdForUpdate(foreignOrUnknownId, patient.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.rescheduleCurrentPatientAppointment(
+                userId, foreignOrUnknownId, Instant.parse("2026-10-15T12:00:00Z")))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Appointment not found");
+        verify(appointmentService, never()).reschedule(any(), any());
+        verify(appointments, never()).findById(any());
+    }
+
+    @Test
     void listsOnlyResolvedPatientsAppointmentsWithDeterministicPagination() {
         Appointment appointment = appointment(patient.getId());
         when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));

@@ -169,6 +169,19 @@ class AppointmentRepositoryIntegrationTests {
     }
 
     @Test
+    void lockedOwnershipQueryDoesNotReturnAnotherPatientsAppointment() {
+        Patient otherPatient = patients.save(patient("2000000000007"));
+        Appointment foreignAppointment = appointments.saveAndFlush(appointment(otherPatient, SCHEDULED_AT));
+
+        Optional<Appointment> result = appointments.findByIdAndPatient_IdForUpdate(
+                foreignAppointment.getId(), patient.getId());
+
+        assertThat(result).isEmpty();
+        assertThat(appointments.findByIdAndPatient_IdForUpdate(
+                foreignAppointment.getId(), otherPatient.getId())).isPresent();
+    }
+
+    @Test
     void postgresRejectsTwoScheduledAppointmentsForSameProfessionalAndInstant() {
         appointments.saveAndFlush(appointment(patient, SCHEDULED_AT));
 

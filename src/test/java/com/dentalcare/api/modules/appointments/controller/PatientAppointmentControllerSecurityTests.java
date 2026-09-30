@@ -331,6 +331,87 @@ class PatientAppointmentControllerSecurityTests {
     }
 
     @Test
+    void patientReschedulesOwnedAppointmentAndReturnsUpdatedSchedule() throws Exception {
+        Instant newDate = Instant.parse("2026-10-12T15:00:00Z");
+        patientToken("patient-token", userId);
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(appointments.findByIdAndPatient_IdForUpdate(appointment.getId(), patient.getId()))
+                .thenReturn(Optional.of(appointment));
+        Appointment rescheduled = new Appointment(
+                appointment.getId(), patient, appointment.getProfessional(), newDate,
+                AppointmentStatus.SCHEDULED, appointment.getCreatedAt(), Instant.now());
+        when(appointmentService.reschedule(appointment, newDate)).thenReturn(rescheduled);
+
+        mockMvc.perform(patch("/api/v1/patients/me/appointments/{id}/schedule", appointment.getId())
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json")
+                        .content("{\"scheduledAt\":\"%s\"}".formatted(newDate)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(appointment.getId().toString()))
+                .andExpect(jsonPath("$.scheduledAt").value(newDate.toString()))
+                .andExpect(jsonPath("$.professional.id")
+                        .value(appointment.getProfessional().getId().toString()));
+    }
+
+    @Test
+    void rescheduleValidatesRequiredPastAndMalformedDates() throws Exception {
+        patientToken("patient-token", userId);
+
+        mockMvc.perform(patch("/api/v1/patients/me/appointments/{id}/schedule", appointment.getId())
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json").content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.scheduledAt").exists());
+        mockMvc.perform(patch("/api/v1/patients/me/appointments/{id}/schedule", appointment.getId())
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json")
+                        .content("{\"scheduledAt\":\"2020-01-01T00:00:00Z\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(patch("/api/v1/patients/me/appointments/{id}/schedule", appointment.getId())
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json")
+                        .content("{\"scheduledAt\":\"invalid\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rescheduleForeignAndUnknownAppointmentsReturnSame404WithoutDisclosure() throws Exception {
+        UUID foreignOrUnknownId = UUID.randomUUID();
+        patientToken("patient-token", userId);
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(appointments.findByIdAndPatient_IdForUpdate(foreignOrUnknownId, patient.getId()))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(patch("/api/v1/patients/me/appointments/{id}/schedule", foreignOrUnknownId)
+                        .header("Authorization", "Bearer patient-token")
+                        .contentType("application/json")
+                        .content("{\"scheduledAt\":\"2026-10-12T15:00:00Z\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Appointment not found"));
+
+        verify(appointments, never()).findById(any());
+        verify(appointmentService, never()).reschedule(any(), any());
+    }
+
+    @Test
+    void rescheduleRequiresPatientRoleForEveryStaffRole() throws Exception {
+        String path = "/api/v1/patients/me/appointments/{id}/schedule";
+        String body = "{\"scheduledAt\":\"2026-10-12T15:00:00Z\"}";
+        mockMvc.perform(patch(path, appointment.getId()).contentType("application/json").content(body))
+                .andExpect(status().isUnauthorized());
+
+        for (String role : List.of("ADMINISTRATOR", "SECRETARY", "DENTIST", "ASSISTANT", "CASHIER")) {
+            String token = role.toLowerCase() + "-token";
+            when(jwtService.parseAccessToken(token)).thenReturn(
+                    new JwtService.AccessTokenClaims(UUID.randomUUID(), List.of("ROLE_" + role)));
+            mockMvc.perform(patch(path, appointment.getId())
+                            .header("Authorization", "Bearer " + token)
+                            .contentType("application/json").content(body))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
     void listingAndDetailReflectCancelledStatus() throws Exception {
         patientToken("patient-token", userId);
         Appointment cancelledAppointment = new Appointment(
