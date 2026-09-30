@@ -369,6 +369,7 @@ Patient self-service endpoints enable authenticated patients to inspect their ow
 - `GET /api/v1/patients/me`: Returns the basic administrative identity (`PatientResponse`).
 - `GET /api/v1/patients/me/profile`: Returns personal contact and identity details with a masked DPI (`PatientProfileResponse`).
 - `GET /api/v1/patients/me/health`: Returns the patient's persisted health summary (`PatientHealthResponse`), or an `EMPTY` state when no clinical information exists.
+- `GET /api/v1/patients/me/account-statement`: Returns the patient's own charges, payments, and derived balance (`AccountStatementResponse`).
 
 Security and authorization rules:
 1. **Identity resolution authority**: The backend is the sole authority for identifying the patient. Identity is resolved exclusively via `JWT` → `AuthenticatedUser.userId()` → `PatientRepository.findByUser_Id(userId)`.
@@ -378,6 +379,16 @@ Security and authorization rules:
 5. **Accurate semantics**: In `/me/health`, `lastUpdated` comes only from the persisted medical history and remains `null` when none exists. It is never derived from `Patient.updatedAt`, and no fictional clinical data is returned.
 
 Administrative medical-history operations require explicit clinical authorities. `MEDICAL_HISTORY_READ` permits reading the subresource and `MEDICAL_HISTORY_UPDATE` permits creating or replacing it. Secretary, cashier, patient, or other roles without those authorities cannot use administrative clinical endpoints. Patient self-service remains read-only and resolves identity exclusively from the JWT principal.
+
+Administrative billing operations require explicit billing authorities, assigned following the frontend access rules for the cash module:
+
+| Permission | Roles | Allows |
+|---|---|---|
+| `BILLING_READ` | `ADMINISTRATOR`, `SECRETARY`, `CASHIER` | Reading any patient's account statement. |
+| `BILLING_CHARGE_CREATE` | `ADMINISTRATOR`, `CASHIER` | Registering charges. |
+| `BILLING_PAYMENT_CREATE` | `ADMINISTRATOR`, `CASHIER` | Registering payments and advances. |
+
+`DENTIST`, `ASSISTANT`, `PATIENT`, and any caller without the required authority receive `403 Forbidden` on administrative billing endpoints; unauthenticated requests receive `401 Unauthorized`. Patients read only their own statement through `GET /api/v1/patients/me/account-statement`, which is read-only, requires `ROLE_PATIENT`, and returns `403 Forbidden` to staff roles. Clients never send the payment kind, paid amounts, or balances; the backend derives them from persisted data.
 
 ### Login flow
 

@@ -149,6 +149,19 @@ Allergies, current medications, and relevant conditions are persisted in separat
 
 Deleting a patient cascades to its medical-history core and collection rows. Clinical access is controlled by the backend permissions `MEDICAL_HISTORY_READ` and `MEDICAL_HISTORY_UPDATE`.
 
+## Billing core
+
+Billing persists two append-only tables linked to `patients.id`:
+
+- `billing_charges`: `concept`, `amount`, and `created_at`.
+- `billing_payments`: optional `charge_id`, `kind` (`PAYMENT`, `PARTIAL_PAYMENT`, `ADVANCE`), `method` (`CASH`, `CARD`, `TRANSFER`, `CHECK`), `amount`, and `created_at`.
+
+Monetary amounts use `NUMERIC(12,2)` in PostgreSQL and `BigDecimal` in Java; floating-point types are never used for money. `CHECK` constraints require positive amounts, a non-blank concept, and `kind = 'ADVANCE'` exactly when `charge_id` is null. The composite foreign key `(charge_id, patient_id)` → `billing_charges (id, patient_id)` guarantees at the database level that a payment can only be applied to a charge of the same patient.
+
+Paid amounts, charge status, and account balance are derived from these rows and are never stored. Registering a payment against a charge locks that charge row (`PESSIMISTIC_WRITE`) before summing its payments, so concurrent payments cannot exceed the charge amount. Account statements are read in a read-only `REPEATABLE READ` transaction so their totals always match the listed rows.
+
+Billing foreign keys to `patients` do not cascade: financial history is never removed implicitly together with a patient. Changeset `009-create-billing-core` also seeds the permissions `BILLING_READ`, `BILLING_CHARGE_CREATE`, and `BILLING_PAYMENT_CREATE`.
+
 ## Credentials & Environment Variables
 
 Database credentials must come exclusively from environment variables:
