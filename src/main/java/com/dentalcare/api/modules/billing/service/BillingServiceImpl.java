@@ -1,12 +1,15 @@
 package com.dentalcare.api.modules.billing.service;
 
 import com.dentalcare.api.exception.BadRequestException;
+import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.billing.dto.request.CreateChargeRequest;
+import com.dentalcare.api.modules.billing.dto.request.CreatePaymentRequest;
 import com.dentalcare.api.modules.billing.dto.response.AccountStatementResponse;
 import com.dentalcare.api.modules.billing.dto.response.AccountSummaryResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeStatus;
+import com.dentalcare.api.modules.billing.dto.response.PaymentResponse;
 import com.dentalcare.api.modules.billing.mapper.BillingMapper;
 import com.dentalcare.api.modules.billing.model.Charge;
 import com.dentalcare.api.modules.billing.model.Payment;
@@ -89,6 +92,41 @@ public class BillingServiceImpl implements BillingService {
         Charge charge = chargeRepository.saveAndFlush(
                 new Charge(UUID.randomUUID(), patient, concept, amount, clock.instant()));
         return toChargeResponse(charge, ZERO);
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse registerPayment(UUID patientId, CreatePaymentRequest request) {
+        requirePatientId(patientId);
+        if (request == null) {
+            throw new BadRequestException("Payment is required");
+        }
+        if (request.method() == null) {
+            throw new BadRequestException("Payment method is required");
+        }
+        BigDecimal amount = normalizeAmount(request.amount());
+        Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
+
+        Charge charge = null;
+        PaymentKind kind = PaymentKind.ADVANCE;
+        if (request.chargeId() != null) {
+            // Locking the charge serializes concurrent payments, so their sum can never exceed its amount.
+            charge = chargeRepository.findByIdAndPatientIdForUpdate(request.chargeId(), patientId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Charge not found"));
+            BigDecimal pending = charge.getAmount().subtract(paymentRepository.sumAmountByChargeId(charge.getId()));
+            if (pending.signum() <= 0) {
+                throw new ConflictException("Charge is already paid");
+            }
+            if (amount.compareTo(pending) > 0) {
+                throw new ConflictException("Payment amount exceeds the pending balance of the charge");
+            }
+            kind = amount.compareTo(pending) == 0 ? PaymentKind.PAYMENT : PaymentKind.PARTIAL_PAYMENT;
+        }
+
+        Payment payment = paymentRepository.saveAndFlush(new Payment(
+                UUID.randomUUID(), patient, charge, kind, request.method(), amount, clock.instant()));
+        return billingMapper.toPaymentResponse(payment);
     }
 
     private AccountStatementResponse buildStatement(UUID patientId) {

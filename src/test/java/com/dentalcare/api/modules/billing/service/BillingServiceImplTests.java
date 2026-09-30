@@ -1,8 +1,10 @@
 package com.dentalcare.api.modules.billing.service;
 
 import com.dentalcare.api.exception.BadRequestException;
+import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.billing.dto.request.CreateChargeRequest;
+import com.dentalcare.api.modules.billing.dto.request.CreatePaymentRequest;
 import com.dentalcare.api.modules.billing.dto.response.AccountStatementResponse;
 import com.dentalcare.api.modules.billing.dto.response.AccountSummaryResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeResponse;
@@ -230,6 +232,142 @@ class BillingServiceImplTests {
                 .hasMessage("Patient not found");
 
         verifyNoInteractions(chargeRepository, paymentRepository);
+    }
+
+    @Test
+    void registersAdvanceWithoutChargeAndWithoutLocking() {
+        Patient patient = patient();
+        when(patientRepository.findById(patient.getId())).thenReturn(Optional.of(patient));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentResponse response = service.registerPayment(patient.getId(),
+                new CreatePaymentRequest(null, money("200"), PaymentMethod.TRANSFER));
+
+        assertThat(response.kind()).isEqualTo(PaymentKind.ADVANCE);
+        assertThat(response.chargeId()).isNull();
+        assertThat(response.amount()).isEqualTo(money("200.00"));
+        assertThat(response.method()).isEqualTo(PaymentMethod.TRANSFER);
+        assertThat(response.createdAt()).isEqualTo(NOW);
+        verifyNoInteractions(chargeRepository);
+    }
+
+    @Test
+    void amountBelowPendingBalanceIsRegisteredAsPartialPaymentOfLockedCharge() {
+        Patient patient = patient();
+        Charge charge = charge(patient, "Limpieza", "300.00");
+        stubLockedCharge(patient, charge, "100.00");
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentResponse response = service.registerPayment(patient.getId(),
+                new CreatePaymentRequest(charge.getId(), money("50.00"), PaymentMethod.CASH));
+
+        ArgumentCaptor<Payment> saved = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).saveAndFlush(saved.capture());
+        assertThat(saved.getValue().getPatient()).isSameAs(patient);
+        assertThat(saved.getValue().getCharge()).isSameAs(charge);
+        assertThat(response.kind()).isEqualTo(PaymentKind.PARTIAL_PAYMENT);
+        assertThat(response.chargeId()).isEqualTo(charge.getId());
+        assertThat(response.amount()).isEqualTo(money("50.00"));
+    }
+
+    @Test
+    void amountSettlingThePendingBalanceIsRegisteredAsPayment() {
+        Patient patient = patient();
+        Charge charge = charge(patient, "Limpieza", "300.00");
+        stubLockedCharge(patient, charge, "100.00");
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentResponse response = service.registerPayment(patient.getId(),
+                new CreatePaymentRequest(charge.getId(), money("200.00"), PaymentMethod.CARD));
+
+        assertThat(response.kind()).isEqualTo(PaymentKind.PAYMENT);
+    }
+
+    @Test
+    void rejectsPaymentExceedingPendingBalance() {
+        Patient patient = patient();
+        Charge charge = charge(patient, "Limpieza", "300.00");
+        stubLockedCharge(patient, charge, "100.00");
+
+        assertThatThrownBy(() -> service.registerPayment(patient.getId(),
+                new CreatePaymentRequest(charge.getId(), money("200.01"), PaymentMethod.CASH)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Payment amount exceeds the pending balance of the charge");
+
+        verify(paymentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void rejectsPaymentOnFullyPaidCharge() {
+        Patient patient = patient();
+        Charge charge = charge(patient, "Limpieza", "300.00");
+        stubLockedCharge(patient, charge, "300.00");
+
+        assertThatThrownBy(() -> service.registerPayment(patient.getId(),
+                new CreatePaymentRequest(charge.getId(), money("0.01"), PaymentMethod.CASH)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Charge is already paid");
+
+        verify(paymentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void chargeOfAnotherPatientIsReportedAsNotFound() {
+        Patient patient = patient();
+        UUID foreignChargeId = UUID.randomUUID();
+        when(patientRepository.findById(patient.getId())).thenReturn(Optional.of(patient));
+        when(chargeRepository.findByIdAndPatientIdForUpdate(foreignChargeId, patient.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.registerPayment(patient.getId(),
+                new CreatePaymentRequest(foreignChargeId, money("10.00"), PaymentMethod.CASH)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Charge not found");
+
+        verify(paymentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void registerPaymentRejectsUnknownPatient() {
+        UUID patientId = UUID.randomUUID();
+        when(patientRepository.findById(patientId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.registerPayment(patientId,
+                new CreatePaymentRequest(UUID.randomUUID(), money("10.00"), PaymentMethod.CASH)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Patient not found");
+
+        verifyNoInteractions(chargeRepository, paymentRepository);
+    }
+
+    @Test
+    void registerPaymentRejectsInvalidRequestsBeforeTouchingPersistence() {
+        UUID patientId = UUID.randomUUID();
+
+        assertPaymentRejected(patientId, null, "Payment is required");
+        assertPaymentRejected(patientId, new CreatePaymentRequest(null, money("10.00"), null),
+                "Payment method is required");
+        assertPaymentRejected(patientId, new CreatePaymentRequest(null, null, PaymentMethod.CASH),
+                "Amount is required");
+        assertPaymentRejected(patientId, new CreatePaymentRequest(null, money("0.00"), PaymentMethod.CASH),
+                "Amount must be greater than zero");
+        assertPaymentRejected(patientId, new CreatePaymentRequest(null, money("10.001"), PaymentMethod.CASH),
+                "Amount must not have more than 2 decimals");
+
+        verifyNoInteractions(patientRepository, chargeRepository, paymentRepository);
+    }
+
+    private void stubLockedCharge(Patient patient, Charge charge, String alreadyPaid) {
+        when(patientRepository.findById(patient.getId())).thenReturn(Optional.of(patient));
+        when(chargeRepository.findByIdAndPatientIdForUpdate(charge.getId(), patient.getId()))
+                .thenReturn(Optional.of(charge));
+        when(paymentRepository.sumAmountByChargeId(charge.getId())).thenReturn(money(alreadyPaid));
+    }
+
+    private void assertPaymentRejected(UUID patientId, CreatePaymentRequest request, String message) {
+        assertThatThrownBy(() -> service.registerPayment(patientId, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage(message);
     }
 
     private void assertChargeRejected(UUID patientId, String concept, BigDecimal amount, String message) {

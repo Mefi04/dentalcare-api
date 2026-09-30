@@ -1,8 +1,10 @@
 package com.dentalcare.api.modules.billing.controller;
 
 import com.dentalcare.api.modules.billing.dto.request.CreateChargeRequest;
+import com.dentalcare.api.modules.billing.dto.request.CreatePaymentRequest;
 import com.dentalcare.api.modules.billing.dto.response.AccountStatementResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeResponse;
+import com.dentalcare.api.modules.billing.dto.response.PaymentResponse;
 import com.dentalcare.api.modules.billing.service.BillingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,5 +47,16 @@ public class BillingController {
             @PathVariable UUID patientId,
             @Valid @RequestBody CreateChargeRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(billingService.createCharge(patientId, request));
+    }
+
+    @Operation(summary = "Register a payment or an advance on a patient's account",
+            description = "With chargeId the amount is applied to that charge and must not exceed its pending "
+                    + "balance; without chargeId it is registered as an advance.")
+    @PostMapping("/payments")
+    @PreAuthorize("hasAuthority('BILLING_PAYMENT_CREATE')")
+    public ResponseEntity<PaymentResponse> registerPayment(
+            @PathVariable UUID patientId,
+            @Valid @RequestBody CreatePaymentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(billingService.registerPayment(patientId, request));
     }
 }
