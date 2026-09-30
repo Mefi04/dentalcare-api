@@ -178,6 +178,54 @@ class AppointmentServiceImplTests {
                 .isInstanceOf(ResourceNotFoundException.class).hasMessage("Appointment not found");
     }
 
+    @Test
+    void cancelsScheduledAppointmentUpdatingStatusAndTimestamp() {
+        UUID id = UUID.randomUUID();
+        Instant createdAt = NOW.minusSeconds(3600);
+        Appointment appointment = new Appointment(id, patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.SCHEDULED, createdAt, createdAt);
+        when(appointments.saveAndFlush(appointment)).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Appointment result = service.cancel(appointment);
+
+        assertThat(result.getStatus()).isEqualTo(AppointmentStatus.CANCELLED);
+        assertThat(result.getUpdatedAt()).isEqualTo(NOW);
+        assertThat(result.getCreatedAt()).isEqualTo(createdAt);
+        verify(appointments).saveAndFlush(appointment);
+    }
+
+    @Test
+    void rejectsCancellingNullAppointment() {
+        assertThatThrownBy(() -> service.cancel(null))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Appointment is required");
+        verify(appointments, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void rejectsCancellingAlreadyCancelledAppointment() {
+        UUID id = UUID.randomUUID();
+        Appointment appointment = new Appointment(id, patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.CANCELLED, NOW.minusSeconds(3600), NOW.minusSeconds(3600));
+
+        assertThatThrownBy(() -> service.cancel(appointment))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Only scheduled appointments can be cancelled");
+        verify(appointments, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void rejectsCancellingCompletedAppointment() {
+        UUID id = UUID.randomUUID();
+        Appointment appointment = new Appointment(id, patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.COMPLETED, NOW.minusSeconds(3600), NOW.minusSeconds(3600));
+
+        assertThatThrownBy(() -> service.cancel(appointment))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Only scheduled appointments can be cancelled");
+        verify(appointments, never()).saveAndFlush(any());
+    }
+
     private User userWithRole(String roleCode, boolean roleActive, UserStatus status) {
         User user = new User(UUID.randomUUID(), "staff-" + UUID.randomUUID(), "Professional",
                 "professional@example.test", "1234567890123", "hash", status, NOW, NOW);

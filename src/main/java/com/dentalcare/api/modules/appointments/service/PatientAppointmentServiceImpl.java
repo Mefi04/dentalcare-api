@@ -5,6 +5,7 @@ import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.appointments.dto.response.AppointmentProfessionalResponse;
 import com.dentalcare.api.modules.appointments.dto.response.PatientAppointmentResponse;
 import com.dentalcare.api.modules.appointments.mapper.AppointmentMapper;
+import com.dentalcare.api.modules.appointments.model.Appointment;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
@@ -74,6 +75,18 @@ public class PatientAppointmentServiceImpl implements PatientAppointmentService 
         Patient patient = findPatientByAuthenticatedUser(authenticatedUserId);
         return appointmentMapper.toPatientResponse(
                 appointmentService.create(patient.getId(), professionalId, scheduledAt));
+    }
+
+    @Override
+    @Transactional
+    public PatientAppointmentResponse cancelCurrentPatientAppointment(
+            UUID authenticatedUserId, UUID appointmentId) {
+        if (appointmentId == null) throw new BadRequestException("Appointment id is required");
+        Patient patient = findPatientByAuthenticatedUser(authenticatedUserId);
+        Appointment appointment = appointmentRepository.findByIdAndPatient_Id(appointmentId, patient.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+        Appointment cancelledAppointment = appointmentService.cancel(appointment);
+        return appointmentMapper.toPatientResponse(cancelledAppointment);
     }
 
     @Override

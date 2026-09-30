@@ -95,6 +95,37 @@ class AppointmentRepositoryIntegrationTests {
     }
 
     @Test
+    void cancellingAppointmentUpdatesStatusAndTimestampWithoutDeletingRow() {
+        UUID id = UUID.randomUUID();
+        Appointment appointment = appointments.saveAndFlush(new Appointment(id, patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.SCHEDULED, NOW, NOW));
+        long countBefore = appointments.count();
+
+        Instant cancelledAt = NOW.plusSeconds(300);
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        appointment.setUpdatedAt(cancelledAt);
+        appointments.saveAndFlush(appointment);
+
+        assertThat(appointments.count()).isEqualTo(countBefore);
+
+        Appointment recovered = appointments.findById(id).orElseThrow();
+        assertThat(recovered.getStatus()).isEqualTo(AppointmentStatus.CANCELLED);
+        assertThat(recovered.getCreatedAt()).isEqualTo(NOW);
+        assertThat(recovered.getUpdatedAt()).isEqualTo(cancelledAt);
+
+        Optional<Appointment> owned = appointments.findByIdAndPatient_Id(id, patient.getId());
+        assertThat(owned).isPresent();
+        assertThat(owned.get().getStatus()).isEqualTo(AppointmentStatus.CANCELLED);
+
+        // Slot is freed for another scheduled appointment with the same dentist
+        Patient otherPatient = patients.save(patient("2000000000005"));
+        Appointment newAppointment = appointments.saveAndFlush(new Appointment(
+                UUID.randomUUID(), otherPatient, dentist, SCHEDULED_AT,
+                AppointmentStatus.SCHEDULED, cancelledAt, cancelledAt));
+        assertThat(newAppointment.getStatus()).isEqualTo(AppointmentStatus.SCHEDULED);
+    }
+
+    @Test
     void rejectsUnknownPatientForeignKey() {
         UUID missingPatientId = UUID.randomUUID();
 
