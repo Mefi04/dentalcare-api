@@ -138,11 +138,14 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
         }
 
         Appointment appointment = findForUpdate(appointmentId);
+        if (status == AppointmentStatus.CANCELLED) {
+            return administrativeAppointmentMapper.toResponse(appointmentService.cancel(appointment));
+        }
         if (appointment.getStatus() == status) {
             throw new ConflictException("Appointment already has the requested status");
         }
         if (appointment.getStatus() != AppointmentStatus.SCHEDULED
-                || (status != AppointmentStatus.COMPLETED && status != AppointmentStatus.CANCELLED)) {
+                || status != AppointmentStatus.COMPLETED) {
             throw new ConflictException("Invalid appointment status transition");
         }
 

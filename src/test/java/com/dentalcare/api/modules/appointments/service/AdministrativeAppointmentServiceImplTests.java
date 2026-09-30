@@ -195,7 +195,7 @@ class AdministrativeAppointmentServiceImplTests {
     }
 
     @Test
-    void allowsOnlyScheduledToCompletedOrCancelledTransitions() {
+    void completesScheduledAppointment() {
         Appointment scheduled = appointment(UUID.randomUUID(), UUID.randomUUID(),
                 FUTURE, AppointmentStatus.SCHEDULED);
         when(administrativeAppointmentRepository.findDetailedByIdForUpdate(scheduled.getId()))
@@ -206,20 +206,50 @@ class AdministrativeAppointmentServiceImplTests {
 
         assertThat(completed.status()).isEqualTo(AppointmentStatus.COMPLETED);
         assertThat(completed.updatedAt()).isEqualTo(NOW);
+    }
 
-        assertThatThrownBy(() -> service.updateStatus(scheduled.getId(), AppointmentStatus.CANCELLED))
+    @Test
+    void delegatesAdministrativeCancellationToSharedDomainRule() {
+        Appointment scheduled = appointment(UUID.randomUUID(), UUID.randomUUID(),
+                FUTURE, AppointmentStatus.SCHEDULED);
+        when(administrativeAppointmentRepository.findDetailedByIdForUpdate(scheduled.getId()))
+                .thenReturn(Optional.of(scheduled));
+        when(appointmentService.cancel(scheduled)).thenAnswer(invocation -> {
+            scheduled.setStatus(AppointmentStatus.CANCELLED);
+            scheduled.setUpdatedAt(NOW);
+            return scheduled;
+        });
+
+        var cancelled = service.updateStatus(scheduled.getId(), AppointmentStatus.CANCELLED);
+
+        assertThat(cancelled.status()).isEqualTo(AppointmentStatus.CANCELLED);
+        assertThat(cancelled.updatedAt()).isEqualTo(NOW);
+        verify(appointmentService).cancel(scheduled);
+        verify(administrativeAppointmentRepository, never()).saveAndFlush(scheduled);
+    }
+
+    @Test
+    void administrativeCancellationPreservesSharedInvalidTransitionRule() {
+        Appointment completed = appointment(UUID.randomUUID(), UUID.randomUUID(),
+                FUTURE, AppointmentStatus.COMPLETED);
+        when(administrativeAppointmentRepository.findDetailedByIdForUpdate(completed.getId()))
+                .thenReturn(Optional.of(completed));
+        when(appointmentService.cancel(completed))
+                .thenThrow(new ConflictException("Only scheduled appointments can be cancelled"));
+
+        assertThatThrownBy(() -> service.updateStatus(completed.getId(), AppointmentStatus.CANCELLED))
                 .isInstanceOf(ConflictException.class)
-                .hasMessage("Invalid appointment status transition");
+                .hasMessage("Only scheduled appointments can be cancelled");
     }
 
     @Test
     void rejectsSameStatusTransition() {
-        Appointment cancelled = appointment(UUID.randomUUID(), UUID.randomUUID(),
-                FUTURE, AppointmentStatus.CANCELLED);
-        when(administrativeAppointmentRepository.findDetailedByIdForUpdate(cancelled.getId()))
-                .thenReturn(Optional.of(cancelled));
+        Appointment completed = appointment(UUID.randomUUID(), UUID.randomUUID(),
+                FUTURE, AppointmentStatus.COMPLETED);
+        when(administrativeAppointmentRepository.findDetailedByIdForUpdate(completed.getId()))
+                .thenReturn(Optional.of(completed));
 
-        assertThatThrownBy(() -> service.updateStatus(cancelled.getId(), AppointmentStatus.CANCELLED))
+        assertThatThrownBy(() -> service.updateStatus(completed.getId(), AppointmentStatus.COMPLETED))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Appointment already has the requested status");
     }

@@ -167,7 +167,7 @@ Administrative agenda operations use `/api/v1/appointments` and remain separate 
 | `PATCH` | `/api/v1/appointments/{appointmentId}/schedule` | `ADMINISTRATOR` or `SECRETARY` | `200 OK` | Reschedules an existing `SCHEDULED` appointment to a future instant. |
 | `PATCH` | `/api/v1/appointments/{appointmentId}/status` | `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, or `ASSISTANT` | `200 OK` | Moves a `SCHEDULED` appointment to `COMPLETED` or `CANCELLED`; terminal appointments cannot transition again. |
 
-`from` and `to` are inclusive ISO-8601 instants. When both are provided, `from` must not be after `to`. Pagination is zero-based and the service caps page size at 100. A scheduled appointment cannot share the same dentist and instant with another scheduled appointment. Cancellation changes status and never deletes the row.
+`from` and `to` are inclusive ISO-8601 instants. When both are provided, `from` must not be after `to`. Pagination is zero-based and the service caps page size at 100. A scheduled appointment cannot share the same dentist and instant with another scheduled appointment. Administrative cancellation delegates to the same domain rule used by patient self-service (`AppointmentService.cancel`), changes status from `SCHEDULED` to `CANCELLED`, and never deletes the row.
 
 `/patients/me/profile` returns:
 - `fullName`: patient full name.
