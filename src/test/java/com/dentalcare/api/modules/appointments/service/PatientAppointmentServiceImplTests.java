@@ -1,6 +1,7 @@
 package com.dentalcare.api.modules.appointments.service;
 
 import com.dentalcare.api.exception.BadRequestException;
+import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.appointments.dto.response.PatientAppointmentResponse;
 import com.dentalcare.api.modules.appointments.mapper.AppointmentMapper;
@@ -147,6 +148,73 @@ class PatientAppointmentServiceImplTests {
                 .containsExactly("Dra. Ana López", "Dr. Carlos Ruiz");
         assertThat(result).extracting(value -> value.id())
                 .containsExactly(first.getId(), second.getId());
+    }
+
+    @Test
+    void cancelsOnlyOwnedScheduledAppointmentDelegatingToAppointmentService() {
+        Appointment appointment = appointment(patient.getId());
+        Appointment cancelled = new Appointment(
+                appointment.getId(), appointment.getPatient(), appointment.getProfessional(),
+                appointment.getScheduledAt(), AppointmentStatus.CANCELLED,
+                appointment.getCreatedAt(), Instant.now());
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(appointments.findByIdAndPatient_Id(appointment.getId(), patient.getId()))
+                .thenReturn(Optional.of(appointment));
+        when(appointmentService.cancel(appointment)).thenReturn(cancelled);
+
+        PatientAppointmentResponse result = service.cancelCurrentPatientAppointment(userId, appointment.getId());
+
+        assertThat(result.id()).isEqualTo(appointment.getId());
+        assertThat(result.status()).isEqualTo(AppointmentStatus.CANCELLED);
+        verify(appointmentService).cancel(appointment);
+        verify(appointments, never()).findById(any());
+    }
+
+    @Test
+    void cancelRejectsNullAppointmentId() {
+        assertThatThrownBy(() -> service.cancelCurrentPatientAppointment(userId, null))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Appointment id is required");
+        verify(appointments, never()).findByIdAndPatient_Id(any(), any());
+    }
+
+    @Test
+    void cancelRejectsAuthenticatedUserWithoutLinkedPatient() {
+        UUID appointmentId = UUID.randomUUID();
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.cancelCurrentPatientAppointment(userId, appointmentId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Patient not found");
+        verify(appointments, never()).findByIdAndPatient_Id(any(), any());
+    }
+
+    @Test
+    void cancelRejectsMissingOrForeignAppointmentWithSameNotFoundResponse() {
+        UUID foreignOrMissingId = UUID.randomUUID();
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(appointments.findByIdAndPatient_Id(foreignOrMissingId, patient.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.cancelCurrentPatientAppointment(userId, foreignOrMissingId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Appointment not found");
+        verify(appointmentService, never()).cancel(any());
+        verify(appointments, never()).findById(any());
+    }
+
+    @Test
+    void cancelPropagatesConflictExceptionFromAppointmentService() {
+        Appointment appointment = appointment(patient.getId());
+        when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(appointments.findByIdAndPatient_Id(appointment.getId(), patient.getId()))
+                .thenReturn(Optional.of(appointment));
+        when(appointmentService.cancel(appointment))
+                .thenThrow(new ConflictException("Only scheduled appointments can be cancelled"));
+
+        assertThatThrownBy(() -> service.cancelCurrentPatientAppointment(userId, appointment.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Only scheduled appointments can be cancelled");
     }
 
     private Appointment appointment(UUID patientId) {
