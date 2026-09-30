@@ -152,6 +152,7 @@ Mobile clients (Expo / React Native) use dedicated endpoints under `/api/v1/auth
 | `POST` | `/api/v1/patients/me/appointments` | `ROLE_PATIENT` | `201 Created` | Schedules a new appointment for the authenticated patient with an active dentist. Time slot conflicts return `409 Conflict`. |
 | `GET` | `/api/v1/patients/me/appointments/professionals` | `ROLE_PATIENT` | `200 OK` | Lists active dentists available for patient self-service booking. Excludes sensitive staff fields. |
 | `PATCH` | `/api/v1/patients/me/appointments/{appointmentId}/cancel` | `ROLE_PATIENT` | `200 OK` | Cancels an appointment owned by the authenticated patient. Transitions status from `SCHEDULED` to `CANCELLED`. Rejects invalid transitions (`COMPLETED`, `CANCELLED`) with `409 Conflict`. Non-existent or foreign appointments return `404 Not Found`. Does not accept request body or patient ID parameter. |
+| `GET` | `/api/v1/patients/me/account-statement` | `ROLE_PATIENT` | `200 OK` | Returns the authenticated patient's `AccountStatementResponse` (see Billing endpoints). Identity is resolved solely from the JWT principal; caller-supplied `patientId` or `userId` parameters are ignored. |
 
 The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data. It exposes `portalAccessStatus` (`PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE`, `LOCKED`, or `null` if no portal account exists) derived directly from the linked user.
 
@@ -212,6 +213,39 @@ Administrative agenda operations use `/api/v1/appointments` and remain separate 
 | `PUT` | `/api/v1/patients/{patientId}/medical-history` | `MEDICAL_HISTORY_UPDATE` | `200 OK` | Creates or fully replaces allergies, current medications, relevant conditions, and general observations for the patient. |
 
 The administrative medical-history request uses complete replacement semantics and requires all three collection fields. Each collection accepts at most 100 non-blank values of at most 200 characters; observations accept at most 4000 characters. Duplicate list values are normalized case-insensitively. Entities are never exposed directly.
+
+## Billing endpoints
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/patients/{patientId}/account-statement` | `BILLING_READ` | `200 OK` | Returns the summary, charges, and payments of an existing patient. An unknown patient returns `404 Not Found`. |
+| `POST` | `/api/v1/patients/{patientId}/charges` | `BILLING_CHARGE_CREATE` | `201 Created` | Registers a charge and returns `ChargeResponse`. |
+| `POST` | `/api/v1/patients/{patientId}/payments` | `BILLING_PAYMENT_CREATE` | `201 Created` | Registers a payment applied to a charge, or an advance when `chargeId` is omitted, and returns `PaymentResponse`. |
+
+The patient always comes from the path, or from the JWT principal for `/patients/me/account-statement`; a `patientId` sent in a request body is ignored. Monetary values are JSON numbers with two decimals.
+
+`POST /charges` request:
+- `concept`: required, non-blank after trimming, at most 200 characters.
+- `amount`: required, greater than zero, at most 10 integer digits and 2 decimals.
+
+`POST /payments` request:
+- `chargeId`: optional UUID of a charge that belongs to the same patient.
+- `amount`: same rules as the charge amount.
+- `method`: required; one of `CASH`, `CARD`, `TRANSFER`, `CHECK`.
+
+Payment rules:
+- The backend derives `kind`; clients cannot choose it. Without `chargeId` the payment is an `ADVANCE`. With `chargeId`, an amount equal to the pending balance is a `PAYMENT` and a smaller amount is a `PARTIAL_PAYMENT`.
+- A charge that does not exist or belongs to another patient returns `404 Not Found` with message `"Charge not found"`.
+- An amount greater than the pending balance returns `409 Conflict` with message `"Payment amount exceeds the pending balance of the charge"`. A fully paid charge returns `409 Conflict` with message `"Charge is already paid"`.
+- Advances are not applied to charges automatically; they only reduce the account balance.
+
+`AccountStatementResponse`:
+- `patientId`.
+- `summary`: `charged` (sum of charges), `paid` (sum of payments applied to charges), `advances` (sum of advances), and `balance` = `charged - paid - advances`. A negative balance is credit in favor of the patient.
+- `charges`: `id`, `concept`, `amount`, `paid`, `pending` (`amount - paid`), `status` (`PENDING`, `PARTIALLY_PAID`, `PAID`), and `createdAt`, ordered by `createdAt` and `id` ascending.
+- `payments`: `id`, `chargeId` (`null` for advances), `kind`, `method`, `amount`, and `createdAt`, ordered by `createdAt` and `id` ascending.
+
+`paid`, `pending`, `status`, and `balance` are always derived from persisted charges and payments; they are never stored or accepted from clients. The statement is not paginated in this first version. Discounts, receipts, cash drawer operations, refunds, voids, installment plans, and fiscal invoicing are not part of this contract.
 
 ## Pagination
 

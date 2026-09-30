@@ -15,3 +15,5 @@ databaseChangeLog:
       file: db/changelog/changes/007-prevent-scheduled-appointment-collisions.sql
   - include:
       file: db/changelog/changes/008-create-medical-history-core.sql
+  - include:
+      file: db/changelog/changes/009-create-billing-core.sql

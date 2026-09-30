@@ -6,6 +6,8 @@ import com.dentalcare.api.security.jwt.JwtService;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
 import com.dentalcare.api.modules.appointments.repository.AdministrativeAppointmentRepository;
+import com.dentalcare.api.modules.billing.repository.ChargeRepository;
+import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.medicalhistory.repository.MedicalHistoryRepository;
 import com.dentalcare.api.modules.users.repository.UserRepository;
 import com.dentalcare.api.modules.users.repository.RoleRepository;
@@ -40,6 +42,12 @@ class DentalCareApplicationTests {
 
     @MockitoBean
     MedicalHistoryRepository medicalHistoryRepository;
+
+    @MockitoBean
+    ChargeRepository chargeRepository;
+
+    @MockitoBean
+    PaymentRepository paymentRepository;
 
     @MockitoBean
     com.dentalcare.api.modules.auth.repository.RefreshSessionRepository refreshSessionRepository;
