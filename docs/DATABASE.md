@@ -213,6 +213,17 @@ The availability check requires both availability values together, keeps them no
 
 Movement insertion and catalog-stock update execute in one transaction. The service locks the `inventory_items` row with `PESSIMISTIC_WRITE`, validates against the latest persisted quantities, updates the catalog, and inserts the historical row. Any failure rolls back both changes. This prevents lost updates and negative stock when requests for the same item run concurrently. Catalog creation remains the only controlled initialization path; subsequent stock changes go through the movement service.
 
+## Clinical records core
+
+The clinical records core persists clinical consultation encounters, diagnoses, progress notes, and tooth-level odontogram findings:
+
+- `clinical_attentions`: `patient_id` (FK patients, `ON DELETE RESTRICT`), `professional_id` (FK users, `ON DELETE RESTRICT`), optional `appointment_id` (FK appointments, `ON DELETE SET NULL`), non-blank `reason`, non-blank `clinical_notes`, optional `next_steps`, `occurred_at`, `created_at`, `updated_at`.
+- `clinical_diagnoses`: `patient_id` (FK patients, `ON DELETE RESTRICT`), `attention_id` (FK clinical_attentions, `ON DELETE RESTRICT`), optional `treatment_plan_id` (FK treatment_plans, `ON DELETE SET NULL`), `author_id` (FK users, `ON DELETE RESTRICT`), `type` constrained to `PRIMARY` or `SECONDARY`, non-blank `description`, `created_at`.
+- `clinical_evolution_notes`: `patient_id` (FK patients, `ON DELETE RESTRICT`), `attention_id` (FK clinical_attentions, `ON DELETE RESTRICT`), `author_id` (FK users, `ON DELETE RESTRICT`), `consultation_date`, non-blank `procedure_summary`, non-blank `note`, `created_at`.
+- `odontogram_findings`: `patient_id` (FK patients, `ON DELETE RESTRICT`), optional `attention_id` (FK clinical_attentions, `ON DELETE SET NULL`), `author_id` (FK users, `ON DELETE RESTRICT`), `dentition` constrained to `ADULT`, `MIXED`, `CHILD`, non-blank `tooth_code`, optional `surface` constrained to `VESTIBULAR`, `PALATAL`, `MESIAL`, `DISTAL`, `OCCLUSAL`, `finding` constrained to `HEALTHY`, `CARIOUS`, `TREATED`, `MISSING`, `TO_TREAT`, optional `observation`, `created_at`.
+
+Database indexes optimize queries by `(patient_id, occurred_at DESC, id DESC)`, `(patient_id, created_at DESC, id DESC)`, `(patient_id, consultation_date DESC, created_at DESC)`, and `(patient_id, tooth_code, created_at DESC)`. Changeset `013-create-clinical-records-core` also seeds permissions `CLINICAL_RECORD_READ` and `CLINICAL_RECORD_WRITE`. Clinical history is protected against destructive physical deletion.
+
 ## Credentials & Environment Variables
 
 Database credentials must come exclusively from environment variables:

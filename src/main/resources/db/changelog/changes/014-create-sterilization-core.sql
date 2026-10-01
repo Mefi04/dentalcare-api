@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset dentalcare:013-create-sterilization-core
+--changeset dentalcare:014-create-sterilization-core
 CREATE TABLE sterilization_protocols (
     id UUID PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
