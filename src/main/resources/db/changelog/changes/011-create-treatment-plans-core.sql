@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset dentalcare:010-create-treatment-plans-core
+--changeset dentalcare:011-create-treatment-plans-core
 CREATE TABLE treatment_plans (
     id UUID PRIMARY KEY,
     patient_id UUID NOT NULL,
