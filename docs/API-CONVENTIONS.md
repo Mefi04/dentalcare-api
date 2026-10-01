@@ -266,6 +266,19 @@ contains `name`, optional `tooth`, positive `quantity`, and positive `unitPrice`
 The patient always comes from the path. Item positions are assigned by the backend from request order.
 Clients cannot supply status, positions, totals, subtotals, or audit timestamps.
 
+## Reports endpoints
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/reports/dashboard` | `ADMINISTRATOR`, `SECRETARY`, or `CASHIER` | `200 OK` | Returns read-only patient, appointment, and billing metrics from persisted data. Optional inclusive `from` and `to` ISO dates default to the current UTC month. |
+
+The dashboard runs its aggregate queries in one read-only repeatable-read transaction. It never loads full
+patient, appointment, charge, or payment collections. `patients.registeredInPeriod` uses patient creation time;
+appointment counts use `scheduledAt`; period charges and payments use their respective creation times.
+`billing.pendingBalance` and `billing.availableCredit` are mutually exclusive values derived from all persisted
+charges minus all persisted payments, matching the current account-statement balance semantics. An inverted
+period returns `400 Bad Request`.
+
 ## Pagination
 
 Large collections should support pagination where necessary.

@@ -97,7 +97,8 @@ Responsible for sterilization workflows and protocols.
 
 ## reports
 
-Responsible for administrative and clinical reports.
+Responsible for read-only administrative reports. Its dashboard aggregates persisted data from
+`patients`, `appointments`, and `billing` without changing those modules' business rules or persistence.
 
 ## settings
 
