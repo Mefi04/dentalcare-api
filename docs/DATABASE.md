@@ -172,8 +172,31 @@ keys do not cascade on deletion; item rows cascade only when their owning plan i
 Plans use only `DRAFT` and `APPROVED`. Approval records `approved_at`, and database constraints keep that
 timestamp consistent with status. Items require a non-blank name, positive quantity and unit price, and a
 non-negative position unique within the plan. Subtotals and plan totals are derived with `BigDecimal` from
-`quantity * unit_price`; neither value is stored. Changeset `010-create-treatment-plans-core` seeds
+`quantity * unit_price`; neither value is stored. Changeset `011-create-treatment-plans-core` seeds
 `TREATMENT_PLAN_READ`, `TREATMENT_PLAN_CREATE`, `TREATMENT_PLAN_UPDATE`, and `TREATMENT_PLAN_APPROVE`.
+
+## Inventory catalog core
+
+The inventory catalog persists articles in `inventory_items`:
+
+- `id`: UUID primary key.
+- `code`: unique SKU/item code (`uq_inventory_items_code`).
+- `name`: item display name.
+- `description`: optional details.
+- `item_type`: `CONSUMABLE` or `INSTRUMENT`.
+- `category`: item category.
+- `status`: `ACTIVE` or `INACTIVE`.
+- Consumable-specific columns: `unit`, `current_stock`, `minimum_stock`, `expiration_date`.
+- Instrument-specific columns: `location`, `total_quantity`, `available_quantity`.
+
+Database `CHECK` constraints enforce:
+- Non-blank `code`, `name`, `category`.
+- `item_type IN ('CONSUMABLE', 'INSTRUMENT')`.
+- `status IN ('ACTIVE', 'INACTIVE')`.
+- Consumable consistency: `unit`, `current_stock >= 0`, `minimum_stock >= 0` are required for consumables.
+- Instrument consistency: `location`, `total_quantity >= 0`, `available_quantity >= 0`, and `available_quantity <= total_quantity` are required for instruments.
+
+Changeset `010-create-inventory-core` creates indexes on `item_type`, `status`, `category`, and `name`, and seeds the permissions `INVENTORY_READ` and `INVENTORY_WRITE`.
 
 ## Credentials & Environment Variables
 

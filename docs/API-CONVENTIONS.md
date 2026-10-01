@@ -266,6 +266,17 @@ contains `name`, optional `tooth`, positive `quantity`, and positive `unitPrice`
 The patient always comes from the path. Item positions are assigned by the backend from request order.
 Clients cannot supply status, positions, totals, subtotals, or audit timestamps.
 
+## Inventory endpoints
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/inventory/items` | `INVENTORY_READ` | `200 OK` | Lists and filters inventory items (consumables and instruments). Supports `search`, `type`, `category`, `status`, `page`, and `size`. |
+| `GET` | `/api/v1/inventory/items/{id}` | `INVENTORY_READ` | `200 OK` | Retrieves detailed item by UUID. Returns `404 Not Found` if not found. |
+| `POST` | `/api/v1/inventory/items` | `INVENTORY_WRITE` | `201 Created` | Registers a consumable or instrument with type-specific validation. Duplicate code returns `409 Conflict`. |
+| `PUT` | `/api/v1/inventory/items/{id}` | `INVENTORY_WRITE` | `200 OK` | Updates allowed administrative fields (`name`, `description`, `category`, `status`, `unit`, `minimumStock`, `expirationDate`, `location`). Does not alter stock directly. |
+| `PATCH` | `/api/v1/inventory/items/{id}/status` | `INVENTORY_WRITE` | `200 OK` | Transitions item status to `ACTIVE` or `INACTIVE`. |
+| `DELETE` | `/api/v1/inventory/items/{id}` | `INVENTORY_WRITE` | `204 No Content` | Performs logical deactivation (`INACTIVE`) without physical deletion. |
+
 ## Reports endpoints
 
 | Method | Path | Authorization | Success | Notes |
