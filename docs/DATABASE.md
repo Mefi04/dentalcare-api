@@ -224,6 +224,19 @@ The clinical records core persists clinical consultation encounters, diagnoses, 
 
 Database indexes optimize queries by `(patient_id, occurred_at DESC, id DESC)`, `(patient_id, created_at DESC, id DESC)`, `(patient_id, consultation_date DESC, created_at DESC)`, and `(patient_id, tooth_code, created_at DESC)`. Changeset `013-create-clinical-records-core` also seeds permissions `CLINICAL_RECORD_READ` and `CLINICAL_RECORD_WRITE`. Clinical history is protected against destructive physical deletion.
 
+## Prescriptions core
+
+Changeset `015-create-prescriptions-core` stores immutable issuance records in `prescriptions`. Each row links
+one patient and the authenticated professional, and persists medication, presentation, dosage, frequency,
+duration, optional instructions, issuance timestamp, and status. Foreign keys use the default restrictive
+deletion behavior so clinical prescription history is not removed implicitly.
+
+Non-blank checks protect all required instruction fields and the initial status is constrained to `ISSUED`.
+The composite index `(patient_id, issued_at DESC, id DESC)` supports stable patient history pagination; a
+second index supports professional lookups. The changeset seeds `PRESCRIPTION_READ` and
+`PRESCRIPTION_CREATE`. Only active dentists receive creation permission, while authorized clinical and
+administrative staff may read prescriptions according to role permissions.
+
 ## Credentials & Environment Variables
 
 Database credentials must come exclusively from environment variables:
