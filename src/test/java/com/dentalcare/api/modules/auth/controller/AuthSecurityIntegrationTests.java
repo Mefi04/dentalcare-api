@@ -145,6 +145,46 @@ class AuthSecurityIntegrationTests {
     }
 
     @Test
+    void loginRejectsTwelveDigitCuiWith400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cui\":\"123456789012\",\"password\":\"password123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Request validation failed"))
+                .andExpect(jsonPath("$.path").value("/api/v1/auth/login"))
+                .andExpect(jsonPath("$.fieldErrors.cui").value("CUI must contain exactly 13 digits"))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(jsonPath("$.trace").doesNotExist())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void loginRejectsFourteenDigitCuiWith400() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cui\":\"12345678901234\",\"password\":\"password123\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Request validation failed"))
+                .andExpect(jsonPath("$.path").value("/api/v1/auth/login"))
+                .andExpect(jsonPath("$.fieldErrors.cui").value("CUI must contain exactly 13 digits"))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(jsonPath("$.trace").doesNotExist())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
     void refreshWithoutBearerTokenWorksWithCookieAndRotatesCookie() throws Exception {
         RefreshResponse refreshResponse = new RefreshResponse("new-access-token-456", "Bearer", 1800L);
         AuthService.RefreshResult refreshResult = new AuthService.RefreshResult(refreshResponse, "new-rotated-refresh-token", Duration.ofDays(6));
