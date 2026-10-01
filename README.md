@@ -69,6 +69,23 @@ docker compose up --build
 
 El Compose principal usa PostgreSQL/Supabase externo y no crea una base de datos local.
 
+## Integración continua
+
+Los Pull Requests dirigidos a `develop` o `main` ejecutan el workflow `Backend CI`. La validación comprueba el diff real del PR con `git diff --check`, configura Java 21 con caché de Maven, confirma que Docker esté disponible, ejecuta `mvn -B clean verify` y construye la imagen del backend con el `Dockerfile` del repositorio.
+
+Las pruebas de integración que utilizan Testcontainers levantan su propio PostgreSQL en Docker cuando corresponde; el CI no depende de la instancia compartida de Supabase ni requiere credenciales reales del proyecto.
+
+Para reproducir las verificaciones principales localmente desde una rama basada en `develop`:
+
+```bash
+git fetch origin develop
+git diff --check origin/develop...HEAD
+mvn -B clean verify
+docker build --tag dentalcare-api:local .
+```
+
+Docker debe estar disponible para que las pruebas basadas en Testcontainers puedan ejecutarse.
+
 ## Estado del esqueleto
 
 La infraestructura está preparada para JWT y refresh tokens, pero su emisión, validación,
