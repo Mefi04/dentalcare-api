@@ -317,6 +317,12 @@ and dental odontogram charting without duplicating medical history, treatment pl
 | `GET` | `/api/v1/patients/{patientId}/odontogram` | `CLINICAL_RECORD_READ` | `200 OK` | Returns current odontogram chart with standard teeth for the dentition (defaulting to `HEALTHY`) overlaid with latest findings. |
 | `GET` | `/api/v1/patients/{patientId}/odontogram/findings` | `CLINICAL_RECORD_READ` | `200 OK` | Lists paginated historical tooth findings for the patient. |
 
+The consolidated clinical history also derives treatment-procedure events from persisted
+`treatment_procedures`; it creates no duplicate clinical row. Every execution contributes a
+`TREATMENT_PROCEDURE_STARTED` event at `performedAt`. Completed executions additionally contribute a
+`TREATMENT_PROCEDURE_COMPLETED` event at `completedAt`, including procedure, tooth, professional, clinical
+observations, and completion notes. These events participate in the same chronological ordering and pagination.
+
 ## Prescription endpoints
 
 Prescriptions are immutable issuance records. The authenticated professional is always derived from the JWT;
@@ -334,6 +340,25 @@ Creation requires `medication`, `presentation`, `dosage`, `frequency`, and `dura
 optional. The response contains only the patient identity needed for display (`id`, `code`, `name`), the
 issuing professional (`id`, `fullName`), prescription instructions, `issuedAt`, and `status`. The first version
 creates records with status `ISSUED` and exposes no update or deletion operation.
+
+## Treatment procedure endpoints
+
+Procedure executions reuse approved treatment plans and their items. The authenticated user is always the
+professional recorded by the backend; clients cannot submit patient, professional, procedure name, tooth,
+status, sequence, or timestamps.
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `POST` | `/api/v1/treatment-plans/{planId}/procedures` | `TREATMENT_PROCEDURE_EXECUTE` | `201 Created` | Starts one unit of an approved plan item as `IN_PROGRESS`. Body: `treatmentPlanItemId` and optional `clinicalObservations`. |
+| `PATCH` | `/api/v1/treatment-procedures/{procedureId}/complete` | `TREATMENT_PROCEDURE_COMPLETE` | `200 OK` | Performs `IN_PROGRESS -> COMPLETED`; only the dentist who started it may complete it. Optional body: `completionNotes`. |
+| `GET` | `/api/v1/treatment-procedures/{procedureId}` | `TREATMENT_PROCEDURE_READ` | `200 OK` | Returns current execution state and traceability data. |
+| `GET` | `/api/v1/treatment-plans/{planId}/procedures` | `TREATMENT_PROCEDURE_READ` | `200 OK` | Paginated execution history for one plan. |
+| `GET` | `/api/v1/patients/{patientId}/treatment-procedures` | `TREATMENT_PROCEDURE_READ` | `200 OK` | Paginated clinical procedure history for one patient. |
+
+Registration is rejected with `409 Conflict` when the plan is not approved, the item already has an execution
+in progress, or its approved quantity has been completed. A plan item from another plan returns `404 Not
+Found`. Repeated completion returns `409 Conflict`; attempting to complete another dentist's execution returns
+`403 Forbidden`. History is immutable and ordered by `performedAt DESC, id DESC`.
 
 ## Pagination
 

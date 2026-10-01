@@ -18,12 +18,17 @@ import com.dentalcare.api.modules.clinicalrecords.model.ToothValidator;
 import com.dentalcare.api.modules.medicalhistory.model.MedicalHistory;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.treatments.model.TreatmentPlan;
+import com.dentalcare.api.modules.treatments.model.TreatmentProcedure;
+import com.dentalcare.api.modules.treatments.model.TreatmentProcedureStatus;
 import com.dentalcare.api.modules.users.model.User;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class ClinicalRecordMapper {
@@ -170,6 +175,45 @@ public class ClinicalRecordMapper {
                 finding.getAuthor().getFullName(),
                 finding.getCreatedAt()
         );
+    }
+
+    public List<ClinicalHistoryEntryResponse> fromTreatmentProcedure(TreatmentProcedure procedure) {
+        List<ClinicalHistoryEntryResponse> entries = new ArrayList<>();
+        entries.add(new ClinicalHistoryEntryResponse(
+                eventId(procedure.getId(), "STARTED"),
+                "Procedimiento iniciado: " + procedure.getProcedureName(),
+                "TREATMENT_PROCEDURE_STARTED",
+                procedureDetail(procedure.getTooth(), procedure.getClinicalObservations(), null),
+                procedure.getProfessional().getFullName(),
+                procedure.getPerformedAt()));
+
+        if (procedure.getStatus() == TreatmentProcedureStatus.COMPLETED
+                && procedure.getCompletedAt() != null) {
+            entries.add(new ClinicalHistoryEntryResponse(
+                    eventId(procedure.getId(), "COMPLETED"),
+                    "Procedimiento completado: " + procedure.getProcedureName(),
+                    "TREATMENT_PROCEDURE_COMPLETED",
+                    procedureDetail(procedure.getTooth(), procedure.getClinicalObservations(),
+                            procedure.getCompletionNotes()),
+                    procedure.getProfessional().getFullName(),
+                    procedure.getCompletedAt()));
+        }
+        return List.copyOf(entries);
+    }
+
+    private UUID eventId(UUID procedureId, String event) {
+        return UUID.nameUUIDFromBytes(("treatment-procedure:" + procedureId + ":" + event)
+                .getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String procedureDetail(String tooth, String observations, String completionNotes) {
+        List<String> details = new ArrayList<>();
+        if (tooth != null && !tooth.isBlank()) details.add("Pieza " + tooth);
+        if (observations != null && !observations.isBlank()) details.add("Observaciones: " + observations);
+        if (completionNotes != null && !completionNotes.isBlank()) {
+            details.add("Notas de finalización: " + completionNotes);
+        }
+        return details.isEmpty() ? "Sin observaciones clínicas" : String.join(". ", details);
     }
 
     public ClinicalRecordSummaryResponse toSummaryResponse(
