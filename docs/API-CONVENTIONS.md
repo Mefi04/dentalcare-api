@@ -247,6 +247,19 @@ Payment rules:
 
 `paid`, `pending`, `status`, and `balance` are always derived from persisted charges and payments; they are never stored or accepted from clients. The statement is not paginated in this first version. Discounts, receipts, cash drawer operations, refunds, voids, installment plans, and fiscal invoicing are not part of this contract.
 
+## Reports endpoints
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/reports/dashboard` | `ADMINISTRATOR`, `SECRETARY`, or `CASHIER` | `200 OK` | Returns read-only patient, appointment, and billing metrics from persisted data. Optional inclusive `from` and `to` ISO dates default to the current UTC month. |
+
+The dashboard runs its aggregate queries in one read-only repeatable-read transaction. It never loads full
+patient, appointment, charge, or payment collections. `patients.registeredInPeriod` uses patient creation time;
+appointment counts use `scheduledAt`; period charges and payments use their respective creation times.
+`billing.pendingBalance` and `billing.availableCredit` are mutually exclusive values derived from all persisted
+charges minus all persisted payments, matching the current account-statement balance semantics. An inverted
+period returns `400 Bad Request`.
+
 ## Pagination
 
 Large collections should support pagination where necessary.
