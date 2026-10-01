@@ -198,6 +198,21 @@ Database `CHECK` constraints enforce:
 
 Changeset `010-create-inventory-core` creates indexes on `item_type`, `status`, `category`, and `name`, and seeds the permissions `INVENTORY_READ` and `INVENTORY_WRITE`.
 
+## Inventory movements and Kardex
+
+Changeset `012-create-inventory-movements` adds immutable rows in `inventory_movements` with:
+
+- UUID primary key and foreign keys to `inventory_items` and the responsible `users` row, both using `ON DELETE RESTRICT`.
+- `movement_type` constrained to `ENTRY`, `EXIT`, or `ADJUSTMENT`.
+- Positive `quantity`, non-negative `stock_before`/`stock_after`, and optional instrument-specific `available_before`/`available_after` pairs.
+- Optional `observation` and `reference`, plus an immutable `created_at` timestamp.
+
+At API level, `observation` is mandatory for `ADJUSTMENT` movements so physical-count corrections are justified.
+
+The availability check requires both availability values together, keeps them non-negative, and prevents either from exceeding its corresponding total. The main Kardex index is `(inventory_item_id, created_at DESC, id DESC)`; additional indexes support filters by movement type, responsible user, and date.
+
+Movement insertion and catalog-stock update execute in one transaction. The service locks the `inventory_items` row with `PESSIMISTIC_WRITE`, validates against the latest persisted quantities, updates the catalog, and inserts the historical row. Any failure rolls back both changes. This prevents lost updates and negative stock when requests for the same item run concurrently. Catalog creation remains the only controlled initialization path; subsequent stock changes go through the movement service.
+
 ## Credentials & Environment Variables
 
 Database credentials must come exclusively from environment variables:

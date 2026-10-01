@@ -21,3 +21,5 @@ databaseChangeLog:
       file: db/changelog/changes/010-create-inventory-core.sql
   - include:
       file: db/changelog/changes/011-create-treatment-plans-core.sql
+  - include:
+      file: db/changelog/changes/012-create-inventory-movements.sql
