@@ -247,6 +247,17 @@ Payment rules:
 
 `paid`, `pending`, `status`, and `balance` are always derived from persisted charges and payments; they are never stored or accepted from clients. The statement is not paginated in this first version. Discounts, receipts, cash drawer operations, refunds, voids, installment plans, and fiscal invoicing are not part of this contract.
 
+## Inventory endpoints
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/inventory/items` | `INVENTORY_READ` | `200 OK` | Lists and filters inventory items (consumables and instruments). Supports `search`, `type`, `category`, `status`, `page`, and `size`. |
+| `GET` | `/api/v1/inventory/items/{id}` | `INVENTORY_READ` | `200 OK` | Retrieves detailed item by UUID. Returns `404 Not Found` if not found. |
+| `POST` | `/api/v1/inventory/items` | `INVENTORY_WRITE` | `201 Created` | Registers a consumable or instrument with type-specific validation. Duplicate code returns `409 Conflict`. |
+| `PUT` | `/api/v1/inventory/items/{id}` | `INVENTORY_WRITE` | `200 OK` | Updates allowed administrative fields (`name`, `description`, `category`, `status`, `unit`, `minimumStock`, `expirationDate`, `location`). Does not alter stock directly. |
+| `PATCH` | `/api/v1/inventory/items/{id}/status` | `INVENTORY_WRITE` | `200 OK` | Transitions item status to `ACTIVE` or `INACTIVE`. |
+| `DELETE` | `/api/v1/inventory/items/{id}` | `INVENTORY_WRITE` | `204 No Content` | Performs logical deactivation (`INACTIVE`) without physical deletion. |
+
 ## Reports endpoints
 
 | Method | Path | Authorization | Success | Notes |
