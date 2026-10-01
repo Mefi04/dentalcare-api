@@ -1,0 +1,149 @@
+name: SonarQube PR Analysis
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonarqube-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sonar:
+    name: Code analysis
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: |
+            ${{ runner.os }}-sonar
+
+      - name: Check SonarQube configuration
+        id: sonar-config
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          HOST_URL="${SONAR_HOST_URL:-https://sonarcloud.io}"
+          MISSING=()
+
+          if [ -z "${SONAR_TOKEN:-}" ]; then
+            MISSING+=("repository secret SONAR_TOKEN")
+          fi
+
+          if [ -z "${SONAR_PROJECT_KEY:-}" ]; then
+            MISSING+=("repository variable SONAR_PROJECT_KEY")
+          fi
+
+          if [[ "${HOST_URL}" == *"sonarcloud.io"* ]] && [ -z "${SONAR_ORGANIZATION:-}" ]; then
+            MISSING+=("repository variable SONAR_ORGANIZATION")
+          fi
+
+          echo "host_url=${HOST_URL}" >> "$GITHUB_OUTPUT"
+
+          if [ "${#MISSING[@]}" -gt 0 ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SonarQube analysis is installed but not active yet. Missing: ${MISSING[*]}"
+            {
+              echo '## SonarQube configuration pending'
+              echo
+              echo 'The workflow is installed correctly, but the repository is still missing the configuration required to contact SonarQube.'
+              echo
+              echo 'Required configuration:'
+              for item in "${MISSING[@]}"; do
+                echo "- ${item}"
+              done
+              echo
+              echo 'Existing Backend CI and PR Review Bot checks are unaffected.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify Docker availability for integration tests
+        if: steps.sonar-config.outputs.enabled == 'true'
+        run: docker info >/dev/null
+
+      - name: Build, test, collect coverage and analyze
+        if: steps.sonar-config.outputs.enabled == 'true'
+        shell: bash
+        env:
+          EFFECTIVE_SONAR_HOST_URL: ${{ steps.sonar-config.outputs.host_url }}
+        run: |
+          set -euo pipefail
+
+          SONAR_ARGS=(
+            "-Dsonar.projectKey=${SONAR_PROJECT_KEY}"
+            "-Dsonar.host.url=${EFFECTIVE_SONAR_HOST_URL}"
+            "-Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml"
+            "-Dsonar.qualitygate.wait=true"
+            "-Dsonar.qualitygate.timeout=300"
+          )
+
+          if [ -n "${SONAR_ORGANIZATION:-}" ]; then
+            SONAR_ARGS+=("-Dsonar.organization=${SONAR_ORGANIZATION}")
+          fi
+
+          mvn -B -ntp clean \
+            org.jacoco:jacoco-maven-plugin:0.8.15:prepare-agent \
+            verify \
+            org.jacoco:jacoco-maven-plugin:0.8.15:report \
+            org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar \
+            "${SONAR_ARGS[@]}"
+
+      - name: Confirm JaCoCo report
+        if: steps.sonar-config.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s target/site/jacoco/jacoco.xml
+          echo 'JaCoCo XML coverage report generated successfully.'
+
+      - name: SonarQube status summary
+        if: always() && steps.sonar-config.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          {
+            echo '## SonarQube PR analysis'
+            echo
+            echo '- Java: 21'
+            echo '- Scanner: SonarScanner for Maven 5.8.0.7211'
+            echo '- Coverage: JaCoCo 0.8.15'
+            echo '- Quality Gate wait: enabled'
+            echo '- Repository history: full checkout for accurate PR analysis'
+          } >> "$GITHUB_STEP_SUMMARY"
