@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset dentalcare:017-create-password-recovery-tokens
+--changeset dentalcare:018-create-password-recovery-tokens
 CREATE TABLE password_recovery_tokens (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL,

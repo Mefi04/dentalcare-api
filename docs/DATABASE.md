@@ -213,6 +213,16 @@ The availability check requires both availability values together, keeps them no
 
 Movement insertion and catalog-stock update execute in one transaction. The service locks the `inventory_items` row with `PESSIMISTIC_WRITE`, validates against the latest persisted quantities, updates the catalog, and inserts the historical row. Any failure rolls back both changes. This prevents lost updates and negative stock when requests for the same item run concurrently. Catalog creation remains the only controlled initialization path; subsequent stock changes go through the movement service.
 
+## Inventory suppliers and purchases
+
+Changeset `017-create-inventory-suppliers-purchases` adds persistent suppliers, purchase records, and purchase item lines:
+
+- `inventory_suppliers`: UUID primary key, non-blank `name`, optional `contact_name`, `phone`, `email`, `address`, `notes`, `status` (`ACTIVE`/`INACTIVE`), and timestamps. Check constraints validate non-blank name and valid status. No physical deletion is performed.
+- `inventory_purchases`: UUID primary key, unique `code` generated from monotonic sequence `inventory_purchase_code_seq`, foreign key to `inventory_suppliers` (`ON DELETE RESTRICT`), `status` constrained to `PENDING` or `RECEIVED`, `purchase_date`, optional `reference` and `observation`, `created_by` (FK users `ON DELETE RESTRICT`), `created_at`, optional `received_by` (FK users `ON DELETE RESTRICT`), and optional `received_at`. Check constraint enforces receipt consistency: `PENDING` requires null received audit, while `RECEIVED` requires non-null `received_at` and `received_by`.
+- `inventory_purchase_items`: UUID primary key, foreign key to `inventory_purchases` (`ON DELETE CASCADE`), foreign key to `inventory_items` (`ON DELETE RESTRICT`), positive `quantity`, non-negative `unit_cost NUMERIC(12, 2)`, and unique constraint `uq_inventory_purchase_items_item (purchase_id, inventory_item_id)`.
+
+Purchase reception executes under `PESSIMISTIC_WRITE` lock over the purchase row, delegates strictly to `InventoryMovementService.register()` for each item to log auditable `ENTRY` movements in Kardex and update catalog stock, and transitions status to `RECEIVED`.
+
 ## Clinical records core
 
 The clinical records core persists clinical consultation encounters, diagnoses, progress notes, and tooth-level odontogram findings:
@@ -253,7 +263,7 @@ dentists may start or complete procedures.
 
 ## Patient password recovery
 
-Changeset `017-create-password-recovery-tokens` stores only BCrypt hashes of eight-digit recovery codes.
+Changeset `018-create-password-recovery-tokens` stores only BCrypt hashes of eight-digit recovery codes.
 Each row belongs to a user and records request, expiration, use, revocation, and failed-attempt audit data.
 Codes expire after 15 minutes by default, are single-use, and are revoked when superseded or after the
 configured attempt limit. Raw codes and passwords are never persisted or logged. A successful reset revokes
