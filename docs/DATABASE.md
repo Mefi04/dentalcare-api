@@ -261,6 +261,14 @@ exceed that quantity. History indexes support stable ordering by `performed_at D
 and plan queries. The migration seeds read permission for administrator, dentist, and assistant roles; only
 dentists may start or complete procedures.
 
+## Patient password recovery
+
+Changeset `018-create-password-recovery-tokens` stores only BCrypt hashes of eight-digit recovery codes.
+Each row belongs to a user and records request, expiration, use, revocation, and failed-attempt audit data.
+Codes expire after 15 minutes by default, are single-use, and are revoked when superseded or after the
+configured attempt limit. Raw codes and passwords are never persisted or logged. A successful reset revokes
+all refresh sessions for the user; already-issued access JWTs remain valid only until their normal short expiry.
+
 ## Credentials & Environment Variables
 
 Database credentials must come exclusively from environment variables:

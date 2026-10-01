@@ -33,3 +33,5 @@ databaseChangeLog:
       file: db/changelog/changes/016-create-treatment-procedures.sql
   - include:
       file: db/changelog/changes/017-create-inventory-suppliers-purchases.sql
+  - include:
+      file: db/changelog/changes/018-create-password-recovery-tokens.sql

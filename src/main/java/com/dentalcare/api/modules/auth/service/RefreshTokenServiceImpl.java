@@ -131,6 +131,20 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     @Override
+    @Transactional
+    public void revokeAllForUser(UUID userId) {
+        Instant now = clock.instant();
+        List<RefreshSession> sessions = refreshSessionRepository.findAllByUserId(userId);
+        List<RefreshSession> activeSessions = sessions.stream()
+                .filter(session -> session.getRevokedAt() == null)
+                .peek(session -> session.setRevokedAt(now))
+                .toList();
+        if (!activeSessions.isEmpty()) {
+            refreshSessionRepository.saveAll(activeSessions);
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<RefreshSession> findByRawToken(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {

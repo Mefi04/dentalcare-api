@@ -61,6 +61,9 @@ class DentalCareApplicationTests {
     com.dentalcare.api.modules.auth.repository.RefreshSessionRepository refreshSessionRepository;
 
     @MockitoBean
+    com.dentalcare.api.modules.auth.repository.PasswordRecoveryTokenRepository passwordRecoveryTokenRepository;
+
+    @MockitoBean
     com.dentalcare.api.modules.inventory.repository.InventoryItemRepository inventoryItemRepository;
 
     @MockitoBean

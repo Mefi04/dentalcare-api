@@ -44,6 +44,8 @@ public class SecurityConfig {
                             "/api/v1/auth/refresh",
                             "/api/v1/auth/logout",
                             "/api/v1/auth/activate",
+                            "/api/v1/auth/password-recovery/request",
+                            "/api/v1/auth/password-recovery/confirm",
                             "/api/v1/auth/mobile/login",
                             "/api/v1/auth/mobile/refresh",
                             "/api/v1/auth/mobile/logout").permitAll();

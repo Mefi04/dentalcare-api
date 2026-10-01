@@ -62,7 +62,8 @@ Users and roles have a many-to-many relationship through `UserRole`. Roles and p
 - Never store, log, return, or place a raw password in a token.
 - Compare passwords through the password encoder; do not compare hashes directly.
 - Password input must be validated before hashing. The baseline policy enforces a non-blank password between 8 and 128 characters.
-- Initial account activation establishes the user's permanent password via `/api/v1/auth/activate`. Password reset flows remain deferred.
+- Initial account activation establishes the user's permanent password via `/api/v1/auth/activate`.
+- Patient password recovery uses an expiring, one-time, out-of-band code whose raw value is never persisted.
 
 ## Access token
 
@@ -173,6 +174,22 @@ Key rules:
 - The account transitions atomically to `ACTIVE`.
 - No access token or refresh cookie is generated upon activation. The user must subsequently authenticate via `POST /api/v1/auth/login`.
 - To prevent user enumeration, unknown CUI numbers, non-pending account statuses (`ACTIVE`, `INACTIVE`, `LOCKED`), and invalid temporary passwords all return a generic `401 Unauthorized` with message `"Invalid activation credentials"`.
+
+### Patient password recovery
+
+`POST /api/v1/auth/password-recovery/request` accepts a 13-digit `cui` and always returns `202 Accepted`
+with the same generic message, regardless of account existence, status, patient linkage, email availability,
+or mail delivery. Eligible active patient accounts receive an eight-digit code through their registered patient
+email. Delivery runs outside the response path to reduce timing-based account enumeration.
+
+`POST /api/v1/auth/password-recovery/confirm` accepts `cui`, `code`, and `newPassword`. A valid code is
+single-use, expires after 15 minutes by default, and is revoked after five failed attempts by default. Invalid,
+expired, revoked, used, or unknown credentials return the same generic `400 Bad Request`. Successful recovery
+stores only the BCrypt password hash, consumes the code, revokes other outstanding codes, and revokes every
+refresh session for the account. Existing stateless access JWTs retain only their normal short remaining life.
+
+The database stores only a BCrypt code hash plus minimal lifecycle audit timestamps and attempt count. Raw
+passwords and codes are never persisted or logged. A new request revokes previous outstanding codes.
 
 ### Login
 
