@@ -360,6 +360,23 @@ in progress, or its approved quantity has been completed. A plan item from anoth
 Found`. Repeated completion returns `409 Conflict`; attempting to complete another dentist's execution returns
 `403 Forbidden`. History is immutable and ordered by `performedAt DESC, id DESC`.
 
+## Patient password recovery endpoints
+
+Both endpoints are public so the App Móvil can recover an unauthenticated patient account. They never reveal
+whether a CUI exists and never return a raw recovery code.
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `POST` | `/api/v1/auth/password-recovery/request` | Public | `202 Accepted` | Body: `cui`. Always returns the same generic message. For an eligible active patient, revokes earlier codes and sends a new eight-digit code to the patient's registered email. |
+| `POST` | `/api/v1/auth/password-recovery/confirm` | Public | `200 OK` | Body: `cui`, `code`, `newPassword`. Consumes a valid code, stores the password with BCrypt, and revokes all refresh sessions. |
+
+Codes expire after `PASSWORD_RECOVERY_EXPIRATION` (15 minutes by default), are stored only as BCrypt hashes,
+and are revoked after `PASSWORD_RECOVERY_MAX_ATTEMPTS` failed attempts (five by default). Unknown accounts,
+invalid codes, expired codes, and previously used codes share the generic confirmation error
+`Invalid or expired recovery credentials`. Request delivery uses the configured SMTP variables and occurs
+asynchronously after persistence commits, without exposing delivery state. Existing access JWTs cannot be recalled
+under the current stateless architecture and expire according to the normal short access-token lifetime.
+
 ## Pagination
 
 Large collections should support pagination where necessary.

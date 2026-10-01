@@ -11,6 +11,14 @@ spring:
     open-in-view: false
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:false}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -42,3 +50,7 @@ dentalcare:
     cookie-secure: ${JWT_COOKIE_SECURE:false}
   openapi:
     public-access: false
+  password-recovery:
+    expiration: ${PASSWORD_RECOVERY_EXPIRATION:15m}
+    max-attempts: ${PASSWORD_RECOVERY_MAX_ATTEMPTS:5}
+    mail-from: ${PASSWORD_RECOVERY_MAIL_FROM:no-reply@dentalcare.local}

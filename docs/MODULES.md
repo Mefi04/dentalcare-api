@@ -8,6 +8,7 @@ Responsible for:
 - refresh token
 - logout
 - session authentication
+- patient password recovery with expiring one-time codes
 
 ## users
 
