@@ -77,7 +77,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
-        run: python3 .github/scripts/ai_pr_reviewer.py
+          GEMINI_FALLBACK_MODELS: ${{ vars.GEMINI_FALLBACK_MODELS || 'gemini-3.7-flash,gemini-3.5-flash-lite' }}
+        run: python3 .github/scripts/ai_pr_reviewer_resilient.py
 
       - name: Security note
         if: always()
@@ -90,4 +91,5 @@ jobs:
             echo '- No hace checkout ni ejecuta código de la rama del PR.'
             echo '- `GEMINI_API_KEY` existe únicamente como GitHub Actions Secret.'
             echo '- El agente puede leer y comentar, pero no tiene permiso `contents: write` ni capacidad de hacer merge.'
+            echo '- Los errores transitorios 408/429/5xx usan backoff exponencial y modelos Flash de respaldo.'
           } >> "$GITHUB_STEP_SUMMARY"
