@@ -35,10 +35,10 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout trusted base workflow code
+      - name: Checkout trusted default-branch code
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -86,7 +86,7 @@ jobs:
           {
             echo '## Seguridad del AI Reviewer'
             echo
-            echo '- El workflow usa `pull_request_target`, por lo que ejecuta únicamente el código confiable de la rama base.'
+            echo '- El workflow usa `pull_request_target` y ejecuta código únicamente desde la rama predeterminada confiable.'
             echo '- No hace checkout ni ejecuta código de la rama del PR.'
             echo '- `GEMINI_API_KEY` existe únicamente como GitHub Actions Secret.'
             echo '- El agente puede leer y comentar, pero no tiene permiso `contents: write` ni capacidad de hacer merge.'
