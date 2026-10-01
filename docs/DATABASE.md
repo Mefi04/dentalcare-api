@@ -239,3 +239,8 @@ Never commit real Supabase database credentials to the repository. Use local `.e
 Large clinical files must not be stored directly as binary database columns unless explicitly required.
 
 Prefer external object storage and store metadata/reference URLs in PostgreSQL.
+## Sterilization core
+
+`sterilization_protocols` stores reusable active/inactive protocols and their supported method (`STEAM`, `DRY_HEAT`, or `CHEMICAL`). `sterilization_cycles` records each load with its protocol, authenticated responsible user, status, observations, and lifecycle timestamps. `sterilization_cycle_instruments` links cycles to existing `inventory_items`; it does not duplicate instruments or alter stock/Kardex.
+
+The first supported lifecycle is `IN_PROGRESS -> RELEASED`. Released cycles are immutable with respect to status, and the database requires a release timestamp only for released cycles.

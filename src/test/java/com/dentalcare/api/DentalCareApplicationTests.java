@@ -67,6 +67,12 @@ class DentalCareApplicationTests {
     com.dentalcare.api.modules.inventory.repository.InventoryMovementRepository inventoryMovementRepository;
 
     @MockitoBean
+    com.dentalcare.api.modules.sterilization.repository.SterilizationProtocolRepository sterilizationProtocolRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.sterilization.repository.SterilizationCycleRepository sterilizationCycleRepository;
+
+    @MockitoBean
     com.dentalcare.api.modules.clinicalrecords.repository.ClinicalAttentionRepository clinicalAttentionRepository;
 
     @MockitoBean

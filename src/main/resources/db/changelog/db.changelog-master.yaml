@@ -25,3 +25,5 @@ databaseChangeLog:
       file: db/changelog/changes/012-create-inventory-movements.sql
   - include:
       file: db/changelog/changes/013-create-clinical-records-core.sql
+  - include:
+      file: db/changelog/changes/014-create-sterilization-core.sql
