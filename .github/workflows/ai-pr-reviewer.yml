@@ -1,0 +1,93 @@
+name: AI PR Reviewer
+
+on:
+  pull_request_target:
+    branches:
+      - develop
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+      - ready_for_review
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull Request number to analyze
+        required: true
+        type: string
+
+concurrency:
+  group: ai-pr-reviewer-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review Issue vs PR
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout trusted base workflow code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Check Gemini configuration
+        id: gemini
+        shell: bash
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GEMINI_API_KEY:-}" ]; then
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            {
+              echo '## 🤖 AI PR Reviewer'
+              echo
+              echo '⚠️ `GEMINI_API_KEY` no está configurado. El análisis de IA fue omitido de forma segura.'
+              echo
+              echo 'Los demás checks del repositorio no dependen de esta integración.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+            echo 'Gemini API key is configured.'
+          fi
+
+      - name: Analyze linked Issue and pull request
+        if: ${{ steps.gemini.outputs.enabled == 'true' }}
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.8-flash' }}
+        run: python3 .github/scripts/ai_pr_reviewer.py
+
+      - name: Security note
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '## Seguridad del AI Reviewer'
+            echo
+            echo '- El workflow usa `pull_request_target`, por lo que ejecuta únicamente el código confiable de la rama base.'
+            echo '- No hace checkout ni ejecuta código de la rama del PR.'
+            echo '- `GEMINI_API_KEY` existe únicamente como GitHub Actions Secret.'
+            echo '- El agente puede leer y comentar, pero no tiene permiso `contents: write` ni capacidad de hacer merge.'
+          } >> "$GITHUB_STEP_SUMMARY"
