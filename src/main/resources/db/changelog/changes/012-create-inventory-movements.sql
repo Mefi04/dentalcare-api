@@ -1,7 +1,7 @@
 --liquibase formatted sql
 
 --changeset dentalcare:012-create-inventory-movements
-CREATE TABLE inventory_movements (
+CREATE TABLE IF NOT EXISTS inventory_movements (
     id UUID PRIMARY KEY,
     inventory_item_id UUID NOT NULL,
     movement_type VARCHAR(20) NOT NULL,
@@ -32,8 +32,8 @@ CREATE TABLE inventory_movements (
     )
 );
 
-CREATE INDEX idx_inventory_movements_item_created
+CREATE INDEX IF NOT EXISTS idx_inventory_movements_item_created
     ON inventory_movements (inventory_item_id, created_at DESC, id DESC);
-CREATE INDEX idx_inventory_movements_type ON inventory_movements (movement_type);
-CREATE INDEX idx_inventory_movements_performed_by ON inventory_movements (performed_by);
-CREATE INDEX idx_inventory_movements_created_at ON inventory_movements (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inventory_movements_type ON inventory_movements (movement_type);
+CREATE INDEX IF NOT EXISTS idx_inventory_movements_performed_by ON inventory_movements (performed_by);
+CREATE INDEX IF NOT EXISTS idx_inventory_movements_created_at ON inventory_movements (created_at DESC);
