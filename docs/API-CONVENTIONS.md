@@ -279,6 +279,15 @@ Clients cannot supply status, positions, totals, subtotals, or audit timestamps.
 | `POST` | `/api/v1/inventory/items/{itemId}/movements` | `INVENTORY_WRITE` | `201 Created` | Atomically registers an `ENTRY`, `EXIT`, or `ADJUSTMENT` using the authenticated user as responsible. Inactive items reject new movements. |
 | `GET` | `/api/v1/inventory/items/{itemId}/movements` | `INVENTORY_READ` | `200 OK` | Returns the item's paginated Kardex, including inactive items. Supports `type`, `performedBy`, `from`, `to`, `page`, and `size`. |
 | `GET` | `/api/v1/inventory/movements` | `INVENTORY_READ` | `200 OK` | Searches the global paginated Kardex. Supports combinable `itemId`, `type`, `performedBy`, `from`, `to`, `page`, and `size` filters. |
+| `GET` | `/api/v1/inventory/suppliers` | `INVENTORY_READ` | `200 OK` | Lists and searches suppliers with pagination. Supports `search` and `status`. |
+| `GET` | `/api/v1/inventory/suppliers/{id}` | `INVENTORY_READ` | `200 OK` | Retrieves detailed supplier by UUID. |
+| `POST` | `/api/v1/inventory/suppliers` | `INVENTORY_WRITE` | `201 Created` | Registers a new active supplier with uniqueness validation on name. |
+| `PUT` | `/api/v1/inventory/suppliers/{id}` | `INVENTORY_WRITE` | `200 OK` | Updates supplier general details. |
+| `PATCH` | `/api/v1/inventory/suppliers/{id}/status` | `INVENTORY_WRITE` | `200 OK` | Updates supplier status (`ACTIVE`/`INACTIVE`) without physical deletion. |
+| `GET` | `/api/v1/inventory/purchases` | `INVENTORY_READ` | `200 OK` | Lists and filters inventory purchases. Supports `supplierId`, `status`, `from`, `to`, `page`, and `size`. |
+| `GET` | `/api/v1/inventory/purchases/{id}` | `INVENTORY_READ` | `200 OK` | Retrieves detailed purchase by UUID including lines and audit. |
+| `POST` | `/api/v1/inventory/purchases` | `INVENTORY_WRITE` | `201 Created` | Registers a purchase in `PENDING` status for an active supplier. Generates monotonic code `PUR-YYYY-XXXXXX` if not provided. Does not modify stock. |
+| `POST` | `/api/v1/inventory/purchases/{id}/receive` | `INVENTORY_WRITE` | `200 OK` | Atomically receives a `PENDING` purchase, updates consumable stock, and logs auditable `ENTRY` movements in Kardex. Re-receiving returns `409 Conflict`. |
 
 Movement `quantity` is always positive. For `ENTRY` and `EXIT` it is the amount added or permanently removed. For `ADJUSTMENT`, request `quantity` is the absolute physical target; the response stores the actual positive change magnitude while `stockBefore` and `stockAfter` show its direction and result. An adjustment requires a non-blank `observation` and is rejected when the target equals the current quantity. Consumable movements update `currentStock`. Instrument entries/exits update both `totalQuantity` and `availableQuantity`; an exit can only remove available instruments. Instrument adjustments preserve the number of unavailable instruments and reject a target below that number.
 
