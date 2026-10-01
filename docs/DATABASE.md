@@ -162,6 +162,29 @@ Paid amounts, charge status, and account balance are derived from these rows and
 
 Billing foreign keys to `patients` do not cascade: financial history is never removed implicitly together with a patient. Changeset `009-create-billing-core` also seeds the permissions `BILLING_READ`, `BILLING_CHARGE_CREATE`, and `BILLING_PAYMENT_CREATE`.
 
+## Inventory catalog core
+
+The inventory catalog persists articles in `inventory_items`:
+
+- `id`: UUID primary key.
+- `code`: unique SKU/item code (`uq_inventory_items_code`).
+- `name`: item display name.
+- `description`: optional details.
+- `item_type`: `CONSUMABLE` or `INSTRUMENT`.
+- `category`: item category.
+- `status`: `ACTIVE` or `INACTIVE`.
+- Consumable-specific columns: `unit`, `current_stock`, `minimum_stock`, `expiration_date`.
+- Instrument-specific columns: `location`, `total_quantity`, `available_quantity`.
+
+Database `CHECK` constraints enforce:
+- Non-blank `code`, `name`, `category`.
+- `item_type IN ('CONSUMABLE', 'INSTRUMENT')`.
+- `status IN ('ACTIVE', 'INACTIVE')`.
+- Consumable consistency: `unit`, `current_stock >= 0`, `minimum_stock >= 0` are required for consumables.
+- Instrument consistency: `location`, `total_quantity >= 0`, `available_quantity >= 0`, and `available_quantity <= total_quantity` are required for instruments.
+
+Changeset `010-create-inventory-core` creates indexes on `item_type`, `status`, `category`, and `name`, and seeds the permissions `INVENTORY_READ` and `INVENTORY_WRITE`.
+
 ## Credentials & Environment Variables
 
 Database credentials must come exclusively from environment variables:
