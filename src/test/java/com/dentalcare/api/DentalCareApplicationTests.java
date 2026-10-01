@@ -66,6 +66,18 @@ class DentalCareApplicationTests {
     @MockitoBean
     com.dentalcare.api.modules.inventory.repository.InventoryMovementRepository inventoryMovementRepository;
 
+    @MockitoBean
+    com.dentalcare.api.modules.clinicalrecords.repository.ClinicalAttentionRepository clinicalAttentionRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.clinicalrecords.repository.ClinicalDiagnosisRepository clinicalDiagnosisRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.clinicalrecords.repository.ClinicalEvolutionNoteRepository clinicalEvolutionNoteRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.clinicalrecords.repository.OdontogramFindingRepository odontogramFindingRepository;
+
     @Test
     void contextLoads() {
     }

@@ -57,6 +57,7 @@ Responsible for:
 - findings
 - diagnoses
 - clinical evolution
+- clinical attentions and history
 
 ## treatments
 

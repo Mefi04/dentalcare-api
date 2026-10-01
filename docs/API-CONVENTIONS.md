@@ -297,6 +297,26 @@ appointment counts use `scheduledAt`; period charges and payments use their resp
 charges minus all persisted payments, matching the current account-statement balance semantics. An inverted
 period returns `400 Bad Request`.
 
+## Clinical record endpoints
+
+The clinical record module manages consultation encounters, structured diagnoses, chronological evolution notes,
+and dental odontogram charting without duplicating medical history, treatment plans, or patient identities.
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/patients/{patientId}/clinical-record` | `CLINICAL_RECORD_READ` | `200 OK` | Returns aggregated clinical record summary (patient, medical history, latest attention, diagnoses, evolution, current odontogram, treatment plans). |
+| `GET` | `/api/v1/patients/{patientId}/clinical-history` | `CLINICAL_RECORD_READ` | `200 OK` | Returns paginated chronological clinical events timeline. |
+| `POST` | `/api/v1/patients/{patientId}/clinical-attentions` | `CLINICAL_RECORD_WRITE` | `201 Created` | Registers a clinical attention session. Professional is resolved from JWT principal. Optional `appointmentId` is strictly verified against `patientId` (Anti-IDOR). |
+| `GET` | `/api/v1/patients/{patientId}/clinical-attentions` | `CLINICAL_RECORD_READ` | `200 OK` | Lists paginated clinical attention sessions for the patient, ordered by `occurredAt DESC, id DESC`. |
+| `GET` | `/api/v1/clinical-attentions/{attentionId}` | `CLINICAL_RECORD_READ` | `200 OK` | Retrieves detail of an attention session. |
+| `POST` | `/api/v1/clinical-attentions/{attentionId}/diagnoses` | `CLINICAL_RECORD_WRITE` | `201 Created` | Registers a structured diagnosis (`PRIMARY` or `SECONDARY`). Optional `treatmentPlanId` is strictly verified against the attention patient (Anti-IDOR). Author resolved from JWT. |
+| `GET` | `/api/v1/patients/{patientId}/diagnoses` | `CLINICAL_RECORD_READ` | `200 OK` | Lists paginated diagnoses for the patient, with optional `type` filter. |
+| `POST` | `/api/v1/clinical-attentions/{attentionId}/evolution` | `CLINICAL_RECORD_WRITE` | `201 Created` | Registers an evolution note. Author is resolved from JWT principal. |
+| `GET` | `/api/v1/patients/{patientId}/evolution` | `CLINICAL_RECORD_READ` | `200 OK` | Lists paginated evolution notes for the patient, ordered by `consultationDate DESC, createdAt DESC`. |
+| `POST` | `/api/v1/patients/{patientId}/odontogram/findings` | `CLINICAL_RECORD_WRITE` | `201 Created` | Registers an odontogram finding on a tooth. Validates FDI tooth code against the selected dentition. Optional `attentionId` is verified against `patientId`. |
+| `GET` | `/api/v1/patients/{patientId}/odontogram` | `CLINICAL_RECORD_READ` | `200 OK` | Returns current odontogram chart with standard teeth for the dentition (defaulting to `HEALTHY`) overlaid with latest findings. |
+| `GET` | `/api/v1/patients/{patientId}/odontogram/findings` | `CLINICAL_RECORD_READ` | `200 OK` | Lists paginated historical tooth findings for the patient. |
+
 ## Pagination
 
 Large collections should support pagination where necessary.
