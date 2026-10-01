@@ -68,6 +68,7 @@ Responsible for:
 - estimates
 - consents
 - treatment completion
+- persistent execution history for approved plan procedures
 
 ## prescriptions
 

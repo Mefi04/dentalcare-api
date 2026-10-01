@@ -29,3 +29,5 @@ databaseChangeLog:
       file: db/changelog/changes/014-create-sterilization-core.sql
   - include:
       file: db/changelog/changes/015-create-prescriptions-core.sql
+  - include:
+      file: db/changelog/changes/016-create-treatment-procedures.sql

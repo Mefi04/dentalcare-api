@@ -87,6 +87,9 @@ class DentalCareApplicationTests {
     @MockitoBean
     com.dentalcare.api.modules.prescriptions.repository.PrescriptionRepository prescriptionRepository;
 
+    @MockitoBean
+    com.dentalcare.api.modules.treatments.repository.TreatmentProcedureRepository treatmentProcedureRepository;
+
     @Test
     void contextLoads() {
     }

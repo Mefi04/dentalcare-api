@@ -237,6 +237,20 @@ second index supports professional lookups. The changeset seeds `PRESCRIPTION_RE
 `PRESCRIPTION_CREATE`. Only active dentists receive creation permission, while authorized clinical and
 administrative staff may read prescriptions according to role permissions.
 
+## Treatment procedure execution
+
+Changeset `016-create-treatment-procedures` stores one execution row for each unit performed from an approved
+`treatment_plan_items` entry. Each row references the existing plan, item, patient, and authenticated dentist;
+the procedure name and tooth are snapshotted to preserve the clinical history. Execution begins in
+`IN_PROGRESS` and may transition once to `COMPLETED`, which records `completed_at` and optional completion
+notes. The database keeps timestamps consistent with status and permits only one active execution per plan item.
+
+`sequence_number` is unique per plan item and allows the service to execute, in order, up to the quantity
+approved in the plan. Plan-level pessimistic locking serializes registration so concurrent requests cannot
+exceed that quantity. History indexes support stable ordering by `performed_at DESC, id DESC` for both patient
+and plan queries. The migration seeds read permission for administrator, dentist, and assistant roles; only
+dentists may start or complete procedures.
+
 ## Credentials & Environment Variables
 
 Database credentials must come exclusively from environment variables:
