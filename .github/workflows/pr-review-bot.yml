@@ -10,21 +10,19 @@ on:
       - reopened
       - ready_for_review
 
-permissions:
-  contents: read
-  pull-requests: read
-  issues: write
-
 concurrency:
   group: pr-review-bot-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  review:
+  analyze:
     name: Analyze pull request
     if: ${{ github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
 
     steps:
       - name: Checkout pull request
@@ -80,14 +78,13 @@ jobs:
           if grep -Eq '^\.github/workflows/' changed-files.txt; then WORKFLOW_CHANGED=true; fi
           if grep -Eiq '(^|/)\.env($|\.)|\.env\.' changed-files.txt; then ENV_CHANGED=true; fi
 
-          ADDED_LINES_FILE=added-lines.txt
-          grep '^+' pr.diff | grep -v '^+++' > "${ADDED_LINES_FILE}" || true
+          grep '^+' pr.diff | grep -v '^+++' > added-lines.txt || true
 
-          ENDPOINTS_ADDED=$(grep -Ec '@(Get|Post|Put|Patch|Delete|Request)Mapping' "${ADDED_LINES_FILE}" || true)
-          TODO_ADDED=$(grep -Eic 'TODO|FIXME' "${ADDED_LINES_FILE}" || true)
+          ENDPOINTS_ADDED=$(grep -Ec '@(Get|Post|Put|Patch|Delete|Request)Mapping' added-lines.txt || true)
+          TODO_ADDED=$(grep -Eic 'TODO|FIXME' added-lines.txt || true)
 
           SECRET_ALERT=false
-          if grep -Eq -- '(AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' "${ADDED_LINES_FILE}"; then
+          if grep -Eq -- '(AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' added-lines.txt; then
             SECRET_ALERT=true
           fi
 
@@ -147,7 +144,7 @@ jobs:
           }
 
           bool_or_false() {
-            if [ "${1:-}" = "true" ]; then printf 'true'; else printf 'false'; fi
+            if [ "${1:-}" = 'true' ]; then printf 'true'; else printf 'false'; fi
           }
 
           FILE_COUNT=$(value_or_zero "${FILE_COUNT:-}")
@@ -166,17 +163,8 @@ jobs:
           ENV_CHANGED=$(bool_or_false "${ENV_CHANGED:-}")
           SECRET_ALERT=$(bool_or_false "${SECRET_ALERT:-}")
 
-          if [ "${MAVEN_OUTCOME:-failure}" = "success" ]; then
-            MAVEN_STATUS='✅ Correcto'
-          else
-            MAVEN_STATUS='❌ Falló'
-          fi
-
-          if [ "${ANALYSIS_OUTCOME:-failure}" = "success" ]; then
-            ANALYSIS_STATUS='✅ Correcto'
-          else
-            ANALYSIS_STATUS='❌ Falló'
-          fi
+          if [ "${MAVEN_OUTCOME:-failure}" = 'success' ]; then MAVEN_STATUS='✅ Correcto'; else MAVEN_STATUS='❌ Falló'; fi
+          if [ "${ANALYSIS_OUTCOME:-failure}" = 'success' ]; then ANALYSIS_STATUS='✅ Correcto'; else ANALYSIS_STATUS='❌ Falló'; fi
 
           {
             echo '<!-- dentalcare-pr-review-bot -->'
@@ -284,31 +272,22 @@ jobs:
             echo '> Este análisis complementa, pero no sustituye, la revisión humana del PR ni el workflow `Backend CI`.'
           } > pr-review-report.md
 
-      - name: Publish or update bot comment
-        if: always() && github.event.pull_request.head.repo.full_name == github.repository
+      - name: Add report to job summary
+        if: always()
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          set -euo pipefail
-
-          if [ ! -f pr-review-report.md ]; then
-            printf '%s\n' '<!-- dentalcare-pr-review-bot -->' '## 🤖 DentalCare PR Review Bot' '' '❌ No fue posible generar el reporte automático. Revisa los logs del workflow.' > pr-review-report.md
+          if [ -f pr-review-report.md ]; then
+            cat pr-review-report.md >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          COMMENT_ID=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-            --jq '.[] | select(.body | contains("<!-- dentalcare-pr-review-bot -->")) | .id' | head -n 1 || true)
-
-          jq -Rs '{body: .}' pr-review-report.md > pr-review-comment.json
-
-          if [ -n "${COMMENT_ID}" ]; then
-            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" --input pr-review-comment.json >/dev/null
-            echo "Updated bot comment ${COMMENT_ID}."
-          else
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --input pr-review-comment.json >/dev/null
-            echo 'Created bot comment.'
-          fi
+      - name: Upload review report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-review-report-${{ github.event.pull_request.number }}
+          path: pr-review-report.md
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Enforce bot result
         if: always()
@@ -336,3 +315,46 @@ jobs:
           fi
 
           echo 'PR Review Bot checks passed.'
+
+  comment:
+    name: Publish review
+    needs: analyze
+    if: ${{ always() && github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: read
+
+    steps:
+      - name: Download review report
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-review-report-${{ github.event.pull_request.number }}
+
+      - name: Publish or update bot comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          test -s pr-review-report.md
+
+          COMMENT_ID=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body | contains("<!-- dentalcare-pr-review-bot -->")) | .id' | head -n 1 || true)
+
+          jq -Rs '{body: .}' pr-review-report.md > pr-review-comment.json
+
+          if [ -n "${COMMENT_ID}" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${COMMENT_ID}" \
+              --input pr-review-comment.json >/dev/null
+            echo "Updated bot comment ${COMMENT_ID}."
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              --input pr-review-comment.json >/dev/null
+            echo 'Created bot comment.'
+          fi
