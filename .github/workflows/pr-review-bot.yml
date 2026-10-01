@@ -50,7 +50,6 @@ jobs:
 
           git cat-file -e "${BASE_SHA}^{commit}"
           git cat-file -e "${HEAD_SHA}^{commit}"
-
           git diff --name-only "${BASE_SHA}...${HEAD_SHA}" > changed-files.txt
           git diff --numstat "${BASE_SHA}...${HEAD_SHA}" > diff-numstat.txt
           git diff --unified=0 "${BASE_SHA}...${HEAD_SHA}" > pr.diff
@@ -69,17 +68,16 @@ jobs:
           WORKFLOW_CHANGED=false
           ENV_CHANGED=false
 
-          if grep -Eq '^src/main/java/.*\.java$' changed-files.txt; then SOURCE_CHANGED=true; fi
-          if grep -Eq '^src/test/' changed-files.txt; then TESTS_CHANGED=true; fi
-          if grep -Eiq '(^|/)(security|auth)(/|$)|Security|Jwt|Token|Password' changed-files.txt; then SECURITY_CHANGED=true; fi
-          if grep -Eiq 'db/changelog|liquibase' changed-files.txt; then LIQUIBASE_CHANGED=true; fi
-          if grep -Eiq '(^|/)controller/|Controller\.java$' changed-files.txt; then CONTROLLER_CHANGED=true; fi
-          if grep -Eiq '(^|/)(pom\.xml|Dockerfile|docker-compose[^/]*|application[^/]*\.(yml|yaml|properties))$' changed-files.txt; then CONFIG_CHANGED=true; fi
-          if grep -Eq '^\.github/workflows/' changed-files.txt; then WORKFLOW_CHANGED=true; fi
-          if grep -Eiq '(^|/)\.env($|\.)|\.env\.' changed-files.txt; then ENV_CHANGED=true; fi
+          grep -Eq '^src/main/java/.*\.java$' changed-files.txt && SOURCE_CHANGED=true || true
+          grep -Eq '^src/test/' changed-files.txt && TESTS_CHANGED=true || true
+          grep -Eiq '(^|/)(security|auth)(/|$)|Security|Jwt|Token|Password' changed-files.txt && SECURITY_CHANGED=true || true
+          grep -Eiq 'db/changelog|liquibase' changed-files.txt && LIQUIBASE_CHANGED=true || true
+          grep -Eiq '(^|/)controller/|Controller\.java$' changed-files.txt && CONTROLLER_CHANGED=true || true
+          grep -Eiq '(^|/)(pom\.xml|Dockerfile|docker-compose[^/]*|application[^/]*\.(yml|yaml|properties))$' changed-files.txt && CONFIG_CHANGED=true || true
+          grep -Eq '^\.github/workflows/' changed-files.txt && WORKFLOW_CHANGED=true || true
+          grep -Eiq '(^|/)\.env($|\.)|\.env\.' changed-files.txt && ENV_CHANGED=true || true
 
           grep '^+' pr.diff | grep -v '^+++' > added-lines.txt || true
-
           ENDPOINTS_ADDED=$(grep -Ec '@(Get|Post|Put|Patch|Delete|Request)Mapping' added-lines.txt || true)
           TODO_ADDED=$(grep -Eic 'TODO|FIXME' added-lines.txt || true)
 
@@ -139,32 +137,27 @@ jobs:
         run: |
           set -euo pipefail
 
-          value_or_zero() {
-            if [ -n "${1:-}" ]; then printf '%s' "$1"; else printf '0'; fi
-          }
+          num() { [ -n "${1:-}" ] && printf '%s' "$1" || printf '0'; }
+          bool() { [ "${1:-}" = 'true' ] && printf 'true' || printf 'false'; }
 
-          bool_or_false() {
-            if [ "${1:-}" = 'true' ]; then printf 'true'; else printf 'false'; fi
-          }
+          FILE_COUNT=$(num "${FILE_COUNT:-}")
+          ADDITIONS=$(num "${ADDITIONS:-}")
+          DELETIONS=$(num "${DELETIONS:-}")
+          TOTAL_LINES=$(num "${TOTAL_LINES:-}")
+          ENDPOINTS_ADDED=$(num "${ENDPOINTS_ADDED:-}")
+          TODO_ADDED=$(num "${TODO_ADDED:-}")
+          SOURCE_CHANGED=$(bool "${SOURCE_CHANGED:-}")
+          TESTS_CHANGED=$(bool "${TESTS_CHANGED:-}")
+          SECURITY_CHANGED=$(bool "${SECURITY_CHANGED:-}")
+          LIQUIBASE_CHANGED=$(bool "${LIQUIBASE_CHANGED:-}")
+          CONTROLLER_CHANGED=$(bool "${CONTROLLER_CHANGED:-}")
+          CONFIG_CHANGED=$(bool "${CONFIG_CHANGED:-}")
+          WORKFLOW_CHANGED=$(bool "${WORKFLOW_CHANGED:-}")
+          ENV_CHANGED=$(bool "${ENV_CHANGED:-}")
+          SECRET_ALERT=$(bool "${SECRET_ALERT:-}")
 
-          FILE_COUNT=$(value_or_zero "${FILE_COUNT:-}")
-          ADDITIONS=$(value_or_zero "${ADDITIONS:-}")
-          DELETIONS=$(value_or_zero "${DELETIONS:-}")
-          TOTAL_LINES=$(value_or_zero "${TOTAL_LINES:-}")
-          ENDPOINTS_ADDED=$(value_or_zero "${ENDPOINTS_ADDED:-}")
-          TODO_ADDED=$(value_or_zero "${TODO_ADDED:-}")
-          SOURCE_CHANGED=$(bool_or_false "${SOURCE_CHANGED:-}")
-          TESTS_CHANGED=$(bool_or_false "${TESTS_CHANGED:-}")
-          SECURITY_CHANGED=$(bool_or_false "${SECURITY_CHANGED:-}")
-          LIQUIBASE_CHANGED=$(bool_or_false "${LIQUIBASE_CHANGED:-}")
-          CONTROLLER_CHANGED=$(bool_or_false "${CONTROLLER_CHANGED:-}")
-          CONFIG_CHANGED=$(bool_or_false "${CONFIG_CHANGED:-}")
-          WORKFLOW_CHANGED=$(bool_or_false "${WORKFLOW_CHANGED:-}")
-          ENV_CHANGED=$(bool_or_false "${ENV_CHANGED:-}")
-          SECRET_ALERT=$(bool_or_false "${SECRET_ALERT:-}")
-
-          if [ "${MAVEN_OUTCOME:-failure}" = 'success' ]; then MAVEN_STATUS='✅ Correcto'; else MAVEN_STATUS='❌ Falló'; fi
-          if [ "${ANALYSIS_OUTCOME:-failure}" = 'success' ]; then ANALYSIS_STATUS='✅ Correcto'; else ANALYSIS_STATUS='❌ Falló'; fi
+          [ "${MAVEN_OUTCOME:-failure}" = 'success' ] && MAVEN_STATUS='✅ Correcto' || MAVEN_STATUS='❌ Falló'
+          [ "${ANALYSIS_OUTCOME:-failure}" = 'success' ] && ANALYSIS_STATUS='✅ Correcto' || ANALYSIS_STATUS='❌ Falló'
 
           {
             echo '<!-- dentalcare-pr-review-bot -->'
@@ -183,7 +176,7 @@ jobs:
             echo
             echo "- **Archivos modificados:** ${FILE_COUNT}"
             echo "- **Líneas:** +${ADDITIONS} / -${DELETIONS}"
-            echo "- **Endpoints agregados/modificados detectados:** ${ENDPOINTS_ADDED}"
+            echo "- **Endpoints detectados en líneas agregadas:** ${ENDPOINTS_ADDED}"
             echo "- **TODO/FIXME agregados:** ${TODO_ADDED}"
             echo
             echo '### Áreas afectadas'
@@ -204,60 +197,56 @@ jobs:
             echo
             echo '### Observaciones del bot'
             echo
-
             ALERTS=0
+
             if [ "${SOURCE_CHANGED}" = 'true' ] && [ "${TESTS_CHANGED}" != 'true' ]; then
-              echo '- ⚠️ Se modificó código de producción sin cambios detectados en `src/test/`. Conviene confirmar que la cobertura existente protege el cambio.'
+              echo '- ⚠️ Se modificó código de producción sin cambios detectados en `src/test/`. Confirmar que la cobertura existente protege el cambio.'
               ALERTS=$((ALERTS + 1))
             fi
             if [ "${SECURITY_CHANGED}" = 'true' ]; then
-              echo '- ⚠️ Hay cambios relacionados con autenticación o seguridad. Revisar autorización por rol, manejo de tokens y exposición de datos sensibles.'
+              echo '- ⚠️ Hay cambios relacionados con autenticación o seguridad. Revisar autorización por rol, tokens y exposición de datos sensibles.'
               ALERTS=$((ALERTS + 1))
             fi
             if [ "${CONTROLLER_CHANGED}" = 'true' ] || [ "${ENDPOINTS_ADDED}" -gt 0 ]; then
-              echo '- ⚠️ Hay cambios de endpoints. Revisar validaciones de entrada, códigos HTTP, permisos y compatibilidad con los clientes actuales.'
+              echo '- ⚠️ Hay cambios de endpoints. Revisar validaciones, códigos HTTP, permisos y compatibilidad con los clientes actuales.'
               ALERTS=$((ALERTS + 1))
             fi
             if [ "${LIQUIBASE_CHANGED}" = 'true' ]; then
-              echo '- ⚠️ Hay cambios de Liquibase/BD. Revisar compatibilidad de migraciones, restricciones, índices y posibilidad de rollback.'
+              echo '- ⚠️ Hay cambios de Liquibase/BD. Revisar migraciones, restricciones, índices y rollback.'
               ALERTS=$((ALERTS + 1))
             fi
             if [ "${CONFIG_CHANGED}" = 'true' ]; then
-              echo '- ⚠️ Se tocó configuración, dependencias o Docker. Confirmar que no se rompa el despliegue ni los perfiles de ejecución.'
+              echo '- ⚠️ Se tocó configuración, dependencias o Docker. Confirmar despliegue y perfiles de ejecución.'
               ALERTS=$((ALERTS + 1))
             fi
             if [ "${WORKFLOW_CHANGED}" = 'true' ]; then
-              echo '- ⚠️ El PR modifica GitHub Actions. Este cambio merece revisión manual adicional antes del merge.'
+              echo '- ⚠️ El PR modifica GitHub Actions. Requiere revisión manual adicional antes del merge.'
               ALERTS=$((ALERTS + 1))
             fi
             if [ "${ENV_CHANGED}" = 'true' ]; then
-              echo '- 🚨 Se detectó un archivo relacionado con `.env`. Confirmar que no se estén versionando credenciales o secretos.'
+              echo '- 🚨 Se detectó un archivo relacionado con `.env`. Confirmar que no se versionen credenciales.'
               ALERTS=$((ALERTS + 1))
             fi
             if [ "${SECRET_ALERT}" = 'true' ]; then
-              echo '- 🚨 **Posible secreto de alta confianza detectado en líneas agregadas.** El bot no muestra el valor. Revisar el diff y rotar la credencial si fuera real.'
+              echo '- 🚨 **Posible secreto de alta confianza detectado.** El bot no muestra el valor. Revisar el diff y rotar la credencial si fuera real.'
               ALERTS=$((ALERTS + 1))
             fi
             if [ "${TODO_ADDED}" -gt 0 ]; then
-              echo "- ⚠️ Se agregaron ${TODO_ADDED} marcas TODO/FIXME; confirmar que no representen trabajo obligatorio pendiente para este ticket."
+              echo "- ⚠️ Se agregaron ${TODO_ADDED} TODO/FIXME; confirmar que no representen trabajo obligatorio pendiente."
               ALERTS=$((ALERTS + 1))
             fi
             if [ "${TOTAL_LINES}" -gt 1000 ]; then
-              echo '- ⚠️ El cambio supera 1000 líneas modificadas; conviene revisar con especial cuidado el alcance y la trazabilidad con el ticket.'
+              echo '- ⚠️ El cambio supera 1000 líneas; revisar cuidadosamente el alcance y su trazabilidad con el ticket.'
               ALERTS=$((ALERTS + 1))
             fi
-            if [ "${ALERTS}" -eq 0 ]; then
-              echo '- ✅ No se detectaron alertas estructurales adicionales.'
-            fi
+            [ "${ALERTS}" -eq 0 ] && echo '- ✅ No se detectaron alertas estructurales adicionales.' || true
 
             echo
             echo '### Archivos modificados'
             echo
             if [ -s changed-files.txt ]; then
               sed -n '1,25p' changed-files.txt | sed 's/^/- `/' | sed 's/$/`/'
-              if [ "${FILE_COUNT}" -gt 25 ]; then
-                echo "- … y $((FILE_COUNT - 25)) archivo(s) más."
-              fi
+              [ "${FILE_COUNT}" -gt 25 ] && echo "- … y $((FILE_COUNT - 25)) archivo(s) más." || true
             else
               echo '- No fue posible obtener la lista de archivos.'
             fi
@@ -275,10 +264,7 @@ jobs:
       - name: Add report to job summary
         if: always()
         shell: bash
-        run: |
-          if [ -f pr-review-report.md ]; then
-            cat pr-review-report.md >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: test ! -f pr-review-report.md || cat pr-review-report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload review report
         if: always()
@@ -298,22 +284,9 @@ jobs:
           SECRET_ALERT: ${{ steps.analysis.outputs.secret_alert }}
         run: |
           set -euo pipefail
-
-          if [ "${ANALYSIS_OUTCOME:-failure}" != 'success' ]; then
-            echo 'Static PR analysis failed.'
-            exit 1
-          fi
-
-          if [ "${MAVEN_OUTCOME:-failure}" != 'success' ]; then
-            echo 'Maven tests failed.'
-            exit 1
-          fi
-
-          if [ "${SECRET_ALERT:-false}" = 'true' ]; then
-            echo 'A possible high-confidence secret was detected in added lines.'
-            exit 1
-          fi
-
+          [ "${ANALYSIS_OUTCOME:-failure}" = 'success' ] || { echo 'Static PR analysis failed.'; exit 1; }
+          [ "${MAVEN_OUTCOME:-failure}" = 'success' ] || { echo 'Maven tests failed.'; exit 1; }
+          [ "${SECRET_ALERT:-false}" != 'true' ] || { echo 'Possible high-confidence secret detected.'; exit 1; }
           echo 'PR Review Bot checks passed.'
 
   comment:
@@ -326,7 +299,7 @@ jobs:
       actions: read
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
 
     steps:
       - name: Download review report
@@ -341,7 +314,6 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
-
           test -s pr-review-report.md
 
           COMMENT_ID=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
