@@ -390,6 +390,19 @@ Administrative billing operations require explicit billing authorities, assigned
 
 `DENTIST`, `ASSISTANT`, `PATIENT`, and any caller without the required authority receive `403 Forbidden` on administrative billing endpoints; unauthenticated requests receive `401 Unauthorized`. Patients read only their own statement through `GET /api/v1/patients/me/account-statement`, which is read-only, requires `ROLE_PATIENT`, and returns `403 Forbidden` to staff roles. Clients never send the payment kind, paid amounts, or balances; the backend derives them from persisted data.
 
+Administrative treatment-plan operations use dedicated clinical authorities:
+
+| Permission | Roles | Allows |
+|---|---|---|
+| `TREATMENT_PLAN_READ` | `ADMINISTRATOR`, `DENTIST`, `ASSISTANT` | Reading plans and the minimal active-dentist catalog. |
+| `TREATMENT_PLAN_CREATE` | `DENTIST`, `ASSISTANT` | Creating draft plans. |
+| `TREATMENT_PLAN_UPDATE` | `DENTIST`, `ASSISTANT` | Replacing editable data and items while a plan is a draft. |
+| `TREATMENT_PLAN_APPROVE` | `DENTIST` | Performing the clinical transition from `DRAFT` to `APPROVED`. |
+
+`SECRETARY`, `CASHIER`, and `PATIENT` receive none of these permissions. Approved plans are immutable through
+the update contract. The professional catalog exposes only user id and full name; it does not expose account,
+identity, credential, role, authority, or audit data.
+
 Administrative appointment endpoints are isolated under `/api/v1/appointments`. `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, and `ASSISTANT` may read the agenda and update appointment status. Creating and rescheduling appointments is limited to `ADMINISTRATOR` and `SECRETARY`. `PATIENT` and `CASHIER` cannot use the administrative contract. Patient-owned appointment operations remain under `/api/v1/patients/me/appointments` and continue to derive ownership exclusively from the JWT principal.
 
 ### Login flow

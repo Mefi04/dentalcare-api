@@ -162,6 +162,19 @@ Paid amounts, charge status, and account balance are derived from these rows and
 
 Billing foreign keys to `patients` do not cascade: financial history is never removed implicitly together with a patient. Changeset `009-create-billing-core` also seeds the permissions `BILLING_READ`, `BILLING_CHARGE_CREATE`, and `BILLING_PAYMENT_CREATE`.
 
+## Treatment plan core
+
+Treatment plans are stored in `treatment_plans` and their ordered proposed procedures in
+`treatment_plan_items`. Each plan belongs to one patient and references one professional user. The service
+requires that professional to be `ACTIVE` with an active `DENTIST` role. Patient and professional foreign
+keys do not cascade on deletion; item rows cascade only when their owning plan is deleted.
+
+Plans use only `DRAFT` and `APPROVED`. Approval records `approved_at`, and database constraints keep that
+timestamp consistent with status. Items require a non-blank name, positive quantity and unit price, and a
+non-negative position unique within the plan. Subtotals and plan totals are derived with `BigDecimal` from
+`quantity * unit_price`; neither value is stored. Changeset `011-create-treatment-plans-core` seeds
+`TREATMENT_PLAN_READ`, `TREATMENT_PLAN_CREATE`, `TREATMENT_PLAN_UPDATE`, and `TREATMENT_PLAN_APPROVE`.
+
 ## Inventory catalog core
 
 The inventory catalog persists articles in `inventory_items`:
