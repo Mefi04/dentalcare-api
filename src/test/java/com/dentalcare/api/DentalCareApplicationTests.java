@@ -63,6 +63,9 @@ class DentalCareApplicationTests {
     @MockitoBean
     com.dentalcare.api.modules.inventory.repository.InventoryItemRepository inventoryItemRepository;
 
+    @MockitoBean
+    com.dentalcare.api.modules.inventory.repository.InventoryMovementRepository inventoryMovementRepository;
+
     @Test
     void contextLoads() {
     }

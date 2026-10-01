@@ -276,6 +276,13 @@ Clients cannot supply status, positions, totals, subtotals, or audit timestamps.
 | `PUT` | `/api/v1/inventory/items/{id}` | `INVENTORY_WRITE` | `200 OK` | Updates allowed administrative fields (`name`, `description`, `category`, `status`, `unit`, `minimumStock`, `expirationDate`, `location`). Does not alter stock directly. |
 | `PATCH` | `/api/v1/inventory/items/{id}/status` | `INVENTORY_WRITE` | `200 OK` | Transitions item status to `ACTIVE` or `INACTIVE`. |
 | `DELETE` | `/api/v1/inventory/items/{id}` | `INVENTORY_WRITE` | `204 No Content` | Performs logical deactivation (`INACTIVE`) without physical deletion. |
+| `POST` | `/api/v1/inventory/items/{itemId}/movements` | `INVENTORY_WRITE` | `201 Created` | Atomically registers an `ENTRY`, `EXIT`, or `ADJUSTMENT` using the authenticated user as responsible. Inactive items reject new movements. |
+| `GET` | `/api/v1/inventory/items/{itemId}/movements` | `INVENTORY_READ` | `200 OK` | Returns the item's paginated Kardex, including inactive items. Supports `type`, `performedBy`, `from`, `to`, `page`, and `size`. |
+| `GET` | `/api/v1/inventory/movements` | `INVENTORY_READ` | `200 OK` | Searches the global paginated Kardex. Supports combinable `itemId`, `type`, `performedBy`, `from`, `to`, `page`, and `size` filters. |
+
+Movement `quantity` is always positive. For `ENTRY` and `EXIT` it is the amount added or permanently removed. For `ADJUSTMENT`, request `quantity` is the absolute physical target; the response stores the actual positive change magnitude while `stockBefore` and `stockAfter` show its direction and result. An adjustment requires a non-blank `observation` and is rejected when the target equals the current quantity. Consumable movements update `currentStock`. Instrument entries/exits update both `totalQuantity` and `availableQuantity`; an exit can only remove available instruments. Instrument adjustments preserve the number of unavailable instruments and reject a target below that number.
+
+The backend derives `performedBy` solely from the JWT principal. Clients cannot set IDs, responsible user, timestamps, or before/after values. Kardex results use stable ordering `createdAt DESC, id DESC`, zero-based pagination, and a maximum effective page size of 100. `from` and `to` are inclusive ISO-8601 instants and `from` must not be after `to`. Movement history is immutable: there are no update or delete endpoints. Initial quantities remain controlled catalog-creation values and do not generate retroactive `INITIAL` movements.
 
 ## Reports endpoints
 

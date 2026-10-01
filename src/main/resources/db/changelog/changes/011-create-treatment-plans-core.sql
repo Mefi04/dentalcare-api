@@ -1,7 +1,7 @@
 --liquibase formatted sql
 
 --changeset dentalcare:011-create-treatment-plans-core
-CREATE TABLE treatment_plans (
+CREATE TABLE IF NOT EXISTS treatment_plans (
     id UUID PRIMARY KEY,
     patient_id UUID NOT NULL,
     professional_id UUID NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE treatment_plans (
         CHECK ((status = 'APPROVED') = (approved_at IS NOT NULL))
 );
 
-CREATE TABLE treatment_plan_items (
+CREATE TABLE IF NOT EXISTS treatment_plan_items (
     id UUID PRIMARY KEY,
     treatment_plan_id UUID NOT NULL,
     name VARCHAR(200) NOT NULL,
@@ -39,10 +39,10 @@ CREATE TABLE treatment_plan_items (
     CONSTRAINT chk_treatment_plan_items_position CHECK (position >= 0)
 );
 
-CREATE INDEX idx_treatment_plans_patient_created_at
+CREATE INDEX IF NOT EXISTS idx_treatment_plans_patient_created_at
     ON treatment_plans (patient_id, created_at DESC, id DESC);
-CREATE INDEX idx_treatment_plans_professional ON treatment_plans (professional_id);
-CREATE INDEX idx_treatment_plan_items_plan ON treatment_plan_items (treatment_plan_id);
+CREATE INDEX IF NOT EXISTS idx_treatment_plans_professional ON treatment_plans (professional_id);
+CREATE INDEX IF NOT EXISTS idx_treatment_plan_items_plan ON treatment_plan_items (treatment_plan_id);
 
 INSERT INTO permissions (id, code, description) VALUES
     (gen_random_uuid(), 'TREATMENT_PLAN_READ', 'Read treatment plans and available professionals'),
