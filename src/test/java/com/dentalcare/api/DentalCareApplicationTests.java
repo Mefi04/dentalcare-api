@@ -9,6 +9,7 @@ import com.dentalcare.api.modules.appointments.repository.AdministrativeAppointm
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.medicalhistory.repository.MedicalHistoryRepository;
+import com.dentalcare.api.modules.treatments.repository.TreatmentPlanRepository;
 import com.dentalcare.api.modules.users.repository.UserRepository;
 import com.dentalcare.api.modules.users.repository.RoleRepository;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -48,6 +49,9 @@ class DentalCareApplicationTests {
 
     @MockitoBean
     PaymentRepository paymentRepository;
+
+    @MockitoBean
+    TreatmentPlanRepository treatmentPlanRepository;
 
     @MockitoBean
     com.dentalcare.api.modules.auth.repository.RefreshSessionRepository refreshSessionRepository;

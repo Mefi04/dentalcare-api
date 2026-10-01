@@ -17,3 +17,5 @@ databaseChangeLog:
       file: db/changelog/changes/008-create-medical-history-core.sql
   - include:
       file: db/changelog/changes/009-create-billing-core.sql
+  - include:
+      file: db/changelog/changes/010-create-treatment-plans-core.sql

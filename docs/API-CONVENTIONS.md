@@ -247,6 +247,25 @@ Payment rules:
 
 `paid`, `pending`, `status`, and `balance` are always derived from persisted charges and payments; they are never stored or accepted from clients. The statement is not paginated in this first version. Discounts, receipts, cash drawer operations, refunds, voids, installment plans, and fiscal invoicing are not part of this contract.
 
+## Treatment plan endpoints
+
+Treatment plans use a clinical draft/approval workflow. Monetary subtotals and totals are derived from item
+quantity and unit price and are never persisted.
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/patients/{patientId}/treatment-plans` | `TREATMENT_PLAN_READ` | `200 OK` | Lists the patient's plans using zero-based pagination, ordered by `createdAt DESC, id DESC`. |
+| `POST` | `/api/v1/patients/{patientId}/treatment-plans` | `TREATMENT_PLAN_CREATE` | `201 Created` | Creates a `DRAFT` plan with 1–100 ordered items and a `Location` header. |
+| `GET` | `/api/v1/treatment-plans/professionals` | `TREATMENT_PLAN_READ` | `200 OK` | Returns only `id` and `fullName` for active users with an active `DENTIST` role. |
+| `GET` | `/api/v1/treatment-plans/{planId}` | `TREATMENT_PLAN_READ` | `200 OK` | Returns plan detail, ordered items, derived subtotals, and derived total. |
+| `PUT` | `/api/v1/treatment-plans/{planId}` | `TREATMENT_PLAN_UPDATE` | `200 OK` | Fully replaces the editable fields and items of a `DRAFT` plan. An approved plan returns `409 Conflict`. |
+| `PATCH` | `/api/v1/treatment-plans/{planId}/approve` | `TREATMENT_PLAN_APPROVE` | `200 OK` | Performs the sole transition `DRAFT -> APPROVED`; repeated approval returns `409 Conflict`. |
+
+Create and update requests contain `name`, optional `observations`, `professionalId`, and `items`. Each item
+contains `name`, optional `tooth`, positive `quantity`, and positive `unitPrice` with at most two decimals.
+The patient always comes from the path. Item positions are assigned by the backend from request order.
+Clients cannot supply status, positions, totals, subtotals, or audit timestamps.
+
 ## Pagination
 
 Large collections should support pagination where necessary.
