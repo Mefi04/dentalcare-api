@@ -317,6 +317,24 @@ and dental odontogram charting without duplicating medical history, treatment pl
 | `GET` | `/api/v1/patients/{patientId}/odontogram` | `CLINICAL_RECORD_READ` | `200 OK` | Returns current odontogram chart with standard teeth for the dentition (defaulting to `HEALTHY`) overlaid with latest findings. |
 | `GET` | `/api/v1/patients/{patientId}/odontogram/findings` | `CLINICAL_RECORD_READ` | `200 OK` | Lists paginated historical tooth findings for the patient. |
 
+## Prescription endpoints
+
+Prescriptions are immutable issuance records. The authenticated professional is always derived from the JWT;
+clients cannot choose the professional, issuance timestamp, status, or identifiers.
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/patients/{patientId}/prescriptions` | `PRESCRIPTION_READ` | `200 OK` | Lists the patient's prescriptions with zero-based pagination, ordered by `issuedAt DESC, id DESC`. |
+| `POST` | `/api/v1/patients/{patientId}/prescriptions` | `PRESCRIPTION_CREATE` | `201 Created` | Issues a prescription as the authenticated active dentist and returns a `Location` header. |
+| `GET` | `/api/v1/prescriptions/{prescriptionId}` | `PRESCRIPTION_READ` | `200 OK` | Returns prescription detail for authorized staff. |
+| `GET` | `/api/v1/patients/me/prescriptions` | `ROLE_PATIENT` | `200 OK` | Lists only prescriptions owned by the patient linked to the JWT user. |
+| `GET` | `/api/v1/patients/me/prescriptions/{prescriptionId}` | `ROLE_PATIENT` | `200 OK` | Returns the owned prescription or `404 Not Found`, preventing ownership disclosure. |
+
+Creation requires `medication`, `presentation`, `dosage`, `frequency`, and `duration`; `instructions` is
+optional. The response contains only the patient identity needed for display (`id`, `code`, `name`), the
+issuing professional (`id`, `fullName`), prescription instructions, `issuedAt`, and `status`. The first version
+creates records with status `ISSUED` and exposes no update or deletion operation.
+
 ## Pagination
 
 Large collections should support pagination where necessary.

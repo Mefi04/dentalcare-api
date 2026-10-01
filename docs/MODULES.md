@@ -67,8 +67,12 @@ Responsible for:
 - treatment procedures
 - estimates
 - consents
-- prescriptions
 - treatment completion
+
+## prescriptions
+
+Responsible for persistent medical and dental prescriptions, professional issuance, and patient-owned
+self-service consultation.
 
 ## billing
 
