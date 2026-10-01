@@ -317,6 +317,12 @@ and dental odontogram charting without duplicating medical history, treatment pl
 | `GET` | `/api/v1/patients/{patientId}/odontogram` | `CLINICAL_RECORD_READ` | `200 OK` | Returns current odontogram chart with standard teeth for the dentition (defaulting to `HEALTHY`) overlaid with latest findings. |
 | `GET` | `/api/v1/patients/{patientId}/odontogram/findings` | `CLINICAL_RECORD_READ` | `200 OK` | Lists paginated historical tooth findings for the patient. |
 
+The consolidated clinical history also derives treatment-procedure events from persisted
+`treatment_procedures`; it creates no duplicate clinical row. Every execution contributes a
+`TREATMENT_PROCEDURE_STARTED` event at `performedAt`. Completed executions additionally contribute a
+`TREATMENT_PROCEDURE_COMPLETED` event at `completedAt`, including procedure, tooth, professional, clinical
+observations, and completion notes. These events participate in the same chronological ordering and pagination.
+
 ## Prescription endpoints
 
 Prescriptions are immutable issuance records. The authenticated professional is always derived from the JWT;

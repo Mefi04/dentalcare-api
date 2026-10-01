@@ -34,6 +34,7 @@ import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.treatments.model.TreatmentPlan;
 import com.dentalcare.api.modules.treatments.repository.TreatmentPlanRepository;
+import com.dentalcare.api.modules.treatments.repository.TreatmentProcedureRepository;
 import com.dentalcare.api.modules.users.model.User;
 import com.dentalcare.api.modules.users.model.UserStatus;
 import com.dentalcare.api.modules.users.repository.UserRepository;
@@ -74,6 +75,7 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
     private final UserRepository userRepository;
     private final AppointmentRepository appointmentRepository;
     private final TreatmentPlanRepository treatmentPlanRepository;
+    private final TreatmentProcedureRepository treatmentProcedureRepository;
     private final MedicalHistoryRepository medicalHistoryRepository;
     private final ClinicalRecordMapper mapper;
     private final Clock clock;
@@ -86,6 +88,7 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
                                      UserRepository userRepository,
                                      AppointmentRepository appointmentRepository,
                                      TreatmentPlanRepository treatmentPlanRepository,
+                                     TreatmentProcedureRepository treatmentProcedureRepository,
                                      MedicalHistoryRepository medicalHistoryRepository,
                                      ClinicalRecordMapper mapper,
                                      Clock clock) {
@@ -97,6 +100,7 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
         this.userRepository = userRepository;
         this.appointmentRepository = appointmentRepository;
         this.treatmentPlanRepository = treatmentPlanRepository;
+        this.treatmentProcedureRepository = treatmentProcedureRepository;
         this.medicalHistoryRepository = medicalHistoryRepository;
         this.mapper = mapper;
         this.clock = clock;
@@ -334,6 +338,8 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
                 .forEach(e -> allEntries.add(mapper.fromEvolution(e)));
         odontogramFindingRepository.findByPatient_Id(patientId, Pageable.unpaged())
                 .forEach(f -> allEntries.add(mapper.fromFinding(f)));
+        treatmentProcedureRepository.findByPatient_Id(patientId, Pageable.unpaged())
+                .forEach(procedure -> allEntries.addAll(mapper.fromTreatmentProcedure(procedure)));
 
         allEntries.sort(Comparator.comparing(ClinicalHistoryEntryResponse::timestamp).reversed()
                 .thenComparing(ClinicalHistoryEntryResponse::id));

@@ -35,8 +35,12 @@ import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.treatments.model.TreatmentPlan;
+import com.dentalcare.api.modules.treatments.model.TreatmentPlanItem;
 import com.dentalcare.api.modules.treatments.model.TreatmentPlanStatus;
+import com.dentalcare.api.modules.treatments.model.TreatmentProcedure;
+import com.dentalcare.api.modules.treatments.model.TreatmentProcedureStatus;
 import com.dentalcare.api.modules.treatments.repository.TreatmentPlanRepository;
+import com.dentalcare.api.modules.treatments.repository.TreatmentProcedureRepository;
 import com.dentalcare.api.modules.users.model.User;
 import com.dentalcare.api.modules.users.model.UserStatus;
 import com.dentalcare.api.modules.users.repository.UserRepository;
@@ -49,6 +53,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -76,6 +81,7 @@ class ClinicalRecordServiceImplTests {
     @Mock private UserRepository userRepository;
     @Mock private AppointmentRepository appointmentRepository;
     @Mock private TreatmentPlanRepository treatmentPlanRepository;
+    @Mock private TreatmentProcedureRepository treatmentProcedureRepository;
     @Mock private MedicalHistoryRepository medicalHistoryRepository;
 
     private ClinicalRecordService clinicalRecordService;
@@ -91,7 +97,8 @@ class ClinicalRecordServiceImplTests {
                 clinicalAttentionRepository, clinicalDiagnosisRepository,
                 clinicalEvolutionNoteRepository, odontogramFindingRepository,
                 patientRepository, userRepository, appointmentRepository,
-                treatmentPlanRepository, medicalHistoryRepository, mapper, fixedClock
+                treatmentPlanRepository, treatmentProcedureRepository,
+                medicalHistoryRepository, mapper, fixedClock
         );
 
         patientA = createPatient("EXP-001", "Paciente A", "1111111111111");
@@ -348,6 +355,8 @@ class ClinicalRecordServiceImplTests {
                 .thenReturn(new PageImpl<>(List.of(evolution)));
         when(odontogramFindingRepository.findByPatient_Id(patientA.getId(), Pageable.unpaged()))
                 .thenReturn(new PageImpl<>(List.of()));
+        when(treatmentProcedureRepository.findByPatient_Id(patientA.getId(), Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
 
         Page<ClinicalHistoryEntryResponse> history = clinicalRecordService.findClinicalHistory(
                 patientA.getId(), 0, 10
@@ -358,6 +367,55 @@ class ClinicalRecordServiceImplTests {
         assertThat(history.getContent().get(0).category()).isEqualTo("EVOLUTION");
         assertThat(history.getContent().get(1).category()).isEqualTo("DIAGNOSIS");
         assertThat(history.getContent().get(2).category()).isEqualTo("ATTENTION");
+    }
+
+    @Test
+    void findClinicalHistoryIncludesOnlyThePatientsTreatmentProcedureEvents() {
+        when(patientRepository.existsById(patientA.getId())).thenReturn(true);
+        when(patientRepository.existsById(patientB.getId())).thenReturn(true);
+        stubEmptyClinicalHistory(patientA.getId());
+        stubEmptyClinicalHistory(patientB.getId());
+
+        TreatmentPlan plan = new TreatmentPlan(UUID.randomUUID(), patientA, dentist, "Plan aprobado", null,
+                TreatmentPlanStatus.DRAFT, FIXED_NOW.minusSeconds(120), FIXED_NOW.minusSeconds(120));
+        TreatmentPlanItem item = new TreatmentPlanItem(UUID.randomUUID(), "Endodoncia", "21", 1,
+                new BigDecimal("1200.00"), 0);
+        plan.addItem(item);
+        plan.approve(FIXED_NOW.minusSeconds(90));
+        TreatmentProcedure procedure = new TreatmentProcedure(UUID.randomUUID(), plan, item, patientA, dentist,
+                item.getName(), item.getTooth(), 1, "Conductometría realizada",
+                TreatmentProcedureStatus.IN_PROGRESS, FIXED_NOW.minusSeconds(60));
+        procedure.complete("Sin complicaciones", FIXED_NOW);
+
+        when(treatmentProcedureRepository.findByPatient_Id(patientA.getId(), Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(procedure)));
+
+        Page<ClinicalHistoryEntryResponse> patientAHistory =
+                clinicalRecordService.findClinicalHistory(patientA.getId(), 0, 10);
+        Page<ClinicalHistoryEntryResponse> patientBHistory =
+                clinicalRecordService.findClinicalHistory(patientB.getId(), 0, 10);
+
+        assertThat(patientAHistory.getContent()).extracting(ClinicalHistoryEntryResponse::category)
+                .containsExactly("TREATMENT_PROCEDURE_COMPLETED", "TREATMENT_PROCEDURE_STARTED");
+        assertThat(patientAHistory.getContent().get(0).action()).contains("Endodoncia");
+        assertThat(patientAHistory.getContent().get(0).description())
+                .contains("Pieza 21", "Conductometría realizada", "Sin complicaciones");
+        assertThat(patientAHistory.getContent()).extracting(ClinicalHistoryEntryResponse::author)
+                .containsOnly("Dr. Clinico");
+        assertThat(patientBHistory).isEmpty();
+    }
+
+    private void stubEmptyClinicalHistory(UUID patientId) {
+        when(clinicalAttentionRepository.findByPatient_Id(patientId, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(clinicalDiagnosisRepository.findByPatient_Id(patientId, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(clinicalEvolutionNoteRepository.findByPatient_Id(patientId, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(odontogramFindingRepository.findByPatient_Id(patientId, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(treatmentProcedureRepository.findByPatient_Id(patientId, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
     }
 
     @Test
