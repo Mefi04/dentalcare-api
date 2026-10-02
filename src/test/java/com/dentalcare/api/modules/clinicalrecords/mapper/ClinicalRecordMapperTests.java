@@ -6,6 +6,7 @@ import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalEvolution
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalRecordSummaryResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramFindingResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.ToothStateResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalAttention;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDiagnosis;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalEvolutionNote;
@@ -173,11 +174,124 @@ class ClinicalRecordMapperTests {
         assertThat(response.dentition()).isEqualTo(DentitionType.ADULT);
         assertThat(response.teeth()).hasSize(32);
         // Piece 16 should be updated to TREATED by latest finding f2
-        assertThat(response.teeth().get("16")).isEqualTo(ToothFinding.TREATED);
-        assertThat(response.teeth().get("24")).isEqualTo(ToothFinding.MISSING);
+        assertThat(response.teethSummary().get("16")).isEqualTo(ToothFinding.TREATED);
+        assertThat(response.teethSummary().get("24")).isEqualTo(ToothFinding.MISSING);
         // Untouched piece should default to HEALTHY
-        assertThat(response.teeth().get("11")).isEqualTo(ToothFinding.HEALTHY);
-        assertThat(response.teeth().get("48")).isEqualTo(ToothFinding.HEALTHY);
+        assertThat(response.teethSummary().get("11")).isEqualTo(ToothFinding.HEALTHY);
+        assertThat(response.teethSummary().get("48")).isEqualTo(ToothFinding.HEALTHY);
+
+        ToothStateResponse tooth16 = response.teeth().stream()
+                .filter(t -> t.toothCode().equals("16"))
+                .findFirst().orElseThrow();
+        assertThat(tooth16.surfaces().get(ToothSurface.OCCLUSAL)).isEqualTo(ToothFinding.TREATED);
+        assertThat(tooth16.surfaces().get(ToothSurface.MESIAL)).isEqualTo(ToothFinding.HEALTHY);
+    }
+
+    @Test
+    void chronologicalResolutionOfSurfaceFindingsUpdatesStateAccurately() {
+        Instant now = Instant.now();
+        OdontogramFinding f1 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, professional,
+                DentitionType.ADULT, "16", ToothSurface.OCCLUSAL,
+                ToothFinding.CARIOUS, "Caries detectada", now.minusSeconds(100)
+        );
+        OdontogramFinding f2 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, professional,
+                DentitionType.ADULT, "16", ToothSurface.OCCLUSAL,
+                ToothFinding.RESTORED, "Resina oclusal", now.minusSeconds(50)
+        );
+        OdontogramFinding f3 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, professional,
+                DentitionType.ADULT, "16", ToothSurface.MESIAL,
+                ToothFinding.CARIOUS, "Nueva caries mesial", now
+        );
+
+        OdontogramResponse response = mapper.toOdontogramResponse(patient.getId(), DentitionType.ADULT, List.of(f1, f2, f3));
+
+        ToothStateResponse tooth16 = response.teeth().stream()
+                .filter(t -> t.toothCode().equals("16"))
+                .findFirst().orElseThrow();
+
+        assertThat(tooth16.surfaces().get(ToothSurface.OCCLUSAL)).isEqualTo(ToothFinding.RESTORED);
+        assertThat(tooth16.surfaces().get(ToothSurface.MESIAL)).isEqualTo(ToothFinding.CARIOUS);
+        assertThat(tooth16.surfaces().get(ToothSurface.DISTAL)).isEqualTo(ToothFinding.HEALTHY);
+        assertThat(tooth16.globalFinding()).isNull();
+        // Since MESIAL has active caries, overall piece summary is CARIOUS
+        assertThat(response.teethSummary().get("16")).isEqualTo(ToothFinding.CARIOUS);
+    }
+
+    @Test
+    void globalMissingHasVisualPriorityOverPriorSurfacesWithoutErasingHistory() {
+        Instant now = Instant.now();
+        OdontogramFinding f1 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, professional,
+                DentitionType.ADULT, "21", ToothSurface.INCISAL,
+                ToothFinding.CARIOUS, "Caries previa", now.minusSeconds(200)
+        );
+        OdontogramFinding f2 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, professional,
+                DentitionType.ADULT, "21", null,
+                ToothFinding.MISSING, "Pieza perdida por avulsion", now.minusSeconds(100)
+        );
+
+        OdontogramResponse response = mapper.toOdontogramResponse(patient.getId(), DentitionType.ADULT, List.of(f1, f2));
+
+        ToothStateResponse tooth21 = response.teeth().stream()
+                .filter(t -> t.toothCode().equals("21"))
+                .findFirst().orElseThrow();
+
+        assertThat(tooth21.globalFinding()).isEqualTo(ToothFinding.MISSING);
+        // Surface history retained in the surface map
+        assertThat(tooth21.surfaces().get(ToothSurface.INCISAL)).isEqualTo(ToothFinding.CARIOUS);
+        // Overall summary reflects MISSING
+        assertThat(response.teethSummary().get("21")).isEqualTo(ToothFinding.MISSING);
+    }
+
+    @Test
+    void recoveringToothFromMissingUpdatesGlobalStateViaSubsequentEvent() {
+        Instant now = Instant.now();
+        OdontogramFinding f1 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, professional,
+                DentitionType.ADULT, "36", null,
+                ToothFinding.MISSING, "Exodoncia previa", now.minusSeconds(200)
+        );
+        OdontogramFinding f2 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, professional,
+                DentitionType.ADULT, "36", null,
+                ToothFinding.IMPLANT, "Implante oseointegrado", now.minusSeconds(100)
+        );
+
+        OdontogramResponse response = mapper.toOdontogramResponse(patient.getId(), DentitionType.ADULT, List.of(f1, f2));
+
+        ToothStateResponse tooth36 = response.teeth().stream()
+                .filter(t -> t.toothCode().equals("36"))
+                .findFirst().orElseThrow();
+
+        assertThat(tooth36.globalFinding()).isEqualTo(ToothFinding.IMPLANT);
+        assertThat(response.teethSummary().get("36")).isEqualTo(ToothFinding.IMPLANT);
+    }
+
+    @Test
+    void anatomicallyDistinguishesAnteriorMaxillaryAndPosteriorMandibularSurfaces() {
+        OdontogramResponse response = mapper.toOdontogramResponse(DentitionType.ADULT, List.of());
+
+        // Tooth 11: Anterior Maxillary (Incisal, Palatal, Mesial, Distal, Vestibular)
+        ToothStateResponse tooth11 = response.teeth().stream()
+                .filter(t -> t.toothCode().equals("11"))
+                .findFirst().orElseThrow();
+        assertThat(tooth11.surfaces().keySet()).containsExactlyInAnyOrder(
+                ToothSurface.MESIAL, ToothSurface.DISTAL, ToothSurface.VESTIBULAR,
+                ToothSurface.PALATAL, ToothSurface.INCISAL
+        );
+
+        // Tooth 46: Posterior Mandibular (Occlusal, Lingual, Mesial, Distal, Vestibular)
+        ToothStateResponse tooth46 = response.teeth().stream()
+                .filter(t -> t.toothCode().equals("46"))
+                .findFirst().orElseThrow();
+        assertThat(tooth46.surfaces().keySet()).containsExactlyInAnyOrder(
+                ToothSurface.MESIAL, ToothSurface.DISTAL, ToothSurface.VESTIBULAR,
+                ToothSurface.LINGUAL, ToothSurface.OCCLUSAL
+        );
     }
 
     @Test
