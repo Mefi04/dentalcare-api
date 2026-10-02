@@ -3,6 +3,7 @@ package com.dentalcare.api.modules.clinicalrecords.repository;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalAttention;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDiagnosis;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalEvolutionNote;
+import com.dentalcare.api.modules.clinicalrecords.model.ClinicalPreparation;
 import com.dentalcare.api.modules.clinicalrecords.model.DentitionType;
 import com.dentalcare.api.modules.clinicalrecords.model.DiagnosisType;
 import com.dentalcare.api.modules.clinicalrecords.model.OdontogramFinding;
@@ -28,6 +29,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -57,6 +59,7 @@ class ClinicalRecordRepositoryIntegrationTests {
     @Autowired private ClinicalAttentionRepository clinicalAttentionRepository;
     @Autowired private ClinicalDiagnosisRepository clinicalDiagnosisRepository;
     @Autowired private ClinicalEvolutionNoteRepository clinicalEvolutionNoteRepository;
+    @Autowired private ClinicalPreparationRepository clinicalPreparationRepository;
     @Autowired private OdontogramFindingRepository odontogramFindingRepository;
     @Autowired private PatientRepository patientRepository;
     @Autowired private UserRepository userRepository;
@@ -140,6 +143,61 @@ class ClinicalRecordRepositoryIntegrationTests {
                 """).setParameter("id", UUID.randomUUID())
                 .setParameter("patient", patient.getId())
                 .setParameter("author", dentist.getId()).executeUpdate())
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void persistsClinicalPreparationAndPerformsQueries() {
+        Patient patient = patient("PAC-CR-004", "8000000000207");
+        User dentist = dentist("8000000000208");
+
+        ClinicalAttention attention = new ClinicalAttention(
+                UUID.randomUUID(), patient, dentist, null,
+                "Atencion con preparacion", "Notas clinicas", "Continuar monitoreo",
+                NOW, NOW, NOW
+        );
+        clinicalAttentionRepository.saveAndFlush(attention);
+
+        ClinicalPreparation prep = new ClinicalPreparation(
+                UUID.randomUUID(), patient, attention, dentist,
+                "120/80", 75, new BigDecimal("36.6"), new BigDecimal("68.5"),
+                "Sin novedades en signos vitales", NOW, NOW
+        );
+        clinicalPreparationRepository.saveAndFlush(prep);
+        entityManager.clear();
+
+        var prepList = clinicalPreparationRepository.findByPatient_IdOrderByCreatedAtDesc(patient.getId());
+        assertThat(prepList).hasSize(1);
+        assertThat(prepList.getFirst().getBloodPressure()).isEqualTo("120/80");
+        assertThat(prepList.getFirst().getHeartRate()).isEqualTo(75);
+
+        var prepPage = clinicalPreparationRepository.findByPatient_Id(patient.getId(), PageRequest.of(0, 10));
+        assertThat(prepPage.getContent()).hasSize(1);
+
+        var latest = clinicalPreparationRepository.findFirstByPatient_IdOrderByCreatedAtDesc(patient.getId());
+        assertThat(latest).isPresent();
+        assertThat(latest.get().getHeartRate()).isEqualTo(75);
+
+        var byAttention = clinicalPreparationRepository.findFirstByAttention_IdOrderByCreatedAtDesc(attention.getId());
+        assertThat(byAttention).isPresent();
+        assertThat(byAttention.get().getId()).isEqualTo(prep.getId());
+
+        var byIdAndPatient = clinicalPreparationRepository.findByIdAndPatient_Id(prep.getId(), patient.getId());
+        assertThat(byIdAndPatient).isPresent();
+    }
+
+    @Test
+    void databaseRejectsInvalidHeartRateCheckConstraint() {
+        Patient patient = patient("PAC-CR-005", "8000000000209");
+        User dentist = dentist("8000000000210");
+
+        assertThatThrownBy(() -> entityManager.createNativeQuery("""
+                INSERT INTO clinical_preparations
+                    (id, patient_id, prepared_by_id, heart_rate, created_at, updated_at)
+                VALUES (:id, :patient, :preparedBy, -10, NOW(), NOW())
+                """).setParameter("id", UUID.randomUUID())
+                .setParameter("patient", patient.getId())
+                .setParameter("preparedBy", dentist.getId()).executeUpdate())
                 .isInstanceOf(RuntimeException.class);
     }
 
