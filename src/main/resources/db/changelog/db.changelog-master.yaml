@@ -39,3 +39,5 @@ databaseChangeLog:
       file: db/changelog/changes/019-create-clinical-documents.sql
   - include:
       file: db/changelog/changes/020-create-appointment-requests-waiting-room.sql
+  - include:
+      file: db/changelog/changes/021-add-r2-metadata-to-clinical-documents.sql

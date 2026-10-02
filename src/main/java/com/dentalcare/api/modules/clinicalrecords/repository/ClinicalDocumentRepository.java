@@ -22,4 +22,8 @@ public interface ClinicalDocumentRepository extends JpaRepository<ClinicalDocume
 
     @EntityGraph(attributePaths = {"author"})
     Optional<ClinicalDocument> findByIdAndPatient_Id(UUID id, UUID patientId);
+
+    Optional<ClinicalDocument> findByStorageObjectKey(String storageObjectKey);
+
+    boolean existsByStorageObjectKey(String storageObjectKey);
 }
