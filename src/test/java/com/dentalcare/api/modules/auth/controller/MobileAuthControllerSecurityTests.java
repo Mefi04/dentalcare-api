@@ -59,7 +59,7 @@ class MobileAuthControllerSecurityTests {
     @Test
     void successfulMobileLoginReturnsTokensInBodyAndSetsNoCookies() throws Exception {
         UUID id = UUID.randomUUID();
-        UserResponse userResponse = new UserResponse(id, "testuser", "test@example.com", UserStatus.ACTIVE, List.of(), List.of());
+        UserResponse userResponse = new UserResponse(id, "testuser", "Test User", "test@example.com", UserStatus.ACTIVE, List.of(), List.of());
         LoginResponse loginResponse = new LoginResponse("mobile-access-token-123", "Bearer", 1800L, userResponse);
         AuthService.LoginResult loginResult = new AuthService.LoginResult(loginResponse, "mobile-raw-refresh-token-456", Duration.ofDays(7));
 
@@ -75,6 +75,7 @@ class MobileAuthControllerSecurityTests {
                 .andExpect(jsonPath("$.expiresIn").value(1800))
                 .andExpect(jsonPath("$.user.id").value(id.toString()))
                 .andExpect(jsonPath("$.user.username").value("testuser"))
+                .andExpect(jsonPath("$.user.fullName").value("Test User"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
 
         verify(authService).login(new LoginRequest("1234567890123", "password123"));
