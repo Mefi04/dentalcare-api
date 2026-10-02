@@ -386,6 +386,24 @@ invalid codes, expired codes, and previously used codes share the generic confir
 asynchronously after persistence commits, without exposing delivery state. Existing access JWTs cannot be recalled
 under the current stateless architecture and expire according to the normal short access-token lifetime.
 
+## Clinical documents endpoints
+
+Endpoints for managing patient clinical document metadata:
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/patients/{patientId}/documents` | `CLINICAL_RECORD_READ` | `200 OK` | Paginated list of documents for an existing patient. Supports optional filter `?type=...` and stable sorting by `documentDate DESC, createdAt DESC, id DESC`. Unknown patient returns `404 Not Found`. |
+| `GET` | `/api/v1/patients/{patientId}/documents/{documentId}` | `CLINICAL_RECORD_READ` | `200 OK` | Detail of a single document. Enforces ownership: if the document does not exist or belongs to another patient, returns `404 Not Found` without disclosing existence (anti-IDOR). |
+| `POST` | `/api/v1/patients/{patientId}/documents` | `CLINICAL_RECORD_WRITE` | `201 Created` | Registers clinical document metadata. Author is taken exclusively from the authenticated JWT user. Returns `Location: /api/v1/patients/{patientId}/documents/{id}` and `ClinicalDocumentResponse`. |
+
+Supported categories (`ClinicalDocumentType`):
+- `RADIOGRAPHY`: Dental X-rays (panoramic, periapical, bitewing, etc.)
+- `LAB_RESULT`: Clinical laboratory test results
+- `INFORMED_CONSENT`: Signed patient procedure consents
+- `CLINICAL_REPORT`: Specialist interconsultations and medical summaries
+- `PHOTOGRAPHY`: Clinical intraoral and extraoral dental photography
+- `OTHER`: Miscellaneous attached clinical documentation
+
 ## Pagination
 
 Large collections should support pagination where necessary.

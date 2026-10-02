@@ -88,6 +88,9 @@ class DentalCareApplicationTests {
     com.dentalcare.api.modules.clinicalrecords.repository.OdontogramFindingRepository odontogramFindingRepository;
 
     @MockitoBean
+    com.dentalcare.api.modules.clinicalrecords.repository.ClinicalDocumentRepository clinicalDocumentRepository;
+
+    @MockitoBean
     com.dentalcare.api.modules.prescriptions.repository.PrescriptionRepository prescriptionRepository;
 
     @MockitoBean
