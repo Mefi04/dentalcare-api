@@ -154,6 +154,175 @@ class ClinicalDocumentRepositoryIntegrationTests {
                 .isInstanceOf(RuntimeException.class);
     }
 
+    @Test
+    @DisplayName("Persists and queries clinical document with R2 file metadata")
+    void persistsAndQueriesClinicalDocumentWithR2Metadata() {
+        Patient patient = patient("PAC-DOC-R2-1", "8000000000401");
+        User dentist = dentist("8000000000402");
+
+        UUID docId = UUID.randomUUID();
+        String storageKey = "patients/" + patient.getId() + "/documents/" + docId + ".pdf";
+
+        ClinicalDocument document = new ClinicalDocument(
+                docId,
+                patient,
+                dentist,
+                "Radiografía Oclusal",
+                ClinicalDocumentType.RADIOGRAPHY,
+                "Detalle de arcada superior",
+                LocalDate.of(2026, 10, 2),
+                NOW,
+                NOW,
+                storageKey,
+                "radiografia-oclusal.pdf",
+                524288L,
+                "application/pdf"
+        );
+        clinicalDocumentRepository.saveAndFlush(document);
+        entityManager.clear();
+
+        Optional<ClinicalDocument> found = clinicalDocumentRepository.findByIdAndPatient_Id(docId, patient.getId());
+        assertThat(found).isPresent();
+        ClinicalDocument loaded = found.get();
+        assertThat(loaded.getStorageObjectKey()).isEqualTo(storageKey);
+        assertThat(loaded.getFileName()).isEqualTo("radiografia-oclusal.pdf");
+        assertThat(loaded.getFileSize()).isEqualTo(524288L);
+        assertThat(loaded.getContentType()).isEqualTo("application/pdf");
+        assertThat(loaded.hasFile()).isTrue();
+
+        Optional<ClinicalDocument> byKey = clinicalDocumentRepository.findByStorageObjectKey(storageKey);
+        assertThat(byKey).isPresent();
+        assertThat(byKey.get().getId()).isEqualTo(docId);
+        assertThat(clinicalDocumentRepository.existsByStorageObjectKey(storageKey)).isTrue();
+        assertThat(clinicalDocumentRepository.existsByStorageObjectKey("non-existent-key")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Multiple legacy documents can coexist with null storageObjectKey without violating unique constraint")
+    void allowsMultipleLegacyDocumentsWithNullStorageObjectKey() {
+        Patient patient = patient("PAC-DOC-R2-2", "8000000000403");
+        User dentist = dentist("8000000000404");
+
+        ClinicalDocument doc1 = new ClinicalDocument(
+                UUID.randomUUID(),
+                patient,
+                dentist,
+                "Documento Legacy 1",
+                ClinicalDocumentType.OTHER,
+                null,
+                LocalDate.of(2026, 10, 2),
+                NOW,
+                NOW
+        );
+
+        ClinicalDocument doc2 = new ClinicalDocument(
+                UUID.randomUUID(),
+                patient,
+                dentist,
+                "Documento Legacy 2",
+                ClinicalDocumentType.OTHER,
+                null,
+                LocalDate.of(2026, 10, 2),
+                NOW,
+                NOW
+        );
+
+        clinicalDocumentRepository.saveAndFlush(doc1);
+        clinicalDocumentRepository.saveAndFlush(doc2);
+        entityManager.clear();
+
+        assertThat(clinicalDocumentRepository.findById(doc1.getId())).isPresent();
+        assertThat(clinicalDocumentRepository.findById(doc2.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("Database unique constraint rejects duplicate non-null storageObjectKey")
+    void databaseRejectsDuplicateStorageObjectKey() {
+        Patient patient = patient("PAC-DOC-R2-3", "8000000000405");
+        User dentist = dentist("8000000000406");
+        String duplicateKey = "patients/common/duplicate-key.pdf";
+
+        ClinicalDocument doc1 = new ClinicalDocument(
+                UUID.randomUUID(),
+                patient,
+                dentist,
+                "Doc 1",
+                ClinicalDocumentType.RADIOGRAPHY,
+                null,
+                LocalDate.of(2026, 10, 2),
+                NOW,
+                NOW,
+                duplicateKey,
+                "doc1.pdf",
+                100L,
+                "application/pdf"
+        );
+        clinicalDocumentRepository.saveAndFlush(doc1);
+
+        ClinicalDocument doc2 = new ClinicalDocument(
+                UUID.randomUUID(),
+                patient,
+                dentist,
+                "Doc 2",
+                ClinicalDocumentType.RADIOGRAPHY,
+                null,
+                LocalDate.of(2026, 10, 2),
+                NOW,
+                NOW,
+                duplicateKey,
+                "doc2.pdf",
+                200L,
+                "application/pdf"
+        );
+
+        assertThatThrownBy(() -> clinicalDocumentRepository.saveAndFlush(doc2))
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    @DisplayName("Persists documents with valid file sizes (0, 1, positive)")
+    void persistsDocumentsWithValidFileSizes() {
+        Patient patient = patient("PAC-DOC-R2-4", "8000000000407");
+        User dentist = dentist("8000000000408");
+
+        ClinicalDocument docZero = new ClinicalDocument(
+                UUID.randomUUID(), patient, dentist, "Empty file", ClinicalDocumentType.OTHER, null,
+                LocalDate.of(2026, 10, 2), NOW, NOW, "keys/0", "empty.txt", 0L, "text/plain");
+
+        ClinicalDocument docOne = new ClinicalDocument(
+                UUID.randomUUID(), patient, dentist, "1-byte file", ClinicalDocumentType.OTHER, null,
+                LocalDate.of(2026, 10, 2), NOW, NOW, "keys/1", "one.bin", 1L, "application/octet-stream");
+
+        ClinicalDocument docLarge = new ClinicalDocument(
+                UUID.randomUUID(), patient, dentist, "Large file", ClinicalDocumentType.OTHER, null,
+                LocalDate.of(2026, 10, 2), NOW, NOW, "keys/large", "scan.zip", 52428800L, "application/zip");
+
+        clinicalDocumentRepository.saveAndFlush(docZero);
+        clinicalDocumentRepository.saveAndFlush(docOne);
+        clinicalDocumentRepository.saveAndFlush(docLarge);
+        entityManager.clear();
+
+        assertThat(clinicalDocumentRepository.findById(docZero.getId()).get().getFileSize()).isEqualTo(0L);
+        assertThat(clinicalDocumentRepository.findById(docOne.getId()).get().getFileSize()).isEqualTo(1L);
+        assertThat(clinicalDocumentRepository.findById(docLarge.getId()).get().getFileSize()).isEqualTo(52428800L);
+    }
+
+    @Test
+    @DisplayName("Database check constraint rejects negative file size")
+    void databaseRejectsNegativeFileSizeCheckConstraint() {
+        Patient patient = patient("PAC-DOC-R2-5", "8000000000409");
+        User dentist = dentist("8000000000410");
+
+        assertThatThrownBy(() -> entityManager.createNativeQuery("""
+                INSERT INTO clinical_documents
+                    (id, patient_id, author_id, title, type, document_date, created_at, updated_at, file_size)
+                VALUES (:id, :patient, :author, 'Doc Invalido', 'OTHER', CURRENT_DATE, NOW(), NOW(), -1)
+                """).setParameter("id", UUID.randomUUID())
+                .setParameter("patient", patient.getId())
+                .setParameter("author", dentist.getId()).executeUpdate())
+                .isInstanceOf(RuntimeException.class);
+    }
+
     private Patient patient(String code, String dpi) {
         Patient patient = new Patient();
         patient.setId(UUID.randomUUID());

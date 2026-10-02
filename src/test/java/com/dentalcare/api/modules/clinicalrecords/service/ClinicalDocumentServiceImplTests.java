@@ -121,6 +121,11 @@ class ClinicalDocumentServiceImplTests {
         assertThat(saved.getDocumentDate()).isEqualTo(docDate);
         assertThat(saved.getCreatedAt()).isEqualTo(fixedInstant);
         assertThat(saved.getUpdatedAt()).isEqualTo(fixedInstant);
+        assertThat(saved.getStorageObjectKey()).isNull();
+        assertThat(saved.getFileName()).isNull();
+        assertThat(saved.getFileSize()).isNull();
+        assertThat(saved.getContentType()).isNull();
+        assertThat(saved.hasFile()).isFalse();
     }
 
     @Test
