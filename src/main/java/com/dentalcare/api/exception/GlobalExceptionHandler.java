@@ -33,6 +33,27 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentNotFoundInStorageException.class)
+    ResponseEntity<ApiErrorResponse> handleDocumentNotFoundInStorage(
+            com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentNotFoundInStorageException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler({
+            com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageDisabledException.class,
+            com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageUnavailableException.class
+    })
+    ResponseEntity<ApiErrorResponse> handleDocumentStorageUnavailable(
+            com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageException.class)
+    ResponseEntity<ApiErrorResponse> handleDocumentStorage(
+            com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(ConflictException.class)
     ResponseEntity<ApiErrorResponse> handleConflict(ConflictException exception, HttpServletRequest request) {
         return buildResponse(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
