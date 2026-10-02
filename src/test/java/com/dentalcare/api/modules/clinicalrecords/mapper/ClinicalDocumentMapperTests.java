@@ -40,7 +40,7 @@ class ClinicalDocumentMapperTests {
     }
 
     @Test
-    @DisplayName("toResponse maps all fields properly")
+    @DisplayName("toResponse maps legacy document properly without file metadata")
     void toResponseMapsAllFieldsProperly() {
         UUID docId = UUID.randomUUID();
         UUID patientId = UUID.randomUUID();
@@ -80,9 +80,67 @@ class ClinicalDocumentMapperTests {
         assertThat(response.createdAt()).isEqualTo(now);
         assertThat(response.updatedAt()).isEqualTo(now);
 
+        // R2 metadata assertions for legacy document
+        assertThat(response.hasFile()).isFalse();
+        assertThat(response.fileName()).isNull();
+        assertThat(response.fileSize()).isNull();
+        assertThat(response.contentType()).isNull();
+
         ClinicalProfessionalResponse authorResp = response.author();
         assertThat(authorResp).isNotNull();
         assertThat(authorResp.id()).isEqualTo(authorId);
         assertThat(authorResp.fullName()).isEqualTo("Dra. Ana López");
+    }
+
+    @Test
+    @DisplayName("toResponse maps document with R2 file metadata properly")
+    void toResponseMapsDocumentWithR2MetadataProperly() {
+        UUID docId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+
+        Patient patient = mock(Patient.class);
+        when(patient.getId()).thenReturn(patientId);
+
+        User author = mock(User.class);
+        when(author.getId()).thenReturn(authorId);
+        when(author.getFullName()).thenReturn("Dr. Carlos Pérez");
+
+        LocalDate docDate = LocalDate.of(2026, 10, 2);
+        Instant now = Instant.parse("2026-10-02T16:00:00Z");
+
+        ClinicalDocument document = new ClinicalDocument(
+                docId,
+                patient,
+                author,
+                "Radiografía Periapical",
+                ClinicalDocumentType.RADIOGRAPHY,
+                "Pieza 18",
+                docDate,
+                now,
+                now,
+                "patients/" + patientId + "/documents/" + docId + ".pdf",
+                "radiografia-pieza-18.pdf",
+                245672L,
+                "application/pdf"
+        );
+
+        ClinicalDocumentResponse response = mapper.toResponse(document);
+
+        assertThat(response).isNotNull();
+        assertThat(response.id()).isEqualTo(docId);
+        assertThat(response.patientId()).isEqualTo(patientId);
+        assertThat(response.title()).isEqualTo("Radiografía Periapical");
+        assertThat(response.type()).isEqualTo(ClinicalDocumentType.RADIOGRAPHY);
+        assertThat(response.description()).isEqualTo("Pieza 18");
+        assertThat(response.documentDate()).isEqualTo(docDate);
+        assertThat(response.createdAt()).isEqualTo(now);
+        assertThat(response.updatedAt()).isEqualTo(now);
+
+        // R2 metadata assertions
+        assertThat(response.hasFile()).isTrue();
+        assertThat(response.fileName()).isEqualTo("radiografia-pieza-18.pdf");
+        assertThat(response.fileSize()).isEqualTo(245672L);
+        assertThat(response.contentType()).isEqualTo("application/pdf");
     }
 }

@@ -181,6 +181,43 @@ class ClinicalDocumentControllerSecurityTests {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    @DisplayName("Document response exposes safe file metadata and never exposes internal storageObjectKey")
+    void documentResponseExposesSafeMetadataWithoutStorageObjectKey() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        token("reader-token", "CLINICAL_RECORD_READ");
+
+        ClinicalDocumentResponse responseWithFile = new ClinicalDocumentResponse(
+                documentId,
+                patientId,
+                new ClinicalProfessionalResponse(UUID.randomUUID(), "Dr. Perez"),
+                "Radiografía Panorámica",
+                ClinicalDocumentType.RADIOGRAPHY,
+                "Estudio",
+                LocalDate.of(2026, 10, 1),
+                "radiografia.pdf",
+                2048L,
+                "application/pdf",
+                true,
+                Instant.now(),
+                Instant.now()
+        );
+
+        when(clinicalDocumentService.findDocumentById(patientId, documentId)).thenReturn(responseWithFile);
+
+        mockMvc.perform(get("/api/v1/patients/{patientId}/documents/{documentId}", patientId, documentId)
+                .header("Authorization", "Bearer reader-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(documentId.toString()))
+                .andExpect(jsonPath("$.hasFile").value(true))
+                .andExpect(jsonPath("$.fileName").value("radiografia.pdf"))
+                .andExpect(jsonPath("$.fileSize").value(2048))
+                .andExpect(jsonPath("$.contentType").value("application/pdf"))
+                .andExpect(jsonPath("$.storageObjectKey").doesNotExist())
+                .andExpect(jsonPath("$.storage_object_key").doesNotExist());
+    }
+
     private void token(String token, String... authorities) {
         when(jwtService.parseAccessToken(token))
                 .thenReturn(new JwtService.AccessTokenClaims(UUID.randomUUID(), List.of(authorities)));
