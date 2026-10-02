@@ -3,11 +3,16 @@ package com.dentalcare.api.modules.clinicalrecords.controller;
 import com.dentalcare.api.config.CorsConfig;
 import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.exception.GlobalExceptionHandler;
+import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.clinicalrecords.dto.request.CreateClinicalDocumentRequest;
+import com.dentalcare.api.modules.clinicalrecords.dto.request.UploadClinicalDocumentRequest;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentDownload;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalProfessionalResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocumentType;
 import com.dentalcare.api.modules.clinicalrecords.service.ClinicalDocumentService;
+import com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentNotFoundInStorageException;
+import com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageDisabledException;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
 import com.dentalcare.api.security.handler.RestAccessDeniedHandler;
 import com.dentalcare.api.security.handler.RestAuthenticationEntryPoint;
@@ -18,9 +23,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -30,7 +38,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -56,9 +66,19 @@ class ClinicalDocumentControllerSecurityTests {
         mockMvc.perform(get("/api/v1/patients/{patientId}/documents/{documentId}", patientId, documentId))
                 .andExpect(status().isUnauthorized());
 
+        mockMvc.perform(get("/api/v1/patients/{patientId}/documents/{documentId}/download", patientId, documentId))
+                .andExpect(status().isUnauthorized());
+
         mockMvc.perform(post("/api/v1/patients/{patientId}/documents", patientId)
                 .contentType("application/json")
                 .content(validDocumentBody()))
+                .andExpect(status().isUnauthorized());
+
+        MockMultipartFile file = new MockMultipartFile("file", "scan.pdf", "application/pdf", "%PDF".getBytes());
+        mockMvc.perform(multipart("/api/v1/patients/{patientId}/documents/upload", patientId)
+                .file(file)
+                .param("title", "Radiografia")
+                .param("type", "RADIOGRAPHY"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -77,16 +97,28 @@ class ClinicalDocumentControllerSecurityTests {
                 .header("Authorization", "Bearer random-user"))
                 .andExpect(status().isForbidden());
 
+        mockMvc.perform(get("/api/v1/patients/{patientId}/documents/{documentId}/download", patientId, documentId)
+                .header("Authorization", "Bearer random-user"))
+                .andExpect(status().isForbidden());
+
         mockMvc.perform(post("/api/v1/patients/{patientId}/documents", patientId)
                 .header("Authorization", "Bearer random-user")
                 .contentType("application/json")
                 .content(validDocumentBody()))
                 .andExpect(status().isForbidden());
+
+        MockMultipartFile file = new MockMultipartFile("file", "scan.pdf", "application/pdf", "%PDF".getBytes());
+        mockMvc.perform(multipart("/api/v1/patients/{patientId}/documents/upload", patientId)
+                .file(file)
+                .param("title", "Radiografia")
+                .param("type", "RADIOGRAPHY")
+                .header("Authorization", "Bearer random-user"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("User with CLINICAL_RECORD_READ can list and view details but cannot write")
-    void userWithReadPermissionCanReadButCannotWrite() throws Exception {
+    @DisplayName("User with CLINICAL_RECORD_READ can list, view, and download but cannot write or upload")
+    void userWithReadPermissionCanReadAndDownloadButCannotWriteOrUpload() throws Exception {
         UUID patientId = UUID.randomUUID();
         UUID documentId = UUID.randomUUID();
         token("reader-token", "CLINICAL_RECORD_READ");
@@ -95,6 +127,11 @@ class ClinicalDocumentControllerSecurityTests {
                 .thenReturn(new PageImpl<>(List.of(sampleResponse(documentId, patientId))));
         when(clinicalDocumentService.findDocumentById(patientId, documentId))
                 .thenReturn(sampleResponse(documentId, patientId));
+
+        ByteArrayInputStream stream = new ByteArrayInputStream("PDF_STREAM_CONTENT".getBytes(StandardCharsets.UTF_8));
+        ClinicalDocumentDownload download = new ClinicalDocumentDownload(
+                stream, "radiografia.pdf", "application/pdf", 18L);
+        when(clinicalDocumentService.downloadDocument(patientId, documentId)).thenReturn(download);
 
         // Allowed reads
         mockMvc.perform(get("/api/v1/patients/{patientId}/documents", patientId)
@@ -107,17 +144,35 @@ class ClinicalDocumentControllerSecurityTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(documentId.toString()));
 
-        // Denied writes (403 Forbidden)
+        // Allowed download
+        mockMvc.perform(get("/api/v1/patients/{patientId}/documents/{documentId}/download", patientId, documentId)
+                .header("Authorization", "Bearer reader-token"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Length", "18"))
+                .andExpect(header().exists("Content-Disposition"))
+                .andExpect(content().string("PDF_STREAM_CONTENT"));
+
+        // Denied write metadata (403 Forbidden)
         mockMvc.perform(post("/api/v1/patients/{patientId}/documents", patientId)
                 .header("Authorization", "Bearer reader-token")
                 .contentType("application/json")
                 .content(validDocumentBody()))
                 .andExpect(status().isForbidden());
+
+        // Denied upload (403 Forbidden)
+        MockMultipartFile file = new MockMultipartFile("file", "scan.pdf", "application/pdf", "%PDF".getBytes());
+        mockMvc.perform(multipart("/api/v1/patients/{patientId}/documents/upload", patientId)
+                .file(file)
+                .param("title", "Radiografia")
+                .param("type", "RADIOGRAPHY")
+                .header("Authorization", "Bearer reader-token"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @DisplayName("User with CLINICAL_RECORD_WRITE can create clinical documents")
-    void userWithWritePermissionCanCreateDocument() throws Exception {
+    @DisplayName("User with CLINICAL_RECORD_WRITE can create clinical documents and upload files")
+    void userWithWritePermissionCanCreateDocumentAndUpload() throws Exception {
         UUID patientId = UUID.randomUUID();
         UUID documentId = UUID.randomUUID();
         token("writer-token", "CLINICAL_RECORD_WRITE");
@@ -133,52 +188,114 @@ class ClinicalDocumentControllerSecurityTests {
                 .andExpect(header().exists("Location"))
                 .andExpect(jsonPath("$.id").value(documentId.toString()))
                 .andExpect(jsonPath("$.title").value("Radiografía Panorámica"));
+
+        // Test multipart upload
+        ClinicalDocumentResponse uploadedResponse = new ClinicalDocumentResponse(
+                documentId,
+                patientId,
+                new ClinicalProfessionalResponse(UUID.randomUUID(), "Dr. Perez"),
+                "Radiografía Panorámica",
+                ClinicalDocumentType.RADIOGRAPHY,
+                "Estudio",
+                LocalDate.of(2026, 10, 1),
+                "radiografia.pdf",
+                1024L,
+                "application/pdf",
+                true,
+                Instant.now(),
+                Instant.now()
+        );
+        when(clinicalDocumentService.uploadDocument(eq(patientId), any(UploadClinicalDocumentRequest.class), any()))
+                .thenReturn(uploadedResponse);
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "radiografia.pdf", "application/pdf", "%PDF-1.4 test".getBytes(StandardCharsets.UTF_8));
+
+        mockMvc.perform(multipart("/api/v1/patients/{patientId}/documents/upload", patientId)
+                .file(file)
+                .param("title", "Radiografía Panorámica")
+                .param("type", "RADIOGRAPHY")
+                .param("description", "Estudio")
+                .param("documentDate", "2026-10-01")
+                .header("Authorization", "Bearer writer-token"))
+                .andExpect(status().isCreated())
+                .andExpect(header().exists("Location"))
+                .andExpect(jsonPath("$.id").value(documentId.toString()))
+                .andExpect(jsonPath("$.hasFile").value(true))
+                .andExpect(jsonPath("$.fileName").value("radiografia.pdf"));
     }
 
     @Test
-    @DisplayName("Creating document with invalid body returns 400 Bad Request")
-    void creatingDocumentWithInvalidBodyReturns400() throws Exception {
+    @DisplayName("Upload with invalid parameters returns 400 Bad Request")
+    void uploadWithInvalidParametersReturns400() throws Exception {
         UUID patientId = UUID.randomUUID();
         token("writer-token", "CLINICAL_RECORD_WRITE");
 
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "radiografia.pdf", "application/pdf", "%PDF".getBytes());
+
         // Blank title
-        String blankTitleJson = """
-                {
-                    "title": "   ",
-                    "type": "RADIOGRAPHY"
-                }
-                """;
-        mockMvc.perform(post("/api/v1/patients/{patientId}/documents", patientId)
-                .header("Authorization", "Bearer writer-token")
-                .contentType("application/json")
-                .content(blankTitleJson))
+        mockMvc.perform(multipart("/api/v1/patients/{patientId}/documents/upload", patientId)
+                .file(file)
+                .param("title", "   ")
+                .param("type", "RADIOGRAPHY")
+                .header("Authorization", "Bearer writer-token"))
                 .andExpect(status().isBadRequest());
 
-        // Null type
-        String nullTypeJson = """
-                {
-                    "title": "Documento",
-                    "type": null
-                }
-                """;
-        mockMvc.perform(post("/api/v1/patients/{patientId}/documents", patientId)
-                .header("Authorization", "Bearer writer-token")
-                .contentType("application/json")
-                .content(nullTypeJson))
+        // Missing type
+        mockMvc.perform(multipart("/api/v1/patients/{patientId}/documents/upload", patientId)
+                .file(file)
+                .param("title", "Titulo")
+                .header("Authorization", "Bearer writer-token"))
                 .andExpect(status().isBadRequest());
+    }
 
-        // Title exceeding 150 characters
-        String longTitleJson = """
-                {
-                    "title": "%s",
-                    "type": "RADIOGRAPHY"
-                }
-                """.formatted("a".repeat(151));
-        mockMvc.perform(post("/api/v1/patients/{patientId}/documents", patientId)
-                .header("Authorization", "Bearer writer-token")
-                .contentType("application/json")
-                .content(longTitleJson))
-                .andExpect(status().isBadRequest());
+    @Test
+    @DisplayName("Downloading document without attached file (legacy) returns 404 Not Found")
+    void downloadLegacyDocumentWithoutFileReturns404() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        token("reader-token", "CLINICAL_RECORD_READ");
+
+        when(clinicalDocumentService.downloadDocument(patientId, documentId))
+                .thenThrow(new ResourceNotFoundException("Clinical document does not have an attached file"));
+
+        mockMvc.perform(get("/api/v1/patients/{patientId}/documents/{documentId}/download", patientId, documentId)
+                .header("Authorization", "Bearer reader-token"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Clinical document does not have an attached file"));
+    }
+
+    @Test
+    @DisplayName("Downloading document when storage object is missing returns 404 Not Found")
+    void downloadMissingStorageObjectReturns404() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        token("reader-token", "CLINICAL_RECORD_READ");
+
+        when(clinicalDocumentService.downloadDocument(patientId, documentId))
+                .thenThrow(new DocumentNotFoundInStorageException("Document not found in storage", null));
+
+        mockMvc.perform(get("/api/v1/patients/{patientId}/documents/{documentId}/download", patientId, documentId)
+                .header("Authorization", "Bearer reader-token"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Document not found in storage"));
+    }
+
+    @Test
+    @DisplayName("Downloading document when R2 storage is disabled returns 503 Service Unavailable")
+    void downloadWhenStorageDisabledReturns503() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        token("reader-token", "CLINICAL_RECORD_READ");
+
+        when(clinicalDocumentService.downloadDocument(patientId, documentId))
+                .thenThrow(new DocumentStorageDisabledException("Clinical document storage is disabled by configuration"));
+
+        mockMvc.perform(get("/api/v1/patients/{patientId}/documents/{documentId}/download", patientId, documentId)
+                .header("Authorization", "Bearer reader-token"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value("Clinical document storage is disabled by configuration"));
     }
 
     @Test
