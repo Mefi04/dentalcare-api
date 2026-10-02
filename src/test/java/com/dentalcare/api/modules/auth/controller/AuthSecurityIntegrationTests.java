@@ -66,11 +66,12 @@ class AuthSecurityIntegrationTests {
         UUID id = UUID.randomUUID();
         when(jwtService.parseAccessToken("valid")).thenReturn(new JwtService.AccessTokenClaims(id, List.of("USER_READ")));
         when(authService.getCurrentUser(id)).thenReturn(
-                new UserResponse(id, "user", "user@example.com", UserStatus.ACTIVE, List.of(), List.of()));
+                new UserResponse(id, "user", "Test User", "user@example.com", UserStatus.ACTIVE, List.of(), List.of()));
 
         mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer valid"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(id.toString()));
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.fullName").value("Test User"));
     }
 
     @Test
@@ -112,7 +113,7 @@ class AuthSecurityIntegrationTests {
     @Test
     void successfulLoginSetsHttpOnlyCookieAndDoesNotIncludeRefreshTokenInBody() throws Exception {
         UUID id = UUID.randomUUID();
-        UserResponse userResponse = new UserResponse(id, "testuser", "test@example.com", UserStatus.ACTIVE, List.of(), List.of());
+        UserResponse userResponse = new UserResponse(id, "testuser", "Test User", "test@example.com", UserStatus.ACTIVE, List.of(), List.of());
         LoginResponse loginResponse = new LoginResponse("access-token-123", "Bearer", 1800L, userResponse);
         AuthService.LoginResult loginResult = new AuthService.LoginResult(loginResponse, "raw-refresh-cookie-value", Duration.ofDays(7));
 
@@ -126,6 +127,7 @@ class AuthSecurityIntegrationTests {
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.expiresIn").value(1800))
                 .andExpect(jsonPath("$.user.id").value(id.toString()))
+                .andExpect(jsonPath("$.user.fullName").value("Test User"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("refreshToken=raw-refresh-cookie-value")))
                 .andExpect(header().string(HttpHeaders.SET_COOKIE, containsString("HttpOnly")))

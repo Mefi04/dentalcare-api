@@ -13,7 +13,7 @@ public class AuthUserMapper {
     private static final String ROLE_PREFIX = "ROLE_";
 
     public UserResponse toResponse(User user) {
-        return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getStatus(),
+        return new UserResponse(user.getId(), user.getUsername(), user.getFullName(), user.getEmail(), user.getStatus(),
                 roleCodes(user), permissionCodes(user));
     }
 

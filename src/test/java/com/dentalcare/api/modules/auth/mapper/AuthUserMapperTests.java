@@ -33,6 +33,7 @@ class AuthUserMapperTests {
 
         var response = mapper.toResponse(user);
 
+        assertThat(response.fullName()).isEqualTo("Test User");
         assertThat(response.roles()).containsExactly("ADMINISTRATOR");
         assertThat(response.permissions()).containsExactly("PATIENT_READ");
     }
@@ -47,7 +48,7 @@ class AuthUserMapperTests {
     }
 
     private static User userWithRoles(Role... roles) {
-        User user = new User(UUID.randomUUID(), "user", "user@example.com", "1234567890123", "hash", UserStatus.ACTIVE,
+        User user = new User(UUID.randomUUID(), "user", "Test User", "user@example.com", "1234567890123", "hash", UserStatus.ACTIVE,
                 Instant.now(), Instant.now());
         user.setRoles(Set.of(roles));
         return user;
