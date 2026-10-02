@@ -27,7 +27,10 @@ import com.dentalcare.api.modules.clinicalrecords.model.ClinicalEvolutionNote;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalPreparation;
 import com.dentalcare.api.modules.clinicalrecords.model.DentitionType;
 import com.dentalcare.api.modules.clinicalrecords.model.DiagnosisType;
+import com.dentalcare.api.modules.clinicalrecords.model.FdiToothCatalog;
 import com.dentalcare.api.modules.clinicalrecords.model.OdontogramFinding;
+import com.dentalcare.api.modules.clinicalrecords.model.ToothFinding;
+import com.dentalcare.api.modules.clinicalrecords.model.ToothSurface;
 import com.dentalcare.api.modules.clinicalrecords.model.ToothValidator;
 import com.dentalcare.api.modules.clinicalrecords.repository.ClinicalAttentionRepository;
 import com.dentalcare.api.modules.clinicalrecords.repository.ClinicalDiagnosisRepository;
@@ -348,6 +351,10 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
         requireId(patientId, "Patient id is required");
         requireId(authenticatedUserId, "Authentication is required");
 
+        if (request == null) {
+            throw new BadRequestException("Request body is required");
+        }
+
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
 
@@ -362,25 +369,69 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
             }
         }
 
-        if (!ToothValidator.isValidTooth(request.dentition(), request.toothCode())) {
-            throw new BadRequestException("Invalid tooth code " + request.toothCode() + " for dentition " + request.dentition());
+        if (request.dentition() == null) {
+            throw new BadRequestException("Dentition type is required");
+        }
+
+        if (request.toothCode() == null || request.toothCode().isBlank()) {
+            throw new BadRequestException("Tooth code is required");
+        }
+
+        String toothCode = request.toothCode().trim();
+        if (!FdiToothCatalog.isValidFdiCode(toothCode)) {
+            throw new BadRequestException("Invalid tooth code: " + toothCode + " is not a valid FDI code");
+        }
+
+        if (!FdiToothCatalog.isValidTooth(request.dentition(), toothCode)) {
+            throw new BadRequestException("Invalid tooth code: " + toothCode + " is incompatible with dentition " + request.dentition());
+        }
+
+        if (request.finding() == null) {
+            throw new BadRequestException("Tooth finding is required");
+        }
+
+        ToothFinding finding = request.finding();
+        ToothSurface surface = request.surface();
+
+        if (finding.isToothLevelOnly() && surface != null) {
+            throw new BadRequestException("Finding " + finding + " is a tooth-level finding and cannot be applied to a specific surface");
+        }
+
+        if (finding.isSurfaceLevelOnly() && surface == null) {
+            throw new BadRequestException("Finding " + finding + " requires a dental surface");
+        }
+
+        if (surface != null) {
+            if (!FdiToothCatalog.isSurfaceAllowed(toothCode, surface)) {
+                if (FdiToothCatalog.isAnterior(toothCode) && surface == ToothSurface.OCCLUSAL) {
+                    throw new BadRequestException("Surface OCCLUSAL is not allowed on anterior tooth " + toothCode + ". Anterior teeth use INCISAL.");
+                } else if (FdiToothCatalog.isPosterior(toothCode) && surface == ToothSurface.INCISAL) {
+                    throw new BadRequestException("Surface INCISAL is not allowed on posterior tooth " + toothCode + ". Posterior teeth use OCCLUSAL.");
+                } else if (FdiToothCatalog.isMaxillary(toothCode) && surface == ToothSurface.LINGUAL) {
+                    throw new BadRequestException("Surface LINGUAL is not valid for maxillary (upper) tooth " + toothCode + ". Use PALATAL.");
+                } else if (FdiToothCatalog.isMandibular(toothCode) && surface == ToothSurface.PALATAL) {
+                    throw new BadRequestException("Surface PALATAL is not valid for mandibular (lower) tooth " + toothCode + ". Use LINGUAL.");
+                } else {
+                    throw new BadRequestException("Surface " + surface + " is not allowed on tooth " + toothCode);
+                }
+            }
         }
 
         Instant now = clock.instant();
-        OdontogramFinding finding = new OdontogramFinding(
+        OdontogramFinding odontogramFinding = new OdontogramFinding(
                 UUID.randomUUID(),
                 patient,
                 attention,
                 author,
                 request.dentition(),
-                request.toothCode().trim(),
-                request.surface(),
-                request.finding(),
+                toothCode,
+                surface,
+                finding,
                 request.observation() != null ? request.observation().trim() : null,
                 now
         );
 
-        OdontogramFinding saved = odontogramFindingRepository.save(finding);
+        OdontogramFinding saved = odontogramFindingRepository.save(odontogramFinding);
         return mapper.toFindingResponse(saved);
     }
 
@@ -392,19 +443,27 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
 
         DentitionType targetDentition = dentition != null ? dentition : DentitionType.ADULT;
         List<OdontogramFinding> findings = odontogramFindingRepository
-                .findByPatient_IdAndDentitionOrderByCreatedAtAsc(patientId, targetDentition);
+                .findByPatient_IdAndDentitionOrderByCreatedAtAscIdAsc(patientId, targetDentition);
 
-        return mapper.toOdontogramResponse(targetDentition, findings);
+        return mapper.toOdontogramResponse(patientId, targetDentition, findings);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<OdontogramFindingResponse> findOdontogramFindingsByPatient(UUID patientId, int page, int size) {
+        return findOdontogramFindingsByPatient(patientId, null, null, null, page, size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<OdontogramFindingResponse> findOdontogramFindingsByPatient(
+            UUID patientId, String toothCode, DentitionType dentition, ToothFinding finding, int page, int size) {
         requireId(patientId, "Patient id is required");
         ensurePatientExists(patientId);
 
+        String trimmedTooth = (toothCode != null && !toothCode.isBlank()) ? toothCode.trim() : null;
         Pageable pageable = PageRequest.of(Math.max(0, page), clampPageSize(size), FINDING_ORDER);
-        return odontogramFindingRepository.findByPatient_Id(patientId, pageable)
+        return odontogramFindingRepository.findByPatientWithFilters(patientId, trimmedTooth, dentition, finding, pageable)
                 .map(mapper::toFindingResponse);
     }
 
