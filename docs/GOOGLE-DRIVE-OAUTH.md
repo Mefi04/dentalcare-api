@@ -18,13 +18,40 @@ Los archivos creados posteriormente por la API pertenecerán a la cuenta Google 
 2. Habilitar **Google Drive API**.
 3. Configurar **Google Auth Platform / OAuth consent**.
 4. Mientras la aplicación esté en pruebas, registrar la cuenta propietaria como usuario de prueba autorizado.
-5. Crear un **OAuth 2.0 Client ID** para el flujo que se utilice durante la autorización.
-6. Solicitar acceso offline y forzar consentimiento cuando sea necesario para obtener un `refresh_token`.
+5. Crear un **OAuth 2.0 Client ID** de tipo **Web application**.
+6. Registrar como Authorized redirect URI:
+
+   `https://developers.google.com/oauthplayground`
+
 7. Mantener inicialmente el scope:
 
    `https://www.googleapis.com/auth/drive.file`
 
-8. Crear la carpeta `DentalCare_Expedientes` en My Drive y conservar su `folderId`.
+8. Crear la carpeta `DentalCare_Expedientes` en My Drive y conservar su `folderId` fuera del repositorio.
+
+## Obtener el refresh token con OAuth Playground
+
+Usar las credenciales OAuth propias del proyecto para evitar depender de las credenciales temporales del Playground.
+
+1. Abrir Google OAuth 2.0 Playground.
+2. Abrir **OAuth 2.0 Configuration**.
+3. Configurar:
+   - OAuth flow: `Server-side`.
+   - OAuth endpoints: `Google`.
+   - Access type: `Offline`.
+   - Force prompt: `Consent Screen`.
+   - Activar `Use your own OAuth credentials`.
+4. Introducir temporalmente el `client_id` y `client_secret` del cliente web en el Playground. No copiarlos a issues, PRs, logs o capturas públicas.
+5. En **Step 1**, introducir únicamente:
+
+   `https://www.googleapis.com/auth/drive.file`
+
+6. Autorizar con la cuenta Google propietaria de My Drive.
+7. En **Step 2**, intercambiar el authorization code por tokens.
+8. Guardar el `refresh_token` directamente en el gestor de secretos o variables privadas del entorno donde correrá el backend.
+9. No conservar el access token como configuración permanente. El backend obtiene y renueva access tokens a partir del `refresh_token`.
+
+El Playground puede revocar automáticamente sus propios refresh tokens temporales; usar las credenciales OAuth propias evita depender de ese comportamiento del Playground.
 
 ### Vigencia del refresh token durante pruebas
 
