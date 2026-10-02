@@ -54,3 +54,10 @@ dentalcare:
     expiration: ${PASSWORD_RECOVERY_EXPIRATION:15m}
     max-attempts: ${PASSWORD_RECOVERY_MAX_ATTEMPTS:5}
     mail-from: ${PASSWORD_RECOVERY_MAIL_FROM:no-reply@dentalcare.local}
+  r2:
+    enabled: ${R2_ENABLED:false}
+    account-id: ${R2_ACCOUNT_ID:}
+    bucket: ${R2_BUCKET:dentalcare-expedientes}
+    endpoint: ${R2_ENDPOINT:}
+    access-key-id: ${R2_ACCESS_KEY_ID:}
+    secret-access-key: ${R2_SECRET_ACCESS_KEY:}
