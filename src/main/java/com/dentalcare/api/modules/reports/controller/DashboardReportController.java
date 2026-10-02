@@ -26,7 +26,9 @@ public class DashboardReportController {
     }
 
     @Operation(summary = "Get real administrative dashboard metrics for a period",
-            description = "Dates are inclusive and interpreted in UTC. Defaults to the current UTC month.")
+            description = "from/to are inclusive LocalDate values interpreted as clinic operating days in "
+                    + "America/Guatemala. Internally, the period is queried as the half-open interval "
+                    + "[start of from, start of the day after to). Defaults to the current clinic month.")
     @GetMapping("/dashboard")
     @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'SECRETARY', 'CASHIER')")
     public ResponseEntity<DashboardReportResponse> getDashboard(

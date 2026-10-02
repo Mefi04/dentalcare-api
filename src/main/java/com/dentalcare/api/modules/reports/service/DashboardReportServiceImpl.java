@@ -19,13 +19,14 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.Map;
 
 @Service
 public class DashboardReportServiceImpl implements DashboardReportService {
 
     private static final BigDecimal ZERO = BigDecimal.ZERO.setScale(2);
+    private static final ZoneId CLINIC_ZONE = ZoneId.of("America/Guatemala");
 
     private final DashboardMetricsRepository dashboardMetricsRepository;
     private final Clock clock;
@@ -39,15 +40,15 @@ public class DashboardReportServiceImpl implements DashboardReportService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public DashboardReportResponse getDashboard(LocalDate requestedFrom, LocalDate requestedTo) {
         Instant generatedAt = clock.instant();
-        LocalDate today = LocalDate.ofInstant(generatedAt, ZoneOffset.UTC);
+        LocalDate today = LocalDate.ofInstant(generatedAt, CLINIC_ZONE);
         LocalDate from = requestedFrom != null ? requestedFrom : today.withDayOfMonth(1);
         LocalDate to = requestedTo != null ? requestedTo : today;
         if (from.isAfter(to)) {
             throw new BadRequestException("Report start date must not be after end date");
         }
 
-        Instant fromInclusive = from.atStartOfDay(ZoneOffset.UTC).toInstant();
-        Instant toExclusive = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant fromInclusive = from.atStartOfDay(CLINIC_ZONE).toInstant();
+        Instant toExclusive = to.plusDays(1).atStartOfDay(CLINIC_ZONE).toInstant();
         PatientMetricsSnapshot patients = dashboardMetricsRepository.findPatientMetrics(fromInclusive, toExclusive);
         Map<AppointmentStatus, Long> appointments = dashboardMetricsRepository
                 .countAppointmentsByStatus(fromInclusive, toExclusive);

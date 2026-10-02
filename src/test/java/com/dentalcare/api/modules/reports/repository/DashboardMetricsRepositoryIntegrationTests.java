@@ -103,6 +103,63 @@ class DashboardMetricsRepositoryIntegrationTests {
         assertThat(billingMetrics.totalPayments()).isEqualByComparingTo("150.00");
     }
 
+    @Test
+    void appliesGuatemalaDayBoundariesAsInclusiveExclusiveInstants() {
+        Instant fromInclusive = Instant.parse("2026-10-02T06:00:00Z");
+        Instant toExclusive = Instant.parse("2026-10-03T06:00:00Z");
+        Instant justBeforeStart = Instant.parse("2026-10-02T05:59:59.999999Z");
+        Instant inside = Instant.parse("2026-10-02T18:00:00Z");
+        Instant justBeforeEnd = Instant.parse("2026-10-03T05:59:59.999999Z");
+
+        Patient before = patients.save(patient("PAC-BOUNDARY-1", "7100000000001", justBeforeStart));
+        Patient atStart = patients.save(patient("PAC-BOUNDARY-2", "7100000000002", fromInclusive));
+        Patient inPeriod = patients.save(patient("PAC-BOUNDARY-3", "7100000000003", inside));
+        Patient beforeEnd = patients.save(patient("PAC-BOUNDARY-4", "7100000000004", justBeforeEnd));
+        Patient atEnd = patients.save(patient("PAC-BOUNDARY-5", "7100000000005", toExclusive));
+        Role dentistRole = roles.findByCode("DENTIST").orElseThrow();
+        User dentist = users.save(user(dentistRole));
+
+        appointments.saveAllAndFlush(List.of(
+                appointment(before, dentist, justBeforeStart, AppointmentStatus.SCHEDULED),
+                appointment(atStart, dentist, fromInclusive, AppointmentStatus.COMPLETED),
+                appointment(beforeEnd, dentist, justBeforeEnd, AppointmentStatus.CANCELLED),
+                appointment(atEnd, dentist, toExclusive, AppointmentStatus.SCHEDULED)));
+
+        Charge chargeBefore = charges.saveAndFlush(charge(before, "Before boundary", "1.00", justBeforeStart));
+        Charge chargeAtStart = charges.saveAndFlush(charge(atStart, "At start", "10.00", fromInclusive));
+        Charge chargeBeforeEnd = charges.saveAndFlush(charge(beforeEnd, "Before end", "100.00", justBeforeEnd));
+        Charge chargeAtEnd = charges.saveAndFlush(charge(atEnd, "At end", "1000.00", toExclusive));
+        payments.saveAllAndFlush(List.of(
+                payment(before, chargeBefore, "0.10", justBeforeStart),
+                payment(atStart, chargeAtStart, "1.00", fromInclusive),
+                payment(beforeEnd, chargeBeforeEnd, "10.00", justBeforeEnd),
+                payment(atEnd, chargeAtEnd, "100.00", toExclusive)));
+
+        PatientMetricsSnapshot patientMetrics = metrics.findPatientMetrics(fromInclusive, toExclusive);
+        PatientMetricsSnapshot patientsAtStart = metrics.findPatientMetrics(fromInclusive, inside);
+        PatientMetricsSnapshot patientsBeforeEnd = metrics.findPatientMetrics(justBeforeEnd, toExclusive);
+        PatientMetricsSnapshot patientsBeforeStart = metrics.findPatientMetrics(justBeforeStart, fromInclusive);
+        PatientMetricsSnapshot patientsAtEnd = metrics.findPatientMetrics(toExclusive, toExclusive.plusNanos(1_000));
+        Map<AppointmentStatus, Long> appointmentMetrics =
+                metrics.countAppointmentsByStatus(fromInclusive, toExclusive);
+        BillingMetricsSnapshot billingMetrics = metrics.findBillingMetrics(fromInclusive, toExclusive);
+
+        assertThat(patientMetrics.total()).isEqualTo(5);
+        assertThat(patientMetrics.registeredInPeriod()).isEqualTo(3);
+        assertThat(patientsAtStart.registeredInPeriod()).isEqualTo(1);
+        assertThat(patientsBeforeEnd.registeredInPeriod()).isEqualTo(1);
+        assertThat(patientsBeforeStart.registeredInPeriod()).isEqualTo(1);
+        assertThat(patientsAtEnd.registeredInPeriod()).isEqualTo(1);
+        assertThat(appointmentMetrics)
+                .containsOnlyKeys(AppointmentStatus.COMPLETED, AppointmentStatus.CANCELLED)
+                .containsEntry(AppointmentStatus.COMPLETED, 1L)
+                .containsEntry(AppointmentStatus.CANCELLED, 1L);
+        assertThat(billingMetrics.chargesCreatedInPeriod()).isEqualByComparingTo("110.00");
+        assertThat(billingMetrics.paymentsReceivedInPeriod()).isEqualByComparingTo("11.00");
+        assertThat(billingMetrics.totalCharges()).isEqualByComparingTo("1111.00");
+        assertThat(billingMetrics.totalPayments()).isEqualByComparingTo("111.10");
+    }
+
     private Patient patient(String code, String dpi, Instant createdAt) {
         Patient patient = new Patient();
         patient.setId(UUID.randomUUID());
@@ -126,16 +183,28 @@ class DashboardMetricsRepositoryIntegrationTests {
 
     private Appointment appointment(Patient patient, User professional, String scheduledAt,
                                     AppointmentStatus status) {
-        Instant instant = Instant.parse(scheduledAt);
+        return appointment(patient, professional, Instant.parse(scheduledAt), status);
+    }
+
+    private Appointment appointment(Patient patient, User professional, Instant instant,
+                                    AppointmentStatus status) {
         return new Appointment(UUID.randomUUID(), patient, professional, instant, status, instant, instant);
     }
 
     private Charge charge(Patient patient, String concept, String amount, String createdAt) {
-        return new Charge(UUID.randomUUID(), patient, concept, new BigDecimal(amount), Instant.parse(createdAt));
+        return charge(patient, concept, amount, Instant.parse(createdAt));
+    }
+
+    private Charge charge(Patient patient, String concept, String amount, Instant createdAt) {
+        return new Charge(UUID.randomUUID(), patient, concept, new BigDecimal(amount), createdAt);
     }
 
     private Payment payment(Patient patient, Charge charge, String amount, String createdAt) {
+        return payment(patient, charge, amount, Instant.parse(createdAt));
+    }
+
+    private Payment payment(Patient patient, Charge charge, String amount, Instant createdAt) {
         return new Payment(UUID.randomUUID(), patient, charge, PaymentKind.PARTIAL_PAYMENT, PaymentMethod.CASH,
-                new BigDecimal(amount), Instant.parse(createdAt));
+                new BigDecimal(amount), createdAt);
     }
 }

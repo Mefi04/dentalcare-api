@@ -45,8 +45,8 @@ class DashboardReportServiceImplTests {
     void aggregatesRealSnapshotsForExplicitInclusivePeriod() {
         LocalDate from = LocalDate.of(2026, 9, 1);
         LocalDate to = LocalDate.of(2026, 9, 30);
-        Instant fromInstant = Instant.parse("2026-09-01T00:00:00Z");
-        Instant toExclusive = Instant.parse("2026-10-01T00:00:00Z");
+        Instant fromInstant = Instant.parse("2026-09-01T06:00:00Z");
+        Instant toExclusive = Instant.parse("2026-10-01T06:00:00Z");
         Map<AppointmentStatus, Long> appointments = new EnumMap<>(AppointmentStatus.class);
         appointments.put(AppointmentStatus.SCHEDULED, 4L);
         appointments.put(AppointmentStatus.COMPLETED, 8L);
@@ -77,9 +77,28 @@ class DashboardReportServiceImplTests {
     }
 
     @Test
-    void defaultsToCurrentUtcMonthAndReportsCreditWithoutNegativePendingBalance() {
-        Instant from = Instant.parse("2026-10-01T00:00:00Z");
-        Instant toExclusive = Instant.parse("2026-10-02T00:00:00Z");
+    void usesGuatemalaBoundariesForExplicitSingleDayPeriod() {
+        LocalDate date = LocalDate.of(2026, 10, 2);
+        Instant from = Instant.parse("2026-10-02T06:00:00Z");
+        Instant toExclusive = Instant.parse("2026-10-03T06:00:00Z");
+        when(repository.findPatientMetrics(from, toExclusive)).thenReturn(new PatientMetricsSnapshot(0, 0));
+        when(repository.countAppointmentsByStatus(from, toExclusive)).thenReturn(Map.of());
+        when(repository.findBillingMetrics(from, toExclusive)).thenReturn(new BillingMetricsSnapshot(
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+
+        DashboardReportResponse result = service.getDashboard(date, date);
+
+        assertThat(result.period().from()).isEqualTo(date);
+        assertThat(result.period().to()).isEqualTo(date);
+        verify(repository).findPatientMetrics(from, toExclusive);
+        verify(repository).countAppointmentsByStatus(from, toExclusive);
+        verify(repository).findBillingMetrics(from, toExclusive);
+    }
+
+    @Test
+    void defaultsToCurrentGuatemalaMonthAndReportsCreditWithoutNegativePendingBalance() {
+        Instant from = Instant.parse("2026-10-01T06:00:00Z");
+        Instant toExclusive = Instant.parse("2026-10-02T06:00:00Z");
         when(repository.findPatientMetrics(from, toExclusive)).thenReturn(new PatientMetricsSnapshot(0, 0));
         when(repository.countAppointmentsByStatus(from, toExclusive)).thenReturn(Map.of());
         when(repository.findBillingMetrics(from, toExclusive)).thenReturn(new BillingMetricsSnapshot(
@@ -92,6 +111,26 @@ class DashboardReportServiceImplTests {
         assertThat(result.appointments().total()).isZero();
         assertThat(result.billing().pendingBalance()).isEqualByComparingTo("0.00");
         assertThat(result.billing().availableCredit()).isEqualByComparingTo("25.00");
+    }
+
+    @Test
+    void keepsPreviousGuatemalaDateWhenUtcIsAlreadyOnNextDay() {
+        Instant utcNextDay = Instant.parse("2026-10-02T01:30:00Z");
+        DashboardReportServiceImpl localService = new DashboardReportServiceImpl(
+                repository, Clock.fixed(utcNextDay, ZoneOffset.UTC));
+        Instant from = Instant.parse("2026-10-01T06:00:00Z");
+        Instant toExclusive = Instant.parse("2026-10-02T06:00:00Z");
+        when(repository.findPatientMetrics(from, toExclusive)).thenReturn(new PatientMetricsSnapshot(0, 0));
+        when(repository.countAppointmentsByStatus(from, toExclusive)).thenReturn(Map.of());
+        when(repository.findBillingMetrics(from, toExclusive)).thenReturn(new BillingMetricsSnapshot(
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+
+        DashboardReportResponse result = localService.getDashboard(null, null);
+
+        assertThat(result.period().from()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(result.period().to()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(result.period().generatedAt()).isEqualTo(utcNextDay);
+        verify(repository).findPatientMetrics(from, toExclusive);
     }
 
     @Test

@@ -297,7 +297,7 @@ The backend derives `performedBy` solely from the JWT principal. Clients cannot 
 
 | Method | Path | Authorization | Success | Notes |
 |---|---|---|---|---|
-| `GET` | `/api/v1/reports/dashboard` | `ADMINISTRATOR`, `SECRETARY`, or `CASHIER` | `200 OK` | Returns read-only patient, appointment, and billing metrics from persisted data. Optional inclusive `from` and `to` ISO dates default to the current UTC month. |
+| `GET` | `/api/v1/reports/dashboard` | `ADMINISTRATOR`, `SECRETARY`, or `CASHIER` | `200 OK` | Returns read-only patient, appointment, and billing metrics from persisted data. Optional inclusive `from` and `to` ISO `LocalDate` values represent clinic operating days in `America/Guatemala` and default to the current clinic month through the current clinic date. |
 
 The dashboard runs its aggregate queries in one read-only repeatable-read transaction. It never loads full
 patient, appointment, charge, or payment collections. `patients.registeredInPeriod` uses patient creation time;
@@ -305,6 +305,12 @@ appointment counts use `scheduledAt`; period charges and payments use their resp
 `billing.pendingBalance` and `billing.availableCredit` are mutually exclusive values derived from all persisted
 charges minus all persisted payments, matching the current account-statement balance semantics. An inverted
 period returns `400 Bad Request`.
+
+Dashboard date boundaries are calculated in `America/Guatemala` and converted to `Instant` only after applying
+the clinic zone. Inclusive `from`/`to` dates are queried internally as the half-open interval
+`[start of from, start of the day after to)`. Detailed upcoming appointments remain in the appointments domain
+and are obtained from `GET /api/v1/appointments` with `from=<current instant>`, `status=SCHEDULED`, and the
+desired pagination; they are not embedded in the dashboard report.
 
 ## Clinical record endpoints
 
