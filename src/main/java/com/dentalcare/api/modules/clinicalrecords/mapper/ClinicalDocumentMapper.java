@@ -28,6 +28,10 @@ public class ClinicalDocumentMapper {
                 document.getType(),
                 document.getDescription(),
                 document.getDocumentDate(),
+                document.getFileName(),
+                document.getFileSize(),
+                document.getContentType(),
+                document.hasFile(),
                 document.getCreatedAt(),
                 document.getUpdatedAt()
         );

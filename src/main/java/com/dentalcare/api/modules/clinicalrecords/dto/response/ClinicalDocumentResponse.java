@@ -14,6 +14,24 @@ public record ClinicalDocumentResponse(
         ClinicalDocumentType type,
         String description,
         LocalDate documentDate,
+        String fileName,
+        Long fileSize,
+        String contentType,
+        boolean hasFile,
         Instant createdAt,
         Instant updatedAt) {
+
+    public ClinicalDocumentResponse(
+            UUID id,
+            UUID patientId,
+            ClinicalProfessionalResponse author,
+            String title,
+            ClinicalDocumentType type,
+            String description,
+            LocalDate documentDate,
+            Instant createdAt,
+            Instant updatedAt) {
+        this(id, patientId, author, title, type, description, documentDate,
+                null, null, null, false, createdAt, updatedAt);
+    }
 }
