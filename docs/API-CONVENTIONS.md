@@ -404,6 +404,41 @@ Supported categories (`ClinicalDocumentType`):
 - `PHOTOGRAPHY`: Clinical intraoral and extraoral dental photography
 - `OTHER`: Miscellaneous attached clinical documentation
 
+## Appointment request endpoints
+
+An appointment request is not a confirmed appointment. Once accepted, the backend transactionally creates one
+`Appointment` and exposes its id as `appointmentId`; clients then use the existing appointment endpoints as the
+source of truth.
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/appointment-requests` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Filters: `from`, `to`, `patientId`, `professionalId`, `status`, `page`, `size`. |
+| `GET` | `/api/v1/appointment-requests/{requestId}` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Administrative detail. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/accept` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Accepts requested slot; a successful retry returns the same confirmation. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/proposal` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Body: future `proposedAt`, optional `professionalId`. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/reject` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Rejects an open request. |
+| `POST` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `201 Created` | Body: `professionalId`, future `requestedAt`; patient comes from JWT. |
+| `GET` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `200 OK` | Lists only owned requests. |
+| `GET` | `/api/v1/patients/me/appointment-requests/{requestId}` | `PATIENT` | `200 OK` | Foreign and unknown ids both return 404. |
+| `POST` | `/api/v1/patients/me/appointment-requests/{requestId}/accept-proposal` | `PATIENT` | `200 OK` | Creates exactly one appointment. |
+| `POST` | `/api/v1/patients/me/appointment-requests/{requestId}/reject-proposal` | `PATIENT` | `200 OK` | Rejects the clinic proposal. |
+| `POST` | `/api/v1/patients/me/appointment-requests/{requestId}/cancel` | `PATIENT` | `200 OK` | Cancels a pending request. |
+
+`actionRequiredBy` is derived as `CLINIC`, `PATIENT`, or `NONE`. Existing direct appointment endpoints remain
+compatible.
+
+## Waiting room endpoints
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `GET` | `/api/v1/appointments/waiting-room` | `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, `ASSISTANT` | `200 OK` | Guatemala clinic `date`; optional `status`, `professionalId`, `page`, `size`. |
+| `GET` | `/api/v1/appointments/{appointmentId}/waiting-room` | Same read roles | `200 OK` | Operational detail. |
+| `POST` | `/api/v1/appointments/{appointmentId}/waiting-room/check-in` | `ADMINISTRATOR`, `SECRETARY`, `ASSISTANT` | `201 Created` | Registers arrival for a scheduled appointment of the current clinic day. |
+| `PATCH` | `/api/v1/appointments/{appointmentId}/waiting-room/status` | `ADMINISTRATOR`, `SECRETARY`, `ASSISTANT` | `200 OK` | Body `status`; only `ARRIVED -> WAITING -> READY`. |
+
+Duplicate check-in, invalid transitions and inactive appointments return `409 Conflict`. Responsible users are
+always obtained from JWT.
+
 ## Pagination
 
 Large collections should support pagination where necessary.

@@ -2,6 +2,9 @@ package com.dentalcare.api.modules.appointments.repository;
 
 import com.dentalcare.api.modules.appointments.model.Appointment;
 import com.dentalcare.api.modules.appointments.model.AppointmentStatus;
+import com.dentalcare.api.modules.appointments.model.AppointmentRequest;
+import com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus;
+import com.dentalcare.api.modules.appointments.model.WaitingRoomEntry;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
@@ -53,6 +56,8 @@ class AppointmentRepositoryIntegrationTests {
     }
 
     @Autowired AppointmentRepository appointments;
+    @Autowired AppointmentRequestRepository appointmentRequests;
+    @Autowired WaitingRoomRepository waitingRoom;
     @Autowired PatientRepository patients;
     @Autowired UserRepository users;
     @Autowired RoleRepository roles;
@@ -92,6 +97,38 @@ class AppointmentRepositoryIntegrationTests {
 
         assertThat(appointments.findById(id).orElseThrow().getStatus())
                 .isEqualTo(AppointmentStatus.COMPLETED);
+    }
+
+    @Test
+    void persistsOwnedRequestAndLinksExactlyOneConfirmedAppointment() {
+        Appointment appointment = appointments.saveAndFlush(appointment(patient, SCHEDULED_AT));
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), patient, dentist,
+                SCHEDULED_AT, AppointmentRequestStatus.PENDING, NOW, NOW);
+        request.confirm(appointment, dentist, NOW.plusSeconds(1));
+        appointmentRequests.saveAndFlush(request);
+
+        AppointmentRequest recovered = appointmentRequests.findByIdAndPatient_Id(request.getId(), patient.getId())
+                .orElseThrow();
+        assertThat(recovered.getStatus()).isEqualTo(AppointmentRequestStatus.CONFIRMED);
+        assertThat(recovered.getAppointment().getId()).isEqualTo(appointment.getId());
+        assertThat(appointmentRequests.findByIdAndPatient_Id(request.getId(), UUID.randomUUID())).isEmpty();
+
+        AppointmentRequest duplicate = new AppointmentRequest(UUID.randomUUID(), patient, dentist,
+                SCHEDULED_AT.plusSeconds(3600), AppointmentRequestStatus.PENDING, NOW, NOW);
+        duplicate.confirm(appointment, dentist, NOW.plusSeconds(2));
+        assertThatThrownBy(() -> appointmentRequests.saveAndFlush(duplicate))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void waitingRoomAllowsOnlyOneOperationalEntryPerAppointment() {
+        Appointment appointment = appointments.saveAndFlush(appointment(patient, SCHEDULED_AT));
+        waitingRoom.saveAndFlush(new WaitingRoomEntry(UUID.randomUUID(), appointment, dentist, NOW));
+
+        assertThat(waitingRoom.findByAppointment_Id(appointment.getId())).isPresent();
+        assertThatThrownBy(() -> waitingRoom.saveAndFlush(
+                new WaitingRoomEntry(UUID.randomUUID(), appointment, dentist, NOW.plusSeconds(1))))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test

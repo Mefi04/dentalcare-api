@@ -20,5 +20,5 @@ public interface AdministrativeAppointmentService {
 
     AdministrativeAppointmentResponse reschedule(UUID appointmentId, Instant scheduledAt);
 
-    AdministrativeAppointmentResponse updateStatus(UUID appointmentId, AppointmentStatus status);
+    AdministrativeAppointmentResponse updateStatus(UUID actorId, UUID appointmentId, AppointmentStatus status);
 }

@@ -31,17 +31,20 @@ public class PatientAppointmentServiceImpl implements PatientAppointmentService 
     private final AppointmentMapper appointmentMapper;
     private final AppointmentService appointmentService;
     private final UserRepository userRepository;
+    private final WaitingRoomService waitingRoomService;
 
     public PatientAppointmentServiceImpl(AppointmentRepository appointmentRepository,
                                          PatientRepository patientRepository,
                                          AppointmentMapper appointmentMapper,
                                          AppointmentService appointmentService,
-                                         UserRepository userRepository) {
+                                         UserRepository userRepository,
+                                         WaitingRoomService waitingRoomService) {
         this.appointmentRepository = appointmentRepository;
         this.patientRepository = patientRepository;
         this.appointmentMapper = appointmentMapper;
         this.appointmentService = appointmentService;
         this.userRepository = userRepository;
+        this.waitingRoomService = waitingRoomService;
     }
 
     @Override
@@ -86,6 +89,7 @@ public class PatientAppointmentServiceImpl implements PatientAppointmentService 
         Appointment appointment = appointmentRepository.findByIdAndPatient_Id(appointmentId, patient.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
         Appointment cancelledAppointment = appointmentService.cancel(appointment);
+        waitingRoomService.closeForAppointment(authenticatedUserId, appointmentId);
         return appointmentMapper.toPatientResponse(cancelledAppointment);
     }
 

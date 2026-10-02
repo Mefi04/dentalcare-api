@@ -6,6 +6,7 @@ import com.dentalcare.api.modules.appointments.dto.request.UpdateAppointmentStat
 import com.dentalcare.api.modules.appointments.dto.response.AdministrativeAppointmentResponse;
 import com.dentalcare.api.modules.appointments.model.AppointmentStatus;
 import com.dentalcare.api.modules.appointments.service.AdministrativeAppointmentService;
+import com.dentalcare.api.security.service.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -14,6 +15,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -82,9 +84,10 @@ public class AdministrativeAppointmentController {
     @PatchMapping("/{appointmentId}/status")
     @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'SECRETARY', 'DENTIST', 'ASSISTANT')")
     public ResponseEntity<AdministrativeAppointmentResponse> updateStatus(
+            @AuthenticationPrincipal AuthenticatedUser principal,
             @PathVariable UUID appointmentId,
             @Valid @RequestBody UpdateAppointmentStatusRequest request) {
         return ResponseEntity.ok(administrativeAppointmentService.updateStatus(
-                appointmentId, request.status()));
+                principal.userId(), appointmentId, request.status()));
     }
 }
