@@ -1,6 +1,10 @@
 spring:
   application:
     name: dentalcare-api
+  servlet:
+    multipart:
+      max-file-size: ${DOCUMENT_MAX_FILE_SIZE:10MB}
+      max-request-size: ${DOCUMENT_MAX_REQUEST_SIZE:12MB}
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -61,3 +65,5 @@ dentalcare:
     endpoint: ${R2_ENDPOINT:}
     access-key-id: ${R2_ACCESS_KEY_ID:}
     secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+  clinical-documents:
+    max-file-size: ${DOCUMENT_MAX_FILE_SIZE:10MB}

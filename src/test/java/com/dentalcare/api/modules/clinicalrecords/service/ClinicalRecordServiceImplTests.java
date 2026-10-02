@@ -12,15 +12,21 @@ import com.dentalcare.api.modules.clinicalrecords.dto.request.CreateEvolutionNot
 import com.dentalcare.api.modules.clinicalrecords.dto.request.CreateOdontogramFindingRequest;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalAttentionResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDiagnosisResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.request.CreateClinicalPreparationRequest;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalEvolutionResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalHistoryEntryResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalPreparationResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalRecordSummaryResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.CurrentAttentionResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramFindingResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramResponse;
 import com.dentalcare.api.modules.clinicalrecords.mapper.ClinicalRecordMapper;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalAttention;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDiagnosis;
+import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocument;
+import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocumentType;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalEvolutionNote;
+import com.dentalcare.api.modules.clinicalrecords.model.ClinicalPreparation;
 import com.dentalcare.api.modules.clinicalrecords.model.DentitionType;
 import com.dentalcare.api.modules.clinicalrecords.model.DiagnosisType;
 import com.dentalcare.api.modules.clinicalrecords.model.OdontogramFinding;
@@ -28,8 +34,11 @@ import com.dentalcare.api.modules.clinicalrecords.model.ToothFinding;
 import com.dentalcare.api.modules.clinicalrecords.model.ToothSurface;
 import com.dentalcare.api.modules.clinicalrecords.repository.ClinicalAttentionRepository;
 import com.dentalcare.api.modules.clinicalrecords.repository.ClinicalDiagnosisRepository;
+import com.dentalcare.api.modules.clinicalrecords.repository.ClinicalDocumentRepository;
 import com.dentalcare.api.modules.clinicalrecords.repository.ClinicalEvolutionNoteRepository;
+import com.dentalcare.api.modules.clinicalrecords.repository.ClinicalPreparationRepository;
 import com.dentalcare.api.modules.clinicalrecords.repository.OdontogramFindingRepository;
+import com.dentalcare.api.modules.medicalhistory.model.MedicalHistory;
 import com.dentalcare.api.modules.medicalhistory.repository.MedicalHistoryRepository;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
@@ -77,6 +86,8 @@ class ClinicalRecordServiceImplTests {
     @Mock private ClinicalDiagnosisRepository clinicalDiagnosisRepository;
     @Mock private ClinicalEvolutionNoteRepository clinicalEvolutionNoteRepository;
     @Mock private OdontogramFindingRepository odontogramFindingRepository;
+    @Mock private ClinicalDocumentRepository clinicalDocumentRepository;
+    @Mock private ClinicalPreparationRepository clinicalPreparationRepository;
     @Mock private PatientRepository patientRepository;
     @Mock private UserRepository userRepository;
     @Mock private AppointmentRepository appointmentRepository;
@@ -96,6 +107,7 @@ class ClinicalRecordServiceImplTests {
         clinicalRecordService = new ClinicalRecordServiceImpl(
                 clinicalAttentionRepository, clinicalDiagnosisRepository,
                 clinicalEvolutionNoteRepository, odontogramFindingRepository,
+                clinicalDocumentRepository, clinicalPreparationRepository,
                 patientRepository, userRepository, appointmentRepository,
                 treatmentPlanRepository, treatmentProcedureRepository,
                 medicalHistoryRepository, mapper, fixedClock
@@ -357,6 +369,10 @@ class ClinicalRecordServiceImplTests {
                 .thenReturn(new PageImpl<>(List.of()));
         when(treatmentProcedureRepository.findByPatient_Id(patientA.getId(), Pageable.unpaged()))
                 .thenReturn(new PageImpl<>(List.of()));
+        when(clinicalDocumentRepository.findByPatient_Id(patientA.getId(), Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(clinicalPreparationRepository.findByPatient_Id(patientA.getId(), Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
 
         Page<ClinicalHistoryEntryResponse> history = clinicalRecordService.findClinicalHistory(
                 patientA.getId(), 0, 10
@@ -416,6 +432,10 @@ class ClinicalRecordServiceImplTests {
                 .thenReturn(new PageImpl<>(List.of()));
         when(treatmentProcedureRepository.findByPatient_Id(patientId, Pageable.unpaged()))
                 .thenReturn(new PageImpl<>(List.of()));
+        when(clinicalDocumentRepository.findByPatient_Id(patientId, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(clinicalPreparationRepository.findByPatient_Id(patientId, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
     }
 
     @Test
@@ -439,5 +459,255 @@ class ClinicalRecordServiceImplTests {
         assertThat(summary).isNotNull();
         assertThat(summary.patient().id()).isEqualTo(patientA.getId());
         assertThat(summary.currentOdontogram().dentition()).isEqualTo(DentitionType.ADULT);
+    }
+
+    @Test
+    void findCurrentAttention_whenPatientHasNoAttention_returnsExplicitFalse() {
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(clinicalAttentionRepository.findFirstByPatient_IdOrderByOccurredAtDescCreatedAtDesc(patientA.getId()))
+                .thenReturn(Optional.empty());
+        when(clinicalPreparationRepository.findFirstByPatient_IdOrderByCreatedAtDesc(patientA.getId()))
+                .thenReturn(Optional.empty());
+        when(medicalHistoryRepository.findByPatient_Id(patientA.getId())).thenReturn(Optional.empty());
+
+        CurrentAttentionResponse response = clinicalRecordService.findCurrentAttention(patientA.getId());
+
+        assertThat(response).isNotNull();
+        assertThat(response.hasCurrentAttention()).isFalse();
+        assertThat(response.currentAttention()).isNull();
+        assertThat(response.patient().id()).isEqualTo(patientA.getId());
+        assertThat(response.patient().code()).isEqualTo("EXP-001");
+    }
+
+    @Test
+    void findCurrentAttention_whenPatientHasAttention_returnsConsolidatedDetail() {
+        UUID attentionId = UUID.randomUUID();
+        ClinicalAttention attention = new ClinicalAttention(
+                attentionId, patientA, dentist, null, "Dolor molar", "Caries profunda", "Obturar",
+                FIXED_NOW, FIXED_NOW, FIXED_NOW
+        );
+
+        TreatmentPlan plan = new TreatmentPlan(UUID.randomUUID(), patientA, dentist, "Plan integral", null,
+                TreatmentPlanStatus.APPROVED, FIXED_NOW, FIXED_NOW);
+
+        ClinicalDiagnosis diagnosis = new ClinicalDiagnosis(
+                UUID.randomUUID(), patientA, attention, plan, dentist,
+                DiagnosisType.PRIMARY, "Pulpitis reversible", FIXED_NOW
+        );
+        ClinicalEvolutionNote evolution = new ClinicalEvolutionNote(
+                UUID.randomUUID(), patientA, attention, dentist,
+                LocalDate.of(2026, 10, 1), "Apertura cameral", "Se coloca medicación", FIXED_NOW
+        );
+        OdontogramFinding finding = new OdontogramFinding(
+                UUID.randomUUID(), patientA, attention, dentist,
+                DentitionType.ADULT, "36", ToothSurface.OCCLUSAL,
+                ToothFinding.CARIOUS, "Caries", FIXED_NOW
+        );
+
+        ClinicalPreparation preparation = new ClinicalPreparation(
+                UUID.randomUUID(), patientA, attention, dentist,
+                "120/80", 72, new BigDecimal("36.5"), new BigDecimal("68.50"),
+                "Paciente normotenso", FIXED_NOW, FIXED_NOW
+        );
+
+        MedicalHistory history = new MedicalHistory(UUID.randomUUID(), patientA, FIXED_NOW, FIXED_NOW);
+        history.replaceAllergies(List.of("Penicilina"));
+        history.replaceCurrentMedications(List.of("Ibuprofeno"));
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(clinicalAttentionRepository.findFirstByPatient_IdOrderByOccurredAtDescCreatedAtDesc(patientA.getId()))
+                .thenReturn(Optional.of(attention));
+        when(clinicalPreparationRepository.findFirstByPatient_IdOrderByCreatedAtDesc(patientA.getId()))
+                .thenReturn(Optional.of(preparation));
+        when(medicalHistoryRepository.findByPatient_Id(patientA.getId())).thenReturn(Optional.of(history));
+        when(clinicalDiagnosisRepository.findByAttention_IdOrderByCreatedAtDesc(attentionId))
+                .thenReturn(List.of(diagnosis));
+        when(clinicalEvolutionNoteRepository.findByAttention_IdOrderByConsultationDateDescCreatedAtDesc(attentionId))
+                .thenReturn(List.of(evolution));
+        when(odontogramFindingRepository.findByAttention_IdOrderByCreatedAtDesc(attentionId))
+                .thenReturn(List.of(finding));
+
+        CurrentAttentionResponse response = clinicalRecordService.findCurrentAttention(patientA.getId());
+
+        assertThat(response.hasCurrentAttention()).isTrue();
+        assertThat(response.currentAttention()).isNotNull();
+        assertThat(response.currentAttention().id()).isEqualTo(attentionId);
+        assertThat(response.currentAttention().reason()).isEqualTo("Dolor molar");
+        assertThat(response.currentAttention().diagnoses()).hasSize(1);
+        assertThat(response.currentAttention().diagnoses().get(0).description()).isEqualTo("Pulpitis reversible");
+        assertThat(response.currentAttention().evolutionNotes()).hasSize(1);
+        assertThat(response.currentAttention().evolutionNotes().get(0).procedureSummary()).isEqualTo("Apertura cameral");
+        assertThat(response.currentAttention().odontogramFindings()).hasSize(1);
+        assertThat(response.currentAttention().treatmentPlan()).isNotNull();
+        assertThat(response.currentAttention().treatmentPlan().name()).isEqualTo("Plan integral");
+
+        assertThat(response.preparation()).isNotNull();
+        assertThat(response.preparation().bloodPressure()).isEqualTo("120/80");
+        assertThat(response.preparation().allergies()).containsExactly("Penicilina");
+        assertThat(response.preparation().currentMedications()).containsExactly("Ibuprofeno");
+    }
+
+    @Test
+    void findCurrentAttention_whenAppointmentCancelled_returnsFalse() {
+        Appointment cancelledAppointment = new Appointment(
+                UUID.randomUUID(), patientA, dentist, FIXED_NOW,
+                AppointmentStatus.CANCELLED, FIXED_NOW, FIXED_NOW
+        );
+
+        ClinicalAttention attention = new ClinicalAttention(
+                UUID.randomUUID(), patientA, dentist, cancelledAppointment, "Cita cancelada", "No se presentó", null,
+                FIXED_NOW, FIXED_NOW, FIXED_NOW
+        );
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(clinicalAttentionRepository.findFirstByPatient_IdOrderByOccurredAtDescCreatedAtDesc(patientA.getId()))
+                .thenReturn(Optional.of(attention));
+        when(clinicalPreparationRepository.findFirstByPatient_IdOrderByCreatedAtDesc(patientA.getId()))
+                .thenReturn(Optional.empty());
+        when(medicalHistoryRepository.findByPatient_Id(patientA.getId())).thenReturn(Optional.empty());
+
+        CurrentAttentionResponse response = clinicalRecordService.findCurrentAttention(patientA.getId());
+
+        assertThat(response.hasCurrentAttention()).isFalse();
+        assertThat(response.currentAttention()).isNull();
+    }
+
+    @Test
+    void createPreparation_valid_savesAndReturnsSnapshotWithMedicalHistory() {
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+
+        MedicalHistory history = new MedicalHistory(UUID.randomUUID(), patientA, FIXED_NOW, FIXED_NOW);
+        history.replaceAllergies(List.of("Latex"));
+        history.replaceCurrentMedications(List.of("Amoxicilina"));
+        when(medicalHistoryRepository.findByPatient_Id(patientA.getId())).thenReturn(Optional.of(history));
+
+        when(clinicalPreparationRepository.save(any(ClinicalPreparation.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateClinicalPreparationRequest request = new CreateClinicalPreparationRequest(
+                null, "115/75", 68, new BigDecimal("36.4"), new BigDecimal("65.00"), "Triage pre-atención"
+        );
+
+        ClinicalPreparationResponse response = clinicalRecordService.createPreparation(
+                patientA.getId(), null, request, dentist.getId()
+        );
+
+        assertThat(response).isNotNull();
+        assertThat(response.patientId()).isEqualTo(patientA.getId());
+        assertThat(response.bloodPressure()).isEqualTo("115/75");
+        assertThat(response.heartRate()).isEqualTo(68);
+        assertThat(response.temperature()).isEqualByComparingTo(new BigDecimal("36.4"));
+        assertThat(response.weight()).isEqualByComparingTo(new BigDecimal("65.00"));
+        assertThat(response.observations()).isEqualTo("Triage pre-atención");
+        assertThat(response.allergies()).containsExactly("Latex");
+        assertThat(response.currentMedications()).containsExactly("Amoxicilina");
+    }
+
+    @Test
+    void createPreparation_mismatchedAttention_throwsNotFound() {
+        UUID attentionId = UUID.randomUUID();
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+        when(clinicalAttentionRepository.findByIdAndPatient_Id(attentionId, patientA.getId()))
+                .thenReturn(Optional.empty());
+
+        CreateClinicalPreparationRequest request = new CreateClinicalPreparationRequest(
+                attentionId, "120/80", 70, new BigDecimal("36.5"), null, null
+        );
+
+        assertThatThrownBy(() -> clinicalRecordService.createPreparation(patientA.getId(), attentionId, request, dentist.getId()))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Clinical attention not found");
+    }
+
+    @Test
+    void createDiagnosis_withPatientId_mismatchedAttention_throwsNotFound() {
+        UUID attentionId = UUID.randomUUID();
+        when(clinicalAttentionRepository.findByIdAndPatient_Id(attentionId, patientA.getId()))
+                .thenReturn(Optional.empty());
+
+        CreateClinicalDiagnosisRequest request = new CreateClinicalDiagnosisRequest(
+                DiagnosisType.PRIMARY, "Gingivitis", null
+        );
+
+        assertThatThrownBy(() -> clinicalRecordService.createDiagnosis(patientA.getId(), attentionId, request, dentist.getId()))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Clinical attention not found");
+    }
+
+    @Test
+    void createEvolutionNote_withPatientId_mismatchedAttention_throwsNotFound() {
+        UUID attentionId = UUID.randomUUID();
+        when(clinicalAttentionRepository.findByIdAndPatient_Id(attentionId, patientA.getId()))
+                .thenReturn(Optional.empty());
+
+        CreateEvolutionNoteRequest request = new CreateEvolutionNoteRequest(
+                LocalDate.of(2026, 10, 1), "Profilaxis", "Nota"
+        );
+
+        assertThatThrownBy(() -> clinicalRecordService.createEvolutionNote(patientA.getId(), attentionId, request, dentist.getId()))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Clinical attention not found");
+    }
+
+    @Test
+    void antiIdor_findMethods_throwNotFoundWhenPatientMismatch() {
+        UUID resourceId = UUID.randomUUID();
+
+        when(clinicalAttentionRepository.findByIdAndPatient_Id(resourceId, patientA.getId()))
+                .thenReturn(Optional.empty());
+        assertThatThrownBy(() -> clinicalRecordService.findAttentionById(patientA.getId(), resourceId))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        when(clinicalDiagnosisRepository.findByIdAndPatient_Id(resourceId, patientA.getId()))
+                .thenReturn(Optional.empty());
+        assertThatThrownBy(() -> clinicalRecordService.findDiagnosisById(patientA.getId(), resourceId))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        when(clinicalEvolutionNoteRepository.findByIdAndPatient_Id(resourceId, patientA.getId()))
+                .thenReturn(Optional.empty());
+        assertThatThrownBy(() -> clinicalRecordService.findEvolutionNoteById(patientA.getId(), resourceId))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        when(clinicalPreparationRepository.findByIdAndPatient_Id(resourceId, patientA.getId()))
+                .thenReturn(Optional.empty());
+        assertThatThrownBy(() -> clinicalRecordService.findPreparationById(patientA.getId(), resourceId))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void findClinicalHistory_includesDocumentsAndPreparationsWithoutCallingR2() {
+        when(patientRepository.existsById(patientA.getId())).thenReturn(true);
+        stubEmptyClinicalHistory(patientA.getId());
+
+        ClinicalDocument document = new ClinicalDocument(
+                UUID.randomUUID(), patientA, dentist, "Radiografía Panorámica",
+                ClinicalDocumentType.RADIOGRAPHY, "Rx de control", LocalDate.of(2026, 10, 1),
+                FIXED_NOW.minusSeconds(500), FIXED_NOW.minusSeconds(500),
+                "patients/1/rx.png", "rx.png", 1024L, "image/png"
+        );
+
+        ClinicalPreparation prep = new ClinicalPreparation(
+                UUID.randomUUID(), patientA, null, dentist,
+                "120/80", 72, new BigDecimal("36.5"), new BigDecimal("70.00"),
+                "Triage realizado", FIXED_NOW.minusSeconds(1000), FIXED_NOW.minusSeconds(1000)
+        );
+
+        when(clinicalDocumentRepository.findByPatient_Id(patientA.getId(), Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(document)));
+        when(clinicalPreparationRepository.findByPatient_Id(patientA.getId(), Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of(prep)));
+
+        Page<ClinicalHistoryEntryResponse> history = clinicalRecordService.findClinicalHistory(
+                patientA.getId(), 0, 10
+        );
+
+        assertThat(history.getContent()).hasSize(2);
+        assertThat(history.getContent().get(0).category()).isEqualTo("DOCUMENT");
+        assertThat(history.getContent().get(0).action()).contains("Radiografía Panorámica");
+        assertThat(history.getContent().get(1).category()).isEqualTo("PREPARATION");
+        assertThat(history.getContent().get(1).action()).contains("Preparación pre-atención");
+        assertThat(history.getContent().get(1).description()).contains("P/A: 120/80", "FC: 72 lpm", "Temp: 36.5 °C");
     }
 }

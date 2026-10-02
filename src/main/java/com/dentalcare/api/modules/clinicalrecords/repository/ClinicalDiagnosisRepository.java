@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -25,4 +26,7 @@ public interface ClinicalDiagnosisRepository extends JpaRepository<ClinicalDiagn
 
     @EntityGraph(attributePaths = {"patient", "attention", "treatmentPlan", "author"})
     List<ClinicalDiagnosis> findByAttention_IdOrderByCreatedAtDesc(UUID attentionId);
+
+    @EntityGraph(attributePaths = {"patient", "attention", "treatmentPlan", "author"})
+    Optional<ClinicalDiagnosis> findByIdAndPatient_Id(UUID id, UUID patientId);
 }

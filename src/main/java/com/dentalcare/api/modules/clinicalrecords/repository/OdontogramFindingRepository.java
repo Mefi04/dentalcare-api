@@ -22,4 +22,7 @@ public interface OdontogramFindingRepository extends JpaRepository<OdontogramFin
 
     @EntityGraph(attributePaths = {"patient", "attention", "author"})
     List<OdontogramFinding> findTop20ByPatient_IdOrderByCreatedAtDesc(UUID patientId);
+
+    @EntityGraph(attributePaths = {"patient", "attention", "author"})
+    List<OdontogramFinding> findByAttention_IdOrderByCreatedAtDesc(UUID attentionId);
 }

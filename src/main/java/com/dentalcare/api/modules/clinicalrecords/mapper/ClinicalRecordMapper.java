@@ -4,13 +4,16 @@ import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalAttention
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDiagnosisResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalEvolutionResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalHistoryEntryResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalPreparationResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalProfessionalResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalRecordSummaryResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramFindingResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalAttention;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDiagnosis;
+import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocument;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalEvolutionNote;
+import com.dentalcare.api.modules.clinicalrecords.model.ClinicalPreparation;
 import com.dentalcare.api.modules.clinicalrecords.model.DentitionType;
 import com.dentalcare.api.modules.clinicalrecords.model.OdontogramFinding;
 import com.dentalcare.api.modules.clinicalrecords.model.ToothFinding;
@@ -131,6 +134,34 @@ public class ClinicalRecordMapper {
         return new OdontogramResponse(dentition, teethMap, recentResponses);
     }
 
+    public ClinicalPreparationResponse toPreparationResponse(ClinicalPreparation prep, MedicalHistory history) {
+        if (prep == null) {
+            return null;
+        }
+        List<String> allergies = (history != null && history.getAllergies() != null)
+                ? List.copyOf(history.getAllergies())
+                : List.of();
+        List<String> medications = (history != null && history.getCurrentMedications() != null)
+                ? List.copyOf(history.getCurrentMedications())
+                : List.of();
+
+        return new ClinicalPreparationResponse(
+                prep.getId(),
+                prep.getPatient().getId(),
+                prep.getAttention() != null ? prep.getAttention().getId() : null,
+                toProfessionalResponse(prep.getPreparedBy()),
+                prep.getBloodPressure(),
+                prep.getHeartRate(),
+                prep.getTemperature(),
+                prep.getWeight(),
+                prep.getObservations(),
+                allergies,
+                medications,
+                prep.getCreatedAt(),
+                prep.getUpdatedAt()
+        );
+    }
+
     public ClinicalHistoryEntryResponse fromAttention(ClinicalAttention attention) {
         return new ClinicalHistoryEntryResponse(
                 attention.getId(),
@@ -139,6 +170,41 @@ public class ClinicalRecordMapper {
                 attention.getClinicalNotes(),
                 attention.getProfessional().getFullName(),
                 attention.getOccurredAt()
+        );
+    }
+
+    public ClinicalHistoryEntryResponse fromPreparation(ClinicalPreparation prep) {
+        List<String> details = new ArrayList<>();
+        if (prep.getBloodPressure() != null) details.add("P/A: " + prep.getBloodPressure());
+        if (prep.getHeartRate() != null) details.add("FC: " + prep.getHeartRate() + " lpm");
+        if (prep.getTemperature() != null) details.add("Temp: " + prep.getTemperature() + " °C");
+        if (prep.getWeight() != null) details.add("Peso: " + prep.getWeight() + " kg");
+        if (prep.getObservations() != null && !prep.getObservations().isBlank()) {
+            details.add(prep.getObservations());
+        }
+        String desc = details.isEmpty() ? "Preparación clínica completada" : String.join(" | ", details);
+        return new ClinicalHistoryEntryResponse(
+                prep.getId(),
+                "Preparación pre-atención",
+                "PREPARATION",
+                desc,
+                prep.getPreparedBy().getFullName(),
+                prep.getCreatedAt()
+        );
+    }
+
+    public ClinicalHistoryEntryResponse fromDocument(ClinicalDocument document) {
+        String description = document.getDescription() != null && !document.getDescription().isBlank()
+                ? document.getDescription()
+                : "Tipo: " + document.getType().name();
+        String authorName = document.getAuthor() != null ? document.getAuthor().getFullName() : "Sistema";
+        return new ClinicalHistoryEntryResponse(
+                document.getId(),
+                "Documento adjunto: " + document.getTitle(),
+                "DOCUMENT",
+                description,
+                authorName,
+                document.getCreatedAt()
         );
     }
 
