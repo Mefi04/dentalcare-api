@@ -9,14 +9,17 @@ import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalProfessio
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalRecordSummaryResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramFindingResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.ToothStateResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalAttention;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDiagnosis;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocument;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalEvolutionNote;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalPreparation;
 import com.dentalcare.api.modules.clinicalrecords.model.DentitionType;
+import com.dentalcare.api.modules.clinicalrecords.model.FdiToothCatalog;
 import com.dentalcare.api.modules.clinicalrecords.model.OdontogramFinding;
 import com.dentalcare.api.modules.clinicalrecords.model.ToothFinding;
+import com.dentalcare.api.modules.clinicalrecords.model.ToothSurface;
 import com.dentalcare.api.modules.clinicalrecords.model.ToothValidator;
 import com.dentalcare.api.modules.medicalhistory.model.MedicalHistory;
 import com.dentalcare.api.modules.patients.model.Patient;
@@ -27,10 +30,15 @@ import com.dentalcare.api.modules.users.model.User;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -112,26 +120,138 @@ public class ClinicalRecordMapper {
     }
 
     public OdontogramResponse toOdontogramResponse(DentitionType dentition, List<OdontogramFinding> findings) {
-        Map<String, ToothFinding> teethMap = new LinkedHashMap<>();
-        for (String tooth : ToothValidator.getStandardTeethForDentition(dentition)) {
-            teethMap.put(tooth, ToothFinding.HEALTHY);
-        }
+        return toOdontogramResponse(null, dentition, findings);
+    }
 
-        // Overlay with findings in chronological order so later findings overwrite earlier ones
+    public OdontogramResponse toOdontogramResponse(UUID patientId, DentitionType dentition, List<OdontogramFinding> findings) {
+        DentitionType targetDentition = dentition != null ? dentition : DentitionType.ADULT;
+        Set<String> standardTeeth = FdiToothCatalog.getStandardTeethForDentition(targetDentition);
+        Set<String> allTeethCodes = new LinkedHashSet<>(standardTeeth);
+
         if (findings != null) {
             for (OdontogramFinding finding : findings) {
-                if (finding.getDentition() == dentition && teethMap.containsKey(finding.getToothCode())) {
-                    teethMap.put(finding.getToothCode(), finding.getFinding());
+                if (finding.getDentition() == targetDentition && FdiToothCatalog.isValidTooth(targetDentition, finding.getToothCode())) {
+                    allTeethCodes.add(finding.getToothCode());
                 }
             }
         }
 
+        Map<String, ToothBuilder> builders = new LinkedHashMap<>();
+        for (String toothCode : allTeethCodes) {
+            builders.put(toothCode, new ToothBuilder(toothCode));
+        }
+
+        if (findings != null) {
+            List<OdontogramFinding> sorted = findings.stream()
+                    .filter(f -> f.getDentition() == targetDentition)
+                    .sorted(Comparator.comparing(OdontogramFinding::getCreatedAt).thenComparing(OdontogramFinding::getId))
+                    .toList();
+
+            for (OdontogramFinding finding : sorted) {
+                ToothBuilder builder = builders.get(finding.getToothCode());
+                if (builder != null) {
+                    builder.apply(finding);
+                }
+            }
+        }
+
+        List<ToothStateResponse> toothStates = new ArrayList<>(builders.size());
+        Map<String, ToothFinding> teethSummary = new LinkedHashMap<>(builders.size());
+
+        for (ToothBuilder builder : builders.values()) {
+            ToothStateResponse state = builder.build();
+            toothStates.add(state);
+            teethSummary.put(state.toothCode(), builder.deriveOverallFinding());
+        }
+
         List<OdontogramFindingResponse> recentResponses = findings != null ? findings.stream()
-                .filter(f -> f.getDentition() == dentition)
+                .filter(f -> f.getDentition() == targetDentition)
                 .map(this::toFindingResponse)
                 .toList() : List.of();
 
-        return new OdontogramResponse(dentition, teethMap, recentResponses);
+        return new OdontogramResponse(patientId, targetDentition, toothStates, teethSummary, recentResponses);
+    }
+
+    private static class ToothBuilder {
+        private final String toothCode;
+        private final Integer toothNumber;
+        private ToothFinding globalFinding;
+        private final Map<ToothSurface, ToothFinding> surfaces;
+        private Instant lastUpdatedAt;
+
+        ToothBuilder(String toothCode) {
+            this.toothCode = toothCode;
+            this.toothNumber = parseToothNumber(toothCode);
+            this.globalFinding = null;
+            this.surfaces = new LinkedHashMap<>();
+            for (ToothSurface surface : FdiToothCatalog.allowedSurfaces(toothCode)) {
+                this.surfaces.put(surface, ToothFinding.HEALTHY);
+            }
+            this.lastUpdatedAt = null;
+        }
+
+        private static Integer parseToothNumber(String code) {
+            try {
+                return Integer.parseInt(code);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        void apply(OdontogramFinding f) {
+            this.lastUpdatedAt = f.getCreatedAt();
+            if (f.getSurface() == null || f.getFinding().isToothLevelOnly()) {
+                if (f.getFinding() == ToothFinding.HEALTHY) {
+                    this.globalFinding = null;
+                    for (ToothSurface s : this.surfaces.keySet()) {
+                        this.surfaces.put(s, ToothFinding.HEALTHY);
+                    }
+                } else {
+                    this.globalFinding = f.getFinding();
+                }
+            } else {
+                ToothSurface surface = f.getSurface();
+                if (this.surfaces.containsKey(surface)) {
+                    this.surfaces.put(surface, f.getFinding());
+                    if (this.globalFinding == ToothFinding.MISSING) {
+                        this.globalFinding = null;
+                    }
+                }
+            }
+        }
+
+        ToothFinding deriveOverallFinding() {
+            if (globalFinding != null) {
+                return globalFinding;
+            }
+            boolean hasCarious = false;
+            boolean hasToTreat = false;
+            boolean hasFracture = false;
+            boolean hasTreated = false;
+
+            for (ToothFinding finding : surfaces.values()) {
+                if (finding == ToothFinding.CARIOUS) hasCarious = true;
+                else if (finding == ToothFinding.TO_TREAT) hasToTreat = true;
+                else if (finding == ToothFinding.FRACTURE) hasFracture = true;
+                else if (finding == ToothFinding.TREATED || finding == ToothFinding.RESTORED) hasTreated = true;
+            }
+
+            if (hasCarious) return ToothFinding.CARIOUS;
+            if (hasToTreat) return ToothFinding.TO_TREAT;
+            if (hasFracture) return ToothFinding.FRACTURE;
+            if (hasTreated) return ToothFinding.TREATED;
+            return ToothFinding.HEALTHY;
+        }
+
+        ToothStateResponse build() {
+            return new ToothStateResponse(
+                    toothCode,
+                    toothNumber,
+                    globalFinding,
+                    Collections.unmodifiableMap(new LinkedHashMap<>(surfaces)),
+                    lastUpdatedAt
+            );
+        }
     }
 
     public ClinicalPreparationResponse toPreparationResponse(ClinicalPreparation prep, MedicalHistory history) {

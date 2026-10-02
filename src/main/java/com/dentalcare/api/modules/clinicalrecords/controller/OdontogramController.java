@@ -4,9 +4,13 @@ import com.dentalcare.api.modules.clinicalrecords.dto.request.CreateOdontogramFi
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramFindingResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.DentitionType;
+import com.dentalcare.api.modules.clinicalrecords.model.ToothFinding;
 import com.dentalcare.api.modules.clinicalrecords.service.ClinicalRecordService;
 import com.dentalcare.api.security.service.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -25,7 +29,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "Odontogram", description = "Patient dental odontogram charting, findings, and history")
+@Tag(name = "Odontogram", description = "Patient dental odontogram charting, surface-level findings, and history")
 public class OdontogramController {
 
     private final ClinicalRecordService clinicalRecordService;
@@ -36,9 +40,16 @@ public class OdontogramController {
 
     @PostMapping("/patients/{patientId}/odontogram/findings")
     @PreAuthorize("hasAuthority('CLINICAL_RECORD_WRITE')")
-    @Operation(summary = "Register an odontogram finding on a tooth")
+    @Operation(summary = "Register an odontogram finding on a tooth or tooth surface")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Finding registered successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request, tooth code, surface, or mismatched attention"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - requires CLINICAL_RECORD_WRITE"),
+            @ApiResponse(responseCode = "404", description = "Patient or clinical attention not found")
+    })
     public ResponseEntity<OdontogramFindingResponse> createFinding(
-            @PathVariable UUID patientId,
+            @Parameter(description = "Patient ID") @PathVariable UUID patientId,
             @Valid @RequestBody CreateOdontogramFindingRequest request,
             @AuthenticationPrincipal AuthenticatedUser principal) {
         OdontogramFindingResponse response = clinicalRecordService.createOdontogramFinding(
@@ -49,19 +60,35 @@ public class OdontogramController {
     @GetMapping("/patients/{patientId}/odontogram")
     @PreAuthorize("hasAuthority('CLINICAL_RECORD_READ')")
     @Operation(summary = "Get current odontogram chart for a patient and dentition")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Current odontogram chart retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - requires CLINICAL_RECORD_READ"),
+            @ApiResponse(responseCode = "404", description = "Patient not found")
+    })
     public ResponseEntity<OdontogramResponse> getCurrentOdontogram(
-            @PathVariable UUID patientId,
-            @RequestParam(required = false) DentitionType dentition) {
+            @Parameter(description = "Patient ID") @PathVariable UUID patientId,
+            @Parameter(description = "Dentition type (defaults to ADULT if omitted)") @RequestParam(required = false) DentitionType dentition) {
         return ResponseEntity.ok(clinicalRecordService.findCurrentOdontogram(patientId, dentition));
     }
 
     @GetMapping("/patients/{patientId}/odontogram/findings")
     @PreAuthorize("hasAuthority('CLINICAL_RECORD_READ')")
-    @Operation(summary = "List paginated odontogram findings history for a patient")
+    @Operation(summary = "List paginated odontogram findings history for a patient with optional filters")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Odontogram findings history retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "403", description = "Forbidden - requires CLINICAL_RECORD_READ"),
+            @ApiResponse(responseCode = "404", description = "Patient not found")
+    })
     public ResponseEntity<Page<OdontogramFindingResponse>> getFindingsHistory(
-            @PathVariable UUID patientId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(clinicalRecordService.findOdontogramFindingsByPatient(patientId, page, size));
+            @Parameter(description = "Patient ID") @PathVariable UUID patientId,
+            @Parameter(description = "Filter by FDI tooth code (optional)") @RequestParam(required = false) String toothCode,
+            @Parameter(description = "Filter by dentition type (optional)") @RequestParam(required = false) DentitionType dentition,
+            @Parameter(description = "Filter by finding type (optional)") @RequestParam(required = false) ToothFinding finding,
+            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(clinicalRecordService.findOdontogramFindingsByPatient(
+                patientId, toothCode, dentition, finding, page, size));
     }
 }

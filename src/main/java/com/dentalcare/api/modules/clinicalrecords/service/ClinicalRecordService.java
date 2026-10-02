@@ -16,6 +16,7 @@ import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramFinding
 import com.dentalcare.api.modules.clinicalrecords.dto.response.OdontogramResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.DentitionType;
 import com.dentalcare.api.modules.clinicalrecords.model.DiagnosisType;
+import com.dentalcare.api.modules.clinicalrecords.model.ToothFinding;
 import org.springframework.data.domain.Page;
 
 import java.util.UUID;
@@ -51,6 +52,9 @@ public interface ClinicalRecordService {
     OdontogramResponse findCurrentOdontogram(UUID patientId, DentitionType dentition);
 
     Page<OdontogramFindingResponse> findOdontogramFindingsByPatient(UUID patientId, int page, int size);
+
+    Page<OdontogramFindingResponse> findOdontogramFindingsByPatient(
+            UUID patientId, String toothCode, DentitionType dentition, ToothFinding finding, int page, int size);
 
     Page<ClinicalHistoryEntryResponse> findClinicalHistory(UUID patientId, int page, int size);
 
