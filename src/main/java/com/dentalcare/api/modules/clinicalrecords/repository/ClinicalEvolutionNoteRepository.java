@@ -22,4 +22,7 @@ public interface ClinicalEvolutionNoteRepository extends JpaRepository<ClinicalE
 
     @EntityGraph(attributePaths = {"patient", "attention", "author"})
     List<ClinicalEvolutionNote> findByAttention_IdOrderByConsultationDateDescCreatedAtDesc(UUID attentionId);
+
+    @EntityGraph(attributePaths = {"patient", "attention", "author"})
+    Optional<ClinicalEvolutionNote> findByIdAndPatient_Id(UUID id, UUID patientId);
 }

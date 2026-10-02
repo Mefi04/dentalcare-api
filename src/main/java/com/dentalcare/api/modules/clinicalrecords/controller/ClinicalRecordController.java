@@ -2,6 +2,7 @@ package com.dentalcare.api.modules.clinicalrecords.controller;
 
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalHistoryEntryResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalRecordSummaryResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.CurrentAttentionResponse;
 import com.dentalcare.api.modules.clinicalrecords.service.ClinicalRecordService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,7 +19,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "Clinical records", description = "Patient clinical record consolidated summary and history")
+@Tag(name = "Clinical records", description = "Patient clinical record consolidated summary, current attention, and history")
 public class ClinicalRecordController {
 
     private final ClinicalRecordService clinicalRecordService;
@@ -32,6 +33,13 @@ public class ClinicalRecordController {
     @Operation(summary = "Get patient clinical record consolidated summary")
     public ResponseEntity<ClinicalRecordSummaryResponse> getSummary(@PathVariable UUID patientId) {
         return ResponseEntity.ok(clinicalRecordService.findSummaryByPatient(patientId));
+    }
+
+    @GetMapping("/patients/{patientId}/current-attention")
+    @PreAuthorize("hasAuthority('CLINICAL_RECORD_READ')")
+    @Operation(summary = "Get patient current clinical attention details, diagnoses, and pre-attention preparation")
+    public ResponseEntity<CurrentAttentionResponse> getCurrentAttention(@PathVariable UUID patientId) {
+        return ResponseEntity.ok(clinicalRecordService.findCurrentAttention(patientId));
     }
 
     @GetMapping("/patients/{patientId}/clinical-history")
