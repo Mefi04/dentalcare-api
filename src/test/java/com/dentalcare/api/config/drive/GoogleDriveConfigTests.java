@@ -20,8 +20,12 @@ class GoogleDriveConfigTests {
         contextRunner
                 .withPropertyValues("dentalcare.google-drive.enabled=false")
                 .run(context -> {
+                    assertThat(context).hasSingleBean(GoogleDriveProperties.class);
                     assertThat(context).doesNotHaveBean(Drive.class);
                     assertThat(context).doesNotHaveBean(UserCredentials.class);
+
+                    GoogleDriveProperties properties = context.getBean(GoogleDriveProperties.class);
+                    properties.validateRequiredWhenEnabled();
                 });
     }
 
