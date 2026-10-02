@@ -26,6 +26,14 @@ Los archivos creados posteriormente por la API pertenecerán a la cuenta Google 
 
 8. Crear la carpeta `DentalCare_Expedientes` en My Drive y conservar su `folderId`.
 
+### Vigencia del refresh token durante pruebas
+
+Para aplicaciones OAuth de tipo **External** con estado de publicación **Testing**, Google limita normalmente la vigencia del `refresh_token` a 7 días cuando se solicitan scopes como Drive.
+
+Esto significa que un token obtenido durante pruebas sirve para validar la integración, pero no debe asumirse como una credencial permanente de producción. Antes de habilitar Drive de forma estable se debe revisar el estado de publicación de la aplicación OAuth y obtener un token apropiado para ese estado.
+
+No se debe solucionar este comportamiento guardando access tokens manualmente ni deshabilitando la renovación automática.
+
 ## Consideración importante sobre `drive.file`
 
 El scope `drive.file` otorga acceso por archivo: permite crear archivos nuevos y trabajar con archivos que la aplicación creó o que el usuario compartió explícitamente con la aplicación, por ejemplo mediante Google Picker.
