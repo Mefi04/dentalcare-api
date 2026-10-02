@@ -147,6 +147,76 @@ class ClinicalRecordRepositoryIntegrationTests {
     }
 
     @Test
+    void databaseRejectsInvalidSurfaceCheckConstraint() {
+        Patient patient = patient("PAC-CR-003B", "8000000000215");
+        User dentist = dentist("8000000000216");
+
+        assertThatThrownBy(() -> entityManager.createNativeQuery("""
+                INSERT INTO odontogram_findings
+                    (id, patient_id, author_id, dentition, tooth_code, surface, finding, created_at)
+                VALUES (:id, :patient, :author, 'ADULT', '16', 'INVALID_SURFACE', 'CARIOUS', NOW())
+                """).setParameter("id", UUID.randomUUID())
+                .setParameter("patient", patient.getId())
+                .setParameter("author", dentist.getId()).executeUpdate())
+                .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void persistsEvolvedOdontogramFindingsAndQueriesChronologically() {
+        Patient patient = patient("PAC-CR-003C", "8000000000217");
+        User dentist = dentist("8000000000218");
+
+        OdontogramFinding f1 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, dentist,
+                DentitionType.ADULT, "11", ToothSurface.INCISAL,
+                ToothFinding.CARIOUS, "Caries en borde incisal", NOW.minusSeconds(200)
+        );
+        OdontogramFinding f2 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, dentist,
+                DentitionType.ADULT, "11", ToothSurface.INCISAL,
+                ToothFinding.RESTORED, "Restaurado con resina estetica", NOW.minusSeconds(100)
+        );
+        OdontogramFinding f3 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, dentist,
+                DentitionType.ADULT, "36", null,
+                ToothFinding.IMPLANT, "Implante de titanio", NOW.minusSeconds(50)
+        );
+        OdontogramFinding f4 = new OdontogramFinding(
+                UUID.randomUUID(), patient, null, dentist,
+                DentitionType.ADULT, "46", ToothSurface.LINGUAL,
+                ToothFinding.FRACTURE, "Fractura cuspidea lingual", NOW
+        );
+
+        odontogramFindingRepository.saveAndFlush(f1);
+        odontogramFindingRepository.saveAndFlush(f2);
+        odontogramFindingRepository.saveAndFlush(f3);
+        odontogramFindingRepository.saveAndFlush(f4);
+        entityManager.clear();
+
+        List<OdontogramFinding> chronological = odontogramFindingRepository
+                .findByPatient_IdAndDentitionOrderByCreatedAtAscIdAsc(patient.getId(), DentitionType.ADULT);
+        assertThat(chronological).hasSize(4);
+        assertThat(chronological.get(0).getToothCode()).isEqualTo("11");
+        assertThat(chronological.get(0).getFinding()).isEqualTo(ToothFinding.CARIOUS);
+        assertThat(chronological.get(1).getToothCode()).isEqualTo("11");
+        assertThat(chronological.get(1).getFinding()).isEqualTo(ToothFinding.RESTORED);
+        assertThat(chronological.get(2).getToothCode()).isEqualTo("36");
+        assertThat(chronological.get(2).getFinding()).isEqualTo(ToothFinding.IMPLANT);
+        assertThat(chronological.get(3).getToothCode()).isEqualTo("46");
+        assertThat(chronological.get(3).getFinding()).isEqualTo(ToothFinding.FRACTURE);
+        assertThat(chronological.get(3).getSurface()).isEqualTo(ToothSurface.LINGUAL);
+
+        var filterByTooth = odontogramFindingRepository.findByPatientWithFilters(
+                patient.getId(), "11", DentitionType.ADULT, null, PageRequest.of(0, 10));
+        assertThat(filterByTooth.getContent()).hasSize(2);
+
+        var filterByFinding = odontogramFindingRepository.findByPatientWithFilters(
+                patient.getId(), null, DentitionType.ADULT, ToothFinding.IMPLANT, PageRequest.of(0, 10));
+        assertThat(filterByFinding.getContent()).hasSize(1);
+        assertThat(filterByFinding.getContent().getFirst().getToothCode()).isEqualTo("36");
+    }
+
+    @Test
     void persistsClinicalPreparationAndPerformsQueries() {
         Patient patient = patient("PAC-CR-004", "8000000000207");
         User dentist = dentist("8000000000208");

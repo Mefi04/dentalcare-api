@@ -325,21 +325,157 @@ class ClinicalRecordServiceImplTests {
     }
 
     @Test
+    void createOdontogramFindingRejectsToothLevelFindingWithSurface() {
+        CreateOdontogramFindingRequest request = new CreateOdontogramFindingRequest(
+                null, DentitionType.ADULT, "16", ToothSurface.OCCLUSAL,
+                ToothFinding.MISSING, null
+        );
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+
+        assertThatThrownBy(() -> clinicalRecordService.createOdontogramFinding(patientA.getId(), request, dentist.getId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("is a tooth-level finding and cannot be applied to a specific surface");
+    }
+
+    @Test
+    void createOdontogramFindingRejectsSurfaceLevelFindingWithoutSurface() {
+        CreateOdontogramFindingRequest request = new CreateOdontogramFindingRequest(
+                null, DentitionType.ADULT, "16", null,
+                ToothFinding.CARIOUS, null
+        );
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+
+        assertThatThrownBy(() -> clinicalRecordService.createOdontogramFinding(patientA.getId(), request, dentist.getId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("requires a dental surface");
+    }
+
+    @Test
+    void createOdontogramFindingRejectsOcclusalOnAnteriorTooth() {
+        CreateOdontogramFindingRequest request = new CreateOdontogramFindingRequest(
+                null, DentitionType.ADULT, "11", ToothSurface.OCCLUSAL,
+                ToothFinding.RESTORED, null
+        );
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+
+        assertThatThrownBy(() -> clinicalRecordService.createOdontogramFinding(patientA.getId(), request, dentist.getId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Surface OCCLUSAL is not allowed on anterior tooth 11");
+    }
+
+    @Test
+    void createOdontogramFindingRejectsIncisalOnPosteriorTooth() {
+        CreateOdontogramFindingRequest request = new CreateOdontogramFindingRequest(
+                null, DentitionType.ADULT, "16", ToothSurface.INCISAL,
+                ToothFinding.RESTORED, null
+        );
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+
+        assertThatThrownBy(() -> clinicalRecordService.createOdontogramFinding(patientA.getId(), request, dentist.getId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Surface INCISAL is not allowed on posterior tooth 16");
+    }
+
+    @Test
+    void createOdontogramFindingRejectsLingualOnMaxillaryTooth() {
+        CreateOdontogramFindingRequest request = new CreateOdontogramFindingRequest(
+                null, DentitionType.ADULT, "11", ToothSurface.LINGUAL,
+                ToothFinding.RESTORED, null
+        );
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+
+        assertThatThrownBy(() -> clinicalRecordService.createOdontogramFinding(patientA.getId(), request, dentist.getId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Surface LINGUAL is not valid for maxillary");
+    }
+
+    @Test
+    void createOdontogramFindingRejectsPalatalOnMandibularTooth() {
+        CreateOdontogramFindingRequest request = new CreateOdontogramFindingRequest(
+                null, DentitionType.ADULT, "46", ToothSurface.PALATAL,
+                ToothFinding.RESTORED, null
+        );
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+
+        assertThatThrownBy(() -> clinicalRecordService.createOdontogramFinding(patientA.getId(), request, dentist.getId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Surface PALATAL is not valid for mandibular");
+    }
+
+    @Test
+    void createOdontogramFindingRejectsAttentionBelongingToDifferentPatient() {
+        UUID otherAttentionId = UUID.randomUUID();
+        ClinicalAttention otherAttention = new ClinicalAttention(
+                otherAttentionId, patientB, dentist, null, "Consulta", "Notas", null,
+                FIXED_NOW, FIXED_NOW, FIXED_NOW
+        );
+
+        CreateOdontogramFindingRequest request = new CreateOdontogramFindingRequest(
+                otherAttentionId, DentitionType.ADULT, "11", ToothSurface.INCISAL,
+                ToothFinding.RESTORED, null
+        );
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+        when(clinicalAttentionRepository.findById(otherAttentionId)).thenReturn(Optional.of(otherAttention));
+
+        assertThatThrownBy(() -> clinicalRecordService.createOdontogramFinding(patientA.getId(), request, dentist.getId()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Clinical attention does not belong to the patient");
+    }
+
+    @Test
+    void createOdontogramFindingPersistsAndReturnsResponse() {
+        CreateOdontogramFindingRequest request = new CreateOdontogramFindingRequest(
+                null, DentitionType.ADULT, "11", ToothSurface.INCISAL,
+                ToothFinding.FRACTURE, "Fractura incisal por trauma"
+        );
+
+        when(patientRepository.findById(patientA.getId())).thenReturn(Optional.of(patientA));
+        when(userRepository.findById(dentist.getId())).thenReturn(Optional.of(dentist));
+        when(odontogramFindingRepository.save(any(OdontogramFinding.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OdontogramFindingResponse response = clinicalRecordService.createOdontogramFinding(
+                patientA.getId(), request, dentist.getId()
+        );
+
+        assertThat(response).isNotNull();
+        assertThat(response.toothCode()).isEqualTo("11");
+        assertThat(response.surface()).isEqualTo(ToothSurface.INCISAL);
+        assertThat(response.finding()).isEqualTo(ToothFinding.FRACTURE);
+        assertThat(response.observation()).isEqualTo("Fractura incisal por trauma");
+        assertThat(response.author().id()).isEqualTo(dentist.getId());
+        assertThat(response.author().fullName()).isEqualTo("Dr. Clinico");
+    }
+
+    @Test
     void findCurrentOdontogramBuildsChartOverlay() {
         when(patientRepository.existsById(patientA.getId())).thenReturn(true);
         OdontogramFinding finding = new OdontogramFinding(
                 UUID.randomUUID(), patientA, null, dentist, DentitionType.ADULT,
                 "16", ToothSurface.OCCLUSAL, ToothFinding.CARIOUS, "Caries", FIXED_NOW
         );
-        when(odontogramFindingRepository.findByPatient_IdAndDentitionOrderByCreatedAtAsc(patientA.getId(), DentitionType.ADULT))
+        when(odontogramFindingRepository.findByPatient_IdAndDentitionOrderByCreatedAtAscIdAsc(patientA.getId(), DentitionType.ADULT))
                 .thenReturn(List.of(finding));
 
         OdontogramResponse response = clinicalRecordService.findCurrentOdontogram(patientA.getId(), DentitionType.ADULT);
 
         assertThat(response.dentition()).isEqualTo(DentitionType.ADULT);
         assertThat(response.teeth()).hasSize(32);
-        assertThat(response.teeth().get("16")).isEqualTo(ToothFinding.CARIOUS);
-        assertThat(response.teeth().get("11")).isEqualTo(ToothFinding.HEALTHY);
+        assertThat(response.teethSummary().get("16")).isEqualTo(ToothFinding.CARIOUS);
+        assertThat(response.teethSummary().get("11")).isEqualTo(ToothFinding.HEALTHY);
     }
 
     @Test
@@ -449,7 +585,7 @@ class ClinicalRecordServiceImplTests {
                 .thenReturn(List.of());
         when(clinicalEvolutionNoteRepository.findFirstByPatient_IdOrderByConsultationDateDescCreatedAtDesc(patientA.getId()))
                 .thenReturn(Optional.empty());
-        when(odontogramFindingRepository.findByPatient_IdAndDentitionOrderByCreatedAtAsc(patientA.getId(), DentitionType.ADULT))
+        when(odontogramFindingRepository.findByPatient_IdAndDentitionOrderByCreatedAtAscIdAsc(patientA.getId(), DentitionType.ADULT))
                 .thenReturn(List.of());
         when(treatmentPlanRepository.findByPatient_Id(any(UUID.class), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
