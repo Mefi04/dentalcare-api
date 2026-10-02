@@ -279,6 +279,16 @@ Database credentials must come exclusively from environment variables:
 
 Never commit real Supabase database credentials to the repository. Use local `.env` (ignored by Git) for local testing.
 
+## Clinical documents core
+
+Changeset `019-create-clinical-documents` persists patient clinical document metadata in `clinical_documents`.
+Each record references the existing patient and authenticated author user with `ON DELETE RESTRICT` constraints
+to prevent accidental data loss. Fields include `title` (VARCHAR(150) NOT NULL), `type` (VARCHAR(30) NOT NULL with
+CHECK constraint for `RADIOGRAPHY`, `LAB_RESULT`, `INFORMED_CONSENT`, `CLINICAL_REPORT`, `PHOTOGRAPHY`, `OTHER`),
+optional `description` (VARCHAR(1000)), `document_date` (DATE NOT NULL), and audit timestamps.
+Indexes support chronological pagination by patient (`idx_clinical_documents_patient_date`) and filtering by type (`idx_clinical_documents_type`).
+Queries strictly enforce `patient_id` alongside `id` to prevent IDOR vulnerabilities.
+
 ## Files
 
 Large clinical files must not be stored directly as binary database columns unless explicitly required.
