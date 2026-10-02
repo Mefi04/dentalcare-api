@@ -69,13 +69,22 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.FORBIDDEN, "Access is denied", request, Map.of());
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ExceptionHandler({MethodArgumentNotValidException.class, org.springframework.validation.BindException.class})
     ResponseEntity<ApiErrorResponse> handleValidation(
-            MethodArgumentNotValidException exception, HttpServletRequest request) {
+            Exception exception, HttpServletRequest request) {
+        org.springframework.validation.BindingResult bindingResult = (exception instanceof MethodArgumentNotValidException manve)
+                ? manve.getBindingResult()
+                : ((org.springframework.validation.BindException) exception).getBindingResult();
         Map<String, String> fieldErrors = new LinkedHashMap<>();
-        exception.getBindingResult().getFieldErrors().forEach(error ->
+        bindingResult.getFieldErrors().forEach(error ->
                 fieldErrors.putIfAbsent(error.getField(), error.getDefaultMessage()));
         return buildResponse(HttpStatus.BAD_REQUEST, "Request validation failed", request, fieldErrors);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<ApiErrorResponse> handleMaxUploadSizeExceeded(
+            org.springframework.web.multipart.MaxUploadSizeExceededException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.BAD_REQUEST, "File size exceeds the configured maximum upload limit", request, Map.of());
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})

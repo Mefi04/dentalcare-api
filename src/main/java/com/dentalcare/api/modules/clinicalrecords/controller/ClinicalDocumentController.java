@@ -1,6 +1,8 @@
 package com.dentalcare.api.modules.clinicalrecords.controller;
 
 import com.dentalcare.api.modules.clinicalrecords.dto.request.CreateClinicalDocumentRequest;
+import com.dentalcare.api.modules.clinicalrecords.dto.request.UploadClinicalDocumentRequest;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentDownload;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocumentType;
 import com.dentalcare.api.modules.clinicalrecords.service.ClinicalDocumentService;
@@ -8,11 +10,17 @@ import com.dentalcare.api.security.service.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,11 +30,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1")
-@Tag(name = "Clinical documents", description = "Patient clinical documents metadata management")
+@Tag(name = "Clinical documents", description = "Patient clinical documents metadata management and storage")
 public class ClinicalDocumentController {
 
     private final ClinicalDocumentService clinicalDocumentService;
@@ -49,6 +58,56 @@ public class ClinicalDocumentController {
                 .buildAndExpand(patientId, response.id())
                 .toUri();
         return ResponseEntity.created(location).body(response);
+    }
+
+    @PostMapping(value = "/patients/{patientId}/documents/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('CLINICAL_RECORD_WRITE')")
+    @Operation(summary = "Upload clinical document file and register metadata for a patient")
+    public ResponseEntity<ClinicalDocumentResponse> uploadDocument(
+            @PathVariable UUID patientId,
+            @Valid @ModelAttribute UploadClinicalDocumentRequest request,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        ClinicalDocumentResponse response = clinicalDocumentService.uploadDocument(
+                patientId, request, principal.userId());
+        URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/v1/patients/{patientId}/documents/{id}")
+                .buildAndExpand(patientId, response.id())
+                .toUri();
+        return ResponseEntity.created(location).body(response);
+    }
+
+    @GetMapping("/patients/{patientId}/documents/{documentId}/download")
+    @PreAuthorize("hasAuthority('CLINICAL_RECORD_READ')")
+    @Operation(summary = "Download clinical document file by patient and document id")
+    public ResponseEntity<Resource> downloadDocument(
+            @PathVariable UUID patientId,
+            @PathVariable UUID documentId) {
+        ClinicalDocumentDownload download = clinicalDocumentService.downloadDocument(patientId, documentId);
+
+        String cleanFileName = download.fileName() != null && !download.fileName().isBlank()
+                ? download.fileName().replaceAll("[\\r\\n]", "").trim()
+                : "document";
+
+        ContentDisposition contentDisposition = ContentDisposition.attachment()
+                .filename(cleanFileName, StandardCharsets.UTF_8)
+                .build();
+
+        MediaType mediaType;
+        try {
+            mediaType = MediaType.parseMediaType(download.contentType());
+        } catch (Exception e) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+
+        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
+
+        if (download.contentLength() > 0) {
+            responseBuilder.contentLength(download.contentLength());
+        }
+
+        return responseBuilder.body(new InputStreamResource(download.inputStream()));
     }
 
     @GetMapping("/patients/{patientId}/documents")
