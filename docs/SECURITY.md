@@ -86,6 +86,17 @@ It must not contain passwords, password hashes, clinical data, addresses, phone 
 
 Unless a future server-side access-token revocation mechanism is introduced, an issued access token remains valid until expiration even when its associated refresh session is revoked.
 
+## Agenda permission matrix
+
+- `PATIENT`: only owned `/patients/me/appointment-requests/**` and `/patients/me/appointments/**` resources.
+- `ADMINISTRATOR`, `SECRETARY`: process requests and manage agenda/waiting room.
+- `DENTIST`: read administrative agenda and waiting room, without processing requests or check-in transitions.
+- `ASSISTANT`: read agenda/waiting room and operate waiting-room transitions.
+- `CASHIER`: no appointment-request or waiting-room access.
+
+Patient identity comes from the JWT-linked `Patient`; foreign request ids return the same 404 as unknown ids.
+Staff responsible for processing and check-in also comes exclusively from JWT.
+
 ## Refresh token and session
 
 The refresh token is an opaque, cryptographically secure random value, not a JWT. Its raw value is sent only to the client and is never persisted. The backend stores only a cryptographic hash suitable for deterministic token lookup.

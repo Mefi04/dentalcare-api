@@ -144,7 +144,7 @@ class AdministrativeAppointmentControllerSecurityTests {
         UUID appointmentId = UUID.randomUUID();
         token("assistant-token", "ROLE_ASSISTANT");
         when(administrativeAppointmentService.updateStatus(
-                appointmentId, AppointmentStatus.COMPLETED)).thenReturn(response());
+                any(), eq(appointmentId), eq(AppointmentStatus.COMPLETED))).thenReturn(response());
 
         mockMvc.perform(patch("/api/v1/appointments/{id}/status", appointmentId)
                         .header("Authorization", "Bearer assistant-token")

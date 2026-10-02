@@ -299,3 +299,16 @@ Prefer external object storage and store metadata/reference URLs in PostgreSQL.
 `sterilization_protocols` stores reusable active/inactive protocols and their supported method (`STEAM`, `DRY_HEAT`, or `CHEMICAL`). `sterilization_cycles` records each load with its protocol, authenticated responsible user, status, observations, and lifecycle timestamps. `sterilization_cycle_instruments` links cycles to existing `inventory_items`; it does not duplicate instruments or alter stock/Kardex.
 
 The first supported lifecycle is `IN_PROGRESS -> RELEASED`. Released cycles are immutable with respect to status, and the database requires a release timestamp only for released cycles.
+
+## Appointment requests and waiting room
+
+Changeset `020-create-appointment-requests-waiting-room` adds two operational resources without duplicating
+confirmed appointments. `appointment_requests` stores the patient, requested dentist/time, optional clinic
+proposal, explicit lifecycle (`PENDING`, `PROPOSED`, `CONFIRMED`, `REJECTED`, `CANCELLED`), processing staff,
+audit timestamps, and a unique optional `appointment_id`. A confirmed request must reference exactly one
+persisted appointment. Confirmation locks the request and creates the appointment in the same transaction.
+
+`appointment_waiting_room_entries` has a unique one-to-one foreign key to `appointments` and stores
+`ARRIVED -> WAITING -> READY -> CLOSED`, transition timestamps, check-in staff and latest responsible staff.
+Check-in is limited to a `SCHEDULED` appointment on the current `America/Guatemala` clinic day. Cancelling or
+completing the appointment closes any existing operational entry.

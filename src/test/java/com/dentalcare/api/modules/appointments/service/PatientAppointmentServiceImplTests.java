@@ -40,6 +40,7 @@ class PatientAppointmentServiceImplTests {
     @Mock PatientRepository patients;
     @Mock AppointmentService appointmentService;
     @Mock UserRepository users;
+    @Mock WaitingRoomService waitingRoomService;
 
     private PatientAppointmentServiceImpl service;
     private UUID userId;
@@ -48,7 +49,7 @@ class PatientAppointmentServiceImplTests {
     @BeforeEach
     void setUp() {
         service = new PatientAppointmentServiceImpl(
-                appointments, patients, new AppointmentMapper(), appointmentService, users);
+                appointments, patients, new AppointmentMapper(), appointmentService, users, waitingRoomService);
         userId = UUID.randomUUID();
         patient = new Patient();
         patient.setId(UUID.randomUUID());
@@ -202,6 +203,7 @@ class PatientAppointmentServiceImplTests {
         assertThat(result.id()).isEqualTo(appointment.getId());
         assertThat(result.status()).isEqualTo(AppointmentStatus.CANCELLED);
         verify(appointmentService).cancel(appointment);
+        verify(waitingRoomService).closeForAppointment(userId, appointment.getId());
         verify(appointments, never()).findById(any());
     }
 

@@ -10,6 +10,7 @@ import com.dentalcare.api.modules.appointments.model.AppointmentStatus;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
 import com.dentalcare.api.modules.appointments.service.PatientAppointmentServiceImpl;
 import com.dentalcare.api.modules.appointments.service.AppointmentService;
+import com.dentalcare.api.modules.appointments.service.WaitingRoomService;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.users.model.User;
@@ -54,6 +55,7 @@ class PatientAppointmentControllerSecurityTests {
     @MockitoBean AppointmentRepository appointments;
     @MockitoBean AppointmentService appointmentService;
     @MockitoBean UserRepository users;
+    @MockitoBean WaitingRoomService waitingRoomService;
 
     private UUID userId;
     private Patient patient;

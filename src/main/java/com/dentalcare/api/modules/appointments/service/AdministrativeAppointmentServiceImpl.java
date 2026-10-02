@@ -31,16 +31,19 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
     private final AdministrativeAppointmentRepository administrativeAppointmentRepository;
     private final AppointmentService appointmentService;
     private final AdministrativeAppointmentMapper administrativeAppointmentMapper;
+    private final WaitingRoomService waitingRoomService;
     private final Clock clock;
 
     public AdministrativeAppointmentServiceImpl(
             AdministrativeAppointmentRepository administrativeAppointmentRepository,
             AppointmentService appointmentService,
             AdministrativeAppointmentMapper administrativeAppointmentMapper,
+            WaitingRoomService waitingRoomService,
             Clock clock) {
         this.administrativeAppointmentRepository = administrativeAppointmentRepository;
         this.appointmentService = appointmentService;
         this.administrativeAppointmentMapper = administrativeAppointmentMapper;
+        this.waitingRoomService = waitingRoomService;
         this.clock = clock;
     }
 
@@ -110,7 +113,7 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
 
     @Override
     @Transactional
-    public AdministrativeAppointmentResponse updateStatus(UUID appointmentId, AppointmentStatus status) {
+    public AdministrativeAppointmentResponse updateStatus(UUID actorId, UUID appointmentId, AppointmentStatus status) {
         requireAppointmentId(appointmentId);
         if (status == null) {
             throw new BadRequestException("Appointment status is required");
@@ -118,7 +121,10 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
 
         Appointment appointment = findForUpdate(appointmentId);
         if (status == AppointmentStatus.CANCELLED) {
-            return administrativeAppointmentMapper.toResponse(appointmentService.cancel(appointment));
+            AdministrativeAppointmentResponse response = administrativeAppointmentMapper.toResponse(
+                    appointmentService.cancel(appointment));
+            waitingRoomService.closeForAppointment(actorId, appointmentId);
+            return response;
         }
         if (appointment.getStatus() == status) {
             throw new ConflictException("Appointment already has the requested status");
@@ -130,7 +136,9 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
 
         appointment.setStatus(status);
         appointment.setUpdatedAt(clock.instant());
-        return save(appointment);
+        AdministrativeAppointmentResponse response = save(appointment);
+        waitingRoomService.closeForAppointment(actorId, appointmentId);
+        return response;
     }
 
     private Appointment findForUpdate(UUID appointmentId) {

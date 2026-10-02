@@ -48,6 +48,8 @@ class AdministrativeAppointmentServiceImplTests {
     private AdministrativeAppointmentRepository administrativeAppointmentRepository;
     @Mock
     private AppointmentService appointmentService;
+    @Mock
+    private WaitingRoomService waitingRoomService;
 
     private AdministrativeAppointmentServiceImpl service;
 
@@ -57,6 +59,7 @@ class AdministrativeAppointmentServiceImplTests {
                 administrativeAppointmentRepository,
                 appointmentService,
                 new AdministrativeAppointmentMapper(),
+                waitingRoomService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -201,10 +204,12 @@ class AdministrativeAppointmentServiceImplTests {
                 .thenReturn(Optional.of(scheduled));
         when(administrativeAppointmentRepository.saveAndFlush(scheduled)).thenReturn(scheduled);
 
-        var completed = service.updateStatus(scheduled.getId(), AppointmentStatus.COMPLETED);
+        UUID actorId = UUID.randomUUID();
+        var completed = service.updateStatus(actorId, scheduled.getId(), AppointmentStatus.COMPLETED);
 
         assertThat(completed.status()).isEqualTo(AppointmentStatus.COMPLETED);
         assertThat(completed.updatedAt()).isEqualTo(NOW);
+        verify(waitingRoomService).closeForAppointment(actorId, scheduled.getId());
     }
 
     @Test
@@ -219,11 +224,13 @@ class AdministrativeAppointmentServiceImplTests {
             return scheduled;
         });
 
-        var cancelled = service.updateStatus(scheduled.getId(), AppointmentStatus.CANCELLED);
+        UUID actorId = UUID.randomUUID();
+        var cancelled = service.updateStatus(actorId, scheduled.getId(), AppointmentStatus.CANCELLED);
 
         assertThat(cancelled.status()).isEqualTo(AppointmentStatus.CANCELLED);
         assertThat(cancelled.updatedAt()).isEqualTo(NOW);
         verify(appointmentService).cancel(scheduled);
+        verify(waitingRoomService).closeForAppointment(actorId, scheduled.getId());
         verify(administrativeAppointmentRepository, never()).saveAndFlush(scheduled);
     }
 
@@ -236,7 +243,7 @@ class AdministrativeAppointmentServiceImplTests {
         when(appointmentService.cancel(completed))
                 .thenThrow(new ConflictException("Only scheduled appointments can be cancelled"));
 
-        assertThatThrownBy(() -> service.updateStatus(completed.getId(), AppointmentStatus.CANCELLED))
+        assertThatThrownBy(() -> service.updateStatus(UUID.randomUUID(), completed.getId(), AppointmentStatus.CANCELLED))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Only scheduled appointments can be cancelled");
     }
@@ -248,7 +255,7 @@ class AdministrativeAppointmentServiceImplTests {
         when(administrativeAppointmentRepository.findDetailedByIdForUpdate(completed.getId()))
                 .thenReturn(Optional.of(completed));
 
-        assertThatThrownBy(() -> service.updateStatus(completed.getId(), AppointmentStatus.COMPLETED))
+        assertThatThrownBy(() -> service.updateStatus(UUID.randomUUID(), completed.getId(), AppointmentStatus.COMPLETED))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Appointment already has the requested status");
     }
