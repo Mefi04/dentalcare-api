@@ -95,6 +95,13 @@ Unless a future server-side access-token revocation mechanism is introduced, an 
 - `CASHIER`: no appointment-request or waiting-room access.
 
 Patient identity comes from the JWT-linked `Patient`; foreign request ids return the same 404 as unknown ids.
+
+Patient clinical documents follow the same ownership model. Staff require `CLINICAL_RECORD_WRITE` to explicitly
+share or unshare a document; documents are private by default and sharing is audited with the authenticated staff
+user and server timestamp. `/api/v1/patients/me/documents/**` resolves the patient only from the JWT, returns only
+owned documents whose visibility is enabled, and uses an indistinguishable `404` for private, foreign, and unknown
+identifiers. Download authorization is checked before accessing the private R2 object, and storage keys are never
+included in patient responses.
 Staff responsible for processing and check-in also comes exclusively from JWT.
 
 ## Refresh token and session

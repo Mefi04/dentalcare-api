@@ -8,6 +8,7 @@ import com.dentalcare.api.modules.clinicalrecords.dto.request.UploadClinicalDocu
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentDownload;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalProfessionalResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.PatientClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.mapper.ClinicalDocumentMapper;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocument;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocumentType;
@@ -143,6 +144,9 @@ class ClinicalDocumentServiceImplTests {
         assertThat(saved.getFileSize()).isNull();
         assertThat(saved.getContentType()).isNull();
         assertThat(saved.hasFile()).isFalse();
+        assertThat(saved.isPatientVisible()).isFalse();
+        assertThat(saved.getSharedAt()).isNull();
+        assertThat(saved.getSharedBy()).isNull();
     }
 
     @Test
@@ -675,6 +679,139 @@ class ClinicalDocumentServiceImplTests {
         assertThatThrownBy(() -> service.findDocumentById(patientId, documentId))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Patient not found");
+    }
+
+    @Test
+    @DisplayName("Authorized staff can share and unshare a document with persisted audit data")
+    void updatePatientVisibility_sharesAndUnsharesWithAudit() {
+        UUID patientId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Patient patient = new Patient();
+        patient.setId(patientId);
+        User author = new User();
+        User actor = new User();
+        actor.setId(actorId);
+        actor.setStatus(UserStatus.ACTIVE);
+        ClinicalDocument document = new ClinicalDocument(
+                documentId, patient, author, "Radiografía", ClinicalDocumentType.RADIOGRAPHY,
+                null, LocalDate.now(), fixedInstant.minusSeconds(60), fixedInstant.minusSeconds(60));
+
+        when(patientRepository.existsById(patientId)).thenReturn(true);
+        when(clinicalDocumentRepository.findByIdAndPatient_Id(documentId, patientId))
+                .thenReturn(Optional.of(document));
+        when(userRepository.findById(actorId)).thenReturn(Optional.of(actor));
+        when(clinicalDocumentRepository.save(document)).thenReturn(document);
+        when(mapper.toResponse(document)).thenReturn(mock(ClinicalDocumentResponse.class));
+
+        service.updatePatientVisibility(patientId, documentId, true, actorId);
+
+        assertThat(document.isPatientVisible()).isTrue();
+        assertThat(document.getSharedAt()).isEqualTo(fixedInstant);
+        assertThat(document.getSharedBy()).isEqualTo(actor);
+        assertThat(document.getUpdatedAt()).isEqualTo(fixedInstant);
+
+        service.updatePatientVisibility(patientId, documentId, false, actorId);
+
+        assertThat(document.isPatientVisible()).isFalse();
+        assertThat(document.getSharedAt()).isNull();
+        assertThat(document.getSharedBy()).isNull();
+        verify(clinicalDocumentRepository, org.mockito.Mockito.times(2)).save(document);
+    }
+
+    @Test
+    @DisplayName("Visibility update is idempotent and does not rewrite an unchanged document")
+    void updatePatientVisibility_whenAlreadyPrivate_isIdempotent() {
+        UUID patientId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        Patient patient = new Patient();
+        patient.setId(patientId);
+        User actor = new User();
+        actor.setId(actorId);
+        actor.setStatus(UserStatus.ACTIVE);
+        ClinicalDocument document = new ClinicalDocument(
+                documentId, patient, new User(), "Nota", ClinicalDocumentType.OTHER,
+                null, LocalDate.now(), fixedInstant, fixedInstant);
+        when(patientRepository.existsById(patientId)).thenReturn(true);
+        when(clinicalDocumentRepository.findByIdAndPatient_Id(documentId, patientId))
+                .thenReturn(Optional.of(document));
+        when(userRepository.findById(actorId)).thenReturn(Optional.of(actor));
+        when(mapper.toResponse(document)).thenReturn(mock(ClinicalDocumentResponse.class));
+
+        service.updatePatientVisibility(patientId, documentId, false, actorId);
+
+        verify(clinicalDocumentRepository, never()).save(any());
+        verify(userRepository).findById(actorId);
+    }
+
+    @Test
+    @DisplayName("Patient list uses JWT-linked patient and only the visible repository query")
+    void findVisibleDocumentsForPatient_usesOwnedVisibleQuery() {
+        UUID userId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        Patient patient = new Patient();
+        patient.setId(patientId);
+        ClinicalDocument document = new ClinicalDocument();
+        PatientClinicalDocumentResponse response = mock(PatientClinicalDocumentResponse.class);
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(clinicalDocumentRepository.findByPatient_IdAndPatientVisibleTrueAndType(
+                eq(patientId), eq(ClinicalDocumentType.LAB_RESULT), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(document)));
+        when(mapper.toPatientResponse(document)).thenReturn(response);
+
+        Page<PatientClinicalDocumentResponse> result = service.findVisibleDocumentsForPatient(
+                userId, ClinicalDocumentType.LAB_RESULT, 0, 20);
+
+        assertThat(result.getContent()).containsExactly(response);
+        verify(clinicalDocumentRepository, never()).findByPatient_Id(any(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("Patient detail returns the same 404 for private, foreign, and unknown documents")
+    void findVisibleDocumentForPatient_whenNotVisibleOrForeign_returnsSafeNotFound() {
+        UUID userId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        Patient patient = new Patient();
+        patient.setId(patientId);
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(clinicalDocumentRepository.findByIdAndPatient_IdAndPatientVisibleTrue(documentId, patientId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findVisibleDocumentForPatient(userId, documentId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessage("Clinical document not found");
+    }
+
+    @Test
+    @DisplayName("Patient download rechecks ownership and visibility and preserves file metadata")
+    void downloadVisibleDocumentForPatient_loadsOnlyOwnedSharedFile() {
+        UUID userId = UUID.randomUUID();
+        UUID patientId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        Patient patient = new Patient();
+        patient.setId(patientId);
+        String key = "patients/" + patientId + "/documents/shared.pdf";
+        ClinicalDocument document = new ClinicalDocument(
+                documentId, patient, new User(), "Documento", ClinicalDocumentType.OTHER,
+                null, LocalDate.now(), fixedInstant, fixedInstant,
+                key, "archivo-compartido.pdf", 321L, "application/pdf");
+        document.updatePatientVisibility(true, new User(), fixedInstant);
+        ByteArrayInputStream stream = new ByteArrayInputStream("shared".getBytes(StandardCharsets.UTF_8));
+
+        when(patientRepository.findByUser_Id(userId)).thenReturn(Optional.of(patient));
+        when(clinicalDocumentRepository.findByIdAndPatient_IdAndPatientVisibleTrue(documentId, patientId))
+                .thenReturn(Optional.of(document));
+        when(clinicalDocumentStorage.load(key))
+                .thenReturn(new StoredDocumentContent(key, "application/pdf", 321L, stream));
+
+        ClinicalDocumentDownload result = service.downloadVisibleDocumentForPatient(userId, documentId);
+
+        assertThat(result.fileName()).isEqualTo("archivo-compartido.pdf");
+        assertThat(result.contentType()).isEqualTo("application/pdf");
+        assertThat(result.contentLength()).isEqualTo(321L);
+        assertThat(result.inputStream()).isSameAs(stream);
     }
 
     @Test

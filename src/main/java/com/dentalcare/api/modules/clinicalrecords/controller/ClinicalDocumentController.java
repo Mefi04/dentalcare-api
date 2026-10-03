@@ -2,6 +2,7 @@ package com.dentalcare.api.modules.clinicalrecords.controller;
 
 import com.dentalcare.api.modules.clinicalrecords.dto.request.CreateClinicalDocumentRequest;
 import com.dentalcare.api.modules.clinicalrecords.dto.request.UploadClinicalDocumentRequest;
+import com.dentalcare.api.modules.clinicalrecords.dto.request.UpdateClinicalDocumentVisibilityRequest;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentDownload;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocumentType;
@@ -22,6 +23,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -128,5 +130,17 @@ public class ClinicalDocumentController {
             @PathVariable UUID patientId,
             @PathVariable UUID documentId) {
         return ResponseEntity.ok(clinicalDocumentService.findDocumentById(patientId, documentId));
+    }
+
+    @PatchMapping("/patients/{patientId}/documents/{documentId}/visibility")
+    @PreAuthorize("hasAuthority('CLINICAL_RECORD_WRITE')")
+    @Operation(summary = "Share or unshare a clinical document with the patient")
+    public ResponseEntity<ClinicalDocumentResponse> updatePatientVisibility(
+            @PathVariable UUID patientId,
+            @PathVariable UUID documentId,
+            @Valid @RequestBody UpdateClinicalDocumentVisibilityRequest request,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(clinicalDocumentService.updatePatientVisibility(
+                patientId, documentId, request.visible(), principal.userId()));
     }
 }

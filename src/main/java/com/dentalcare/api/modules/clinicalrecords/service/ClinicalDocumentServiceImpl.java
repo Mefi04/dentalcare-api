@@ -7,6 +7,7 @@ import com.dentalcare.api.modules.clinicalrecords.dto.request.CreateClinicalDocu
 import com.dentalcare.api.modules.clinicalrecords.dto.request.UploadClinicalDocumentRequest;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentDownload;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.PatientClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.mapper.ClinicalDocumentMapper;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocument;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocumentType;
@@ -196,25 +197,7 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
         ClinicalDocument document = clinicalDocumentRepository.findByIdAndPatient_Id(documentId, patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Clinical document not found"));
 
-        if (!document.hasFile()) {
-            throw new ResourceNotFoundException("Clinical document does not have an attached file");
-        }
-
-        StoredDocumentContent content = clinicalDocumentStorage.load(document.getStorageObjectKey());
-
-        long size = content.contentLength() > 0
-                ? content.contentLength()
-                : (document.getFileSize() != null ? document.getFileSize() : 0L);
-
-        String fileName = document.getFileName() != null && !document.getFileName().isBlank()
-                ? document.getFileName()
-                : "document";
-
-        String contentType = document.getContentType() != null && !document.getContentType().isBlank()
-                ? document.getContentType()
-                : content.contentType();
-
-        return new ClinicalDocumentDownload(content.content(), fileName, contentType, size);
+        return buildDownload(document);
     }
 
     @Override
@@ -249,6 +232,70 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
         return mapper.toResponse(document);
     }
 
+    @Override
+    @Transactional
+    public ClinicalDocumentResponse updatePatientVisibility(UUID patientId,
+                                                             UUID documentId,
+                                                             boolean visible,
+                                                             UUID authenticatedUserId) {
+        requireId(patientId, "Patient id is required");
+        requireId(documentId, "Document id is required");
+        requireId(authenticatedUserId, "Authentication is required");
+        ensurePatientExists(patientId);
+
+        ClinicalDocument document = clinicalDocumentRepository.findByIdAndPatient_Id(documentId, patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Clinical document not found"));
+
+        User actor = findActiveUser(authenticatedUserId);
+
+        if (document.isPatientVisible() == visible) {
+            return mapper.toResponse(document);
+        }
+
+        document.updatePatientVisibility(visible, actor, clock.instant());
+        return mapper.toResponse(clinicalDocumentRepository.save(document));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<PatientClinicalDocumentResponse> findVisibleDocumentsForPatient(
+            UUID authenticatedUserId, ClinicalDocumentType type, int page, int size) {
+        Patient patient = findPatientByAuthenticatedUser(authenticatedUserId);
+        Pageable pageable = PageRequest.of(Math.max(0, page), clampPageSize(size), DOCUMENT_ORDER);
+
+        if (type != null) {
+            return clinicalDocumentRepository
+                    .findByPatient_IdAndPatientVisibleTrueAndType(patient.getId(), type, pageable)
+                    .map(mapper::toPatientResponse);
+        }
+        return clinicalDocumentRepository.findByPatient_IdAndPatientVisibleTrue(patient.getId(), pageable)
+                .map(mapper::toPatientResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PatientClinicalDocumentResponse findVisibleDocumentForPatient(
+            UUID authenticatedUserId, UUID documentId) {
+        requireId(documentId, "Document id is required");
+        Patient patient = findPatientByAuthenticatedUser(authenticatedUserId);
+        ClinicalDocument document = clinicalDocumentRepository
+                .findByIdAndPatient_IdAndPatientVisibleTrue(documentId, patient.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Clinical document not found"));
+        return mapper.toPatientResponse(document);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ClinicalDocumentDownload downloadVisibleDocumentForPatient(
+            UUID authenticatedUserId, UUID documentId) {
+        requireId(documentId, "Document id is required");
+        Patient patient = findPatientByAuthenticatedUser(authenticatedUserId);
+        ClinicalDocument document = clinicalDocumentRepository
+                .findByIdAndPatient_IdAndPatientVisibleTrue(documentId, patient.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Clinical document not found"));
+        return buildDownload(document);
+    }
+
     private User findActiveUser(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
@@ -262,6 +309,30 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
         if (!patientRepository.existsById(patientId)) {
             throw new ResourceNotFoundException("Patient not found");
         }
+    }
+
+    private Patient findPatientByAuthenticatedUser(UUID authenticatedUserId) {
+        requireId(authenticatedUserId, "Authentication is required");
+        return patientRepository.findByUser_Id(authenticatedUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient profile not found"));
+    }
+
+    private ClinicalDocumentDownload buildDownload(ClinicalDocument document) {
+        if (!document.hasFile()) {
+            throw new ResourceNotFoundException("Clinical document does not have an attached file");
+        }
+
+        StoredDocumentContent content = clinicalDocumentStorage.load(document.getStorageObjectKey());
+        long size = content.contentLength() > 0
+                ? content.contentLength()
+                : (document.getFileSize() != null ? document.getFileSize() : 0L);
+        String fileName = document.getFileName() != null && !document.getFileName().isBlank()
+                ? document.getFileName()
+                : "document";
+        String contentType = document.getContentType() != null && !document.getContentType().isBlank()
+                ? document.getContentType()
+                : content.contentType();
+        return new ClinicalDocumentDownload(content.content(), fileName, contentType, size);
     }
 
     private static int clampPageSize(int size) {

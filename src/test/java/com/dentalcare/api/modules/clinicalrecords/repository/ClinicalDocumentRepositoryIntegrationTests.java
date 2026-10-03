@@ -323,6 +323,54 @@ class ClinicalDocumentRepositoryIntegrationTests {
                 .isInstanceOf(RuntimeException.class);
     }
 
+    @Test
+    @DisplayName("New documents are private by default and patient queries return only explicitly shared documents")
+    void patientVisibilityDefaultsPrivateAndVisibleQueriesDoNotLeak() {
+        Patient owner = patient("PAC-DOC-VIS-1", "8000000000501");
+        Patient other = patient("PAC-DOC-VIS-2", "8000000000502");
+        User dentist = dentist("8000000000503");
+        ClinicalDocument privateDocument = new ClinicalDocument(
+                UUID.randomUUID(), owner, dentist, "Privado", ClinicalDocumentType.OTHER, null,
+                LocalDate.of(2026, 10, 2), NOW, NOW);
+        ClinicalDocument sharedDocument = new ClinicalDocument(
+                UUID.randomUUID(), owner, dentist, "Compartido", ClinicalDocumentType.RADIOGRAPHY, null,
+                LocalDate.of(2026, 10, 3), NOW, NOW);
+        sharedDocument.updatePatientVisibility(true, dentist, NOW.plusSeconds(60));
+        clinicalDocumentRepository.saveAndFlush(privateDocument);
+        clinicalDocumentRepository.saveAndFlush(sharedDocument);
+        entityManager.clear();
+
+        ClinicalDocument reloadedPrivate = clinicalDocumentRepository.findById(privateDocument.getId()).orElseThrow();
+        assertThat(reloadedPrivate.isPatientVisible()).isFalse();
+        assertThat(reloadedPrivate.getSharedAt()).isNull();
+        assertThat(reloadedPrivate.getSharedBy()).isNull();
+
+        var visible = clinicalDocumentRepository.findByPatient_IdAndPatientVisibleTrue(
+                owner.getId(), PageRequest.of(0, 20));
+        assertThat(visible.getContent()).extracting(ClinicalDocument::getId)
+                .containsExactly(sharedDocument.getId());
+        assertThat(clinicalDocumentRepository.findByIdAndPatient_IdAndPatientVisibleTrue(
+                privateDocument.getId(), owner.getId())).isEmpty();
+        assertThat(clinicalDocumentRepository.findByIdAndPatient_IdAndPatientVisibleTrue(
+                sharedDocument.getId(), other.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Database rejects visible documents without sharing audit")
+    void databaseRejectsVisibleDocumentWithoutAudit() {
+        Patient patient = patient("PAC-DOC-VIS-3", "8000000000504");
+        User dentist = dentist("8000000000505");
+
+        assertThatThrownBy(() -> entityManager.createNativeQuery("""
+                INSERT INTO clinical_documents
+                    (id, patient_id, author_id, title, type, document_date, created_at, updated_at, patient_visible)
+                VALUES (:id, :patient, :author, 'Sin auditoria', 'OTHER', CURRENT_DATE, NOW(), NOW(), TRUE)
+                """).setParameter("id", UUID.randomUUID())
+                .setParameter("patient", patient.getId())
+                .setParameter("author", dentist.getId()).executeUpdate())
+                .isInstanceOf(RuntimeException.class);
+    }
+
     private Patient patient(String code, String dpi) {
         Patient patient = new Patient();
         patient.setId(UUID.randomUUID());

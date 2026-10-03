@@ -9,6 +9,7 @@ import com.dentalcare.api.modules.clinicalrecords.dto.request.UploadClinicalDocu
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentDownload;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalProfessionalResponse;
+import com.dentalcare.api.modules.clinicalrecords.dto.response.PatientClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocumentType;
 import com.dentalcare.api.modules.clinicalrecords.service.ClinicalDocumentService;
 import com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentNotFoundInStorageException;
@@ -39,13 +40,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = ClinicalDocumentController.class, properties = "FRONTEND_URL=http://localhost:3000")
+@WebMvcTest(controllers = {ClinicalDocumentController.class, PatientClinicalDocumentController.class},
+        properties = "FRONTEND_URL=http://localhost:3000")
 @Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class,
         RestAuthenticationEntryPoint.class, RestAccessDeniedHandler.class, GlobalExceptionHandler.class})
 class ClinicalDocumentControllerSecurityTests {
@@ -333,6 +336,88 @@ class ClinicalDocumentControllerSecurityTests {
                 .andExpect(jsonPath("$.contentType").value("application/pdf"))
                 .andExpect(jsonPath("$.storageObjectKey").doesNotExist())
                 .andExpect(jsonPath("$.storage_object_key").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Only clinical writers can change patient visibility")
+    void visibilityUpdateRequiresClinicalWritePermission() throws Exception {
+        UUID patientId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        token("reader", "CLINICAL_RECORD_READ");
+        token("writer", "CLINICAL_RECORD_WRITE");
+        when(clinicalDocumentService.updatePatientVisibility(
+                eq(patientId), eq(documentId), eq(true), any()))
+                .thenReturn(sampleResponse(documentId, patientId));
+
+        mockMvc.perform(patch("/api/v1/patients/{patientId}/documents/{documentId}/visibility",
+                        patientId, documentId)
+                .header("Authorization", "Bearer reader")
+                .contentType("application/json")
+                .content("{\"visible\":true}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/v1/patients/{patientId}/documents/{documentId}/visibility",
+                        patientId, documentId)
+                .header("Authorization", "Bearer writer")
+                .contentType("application/json")
+                .content("{\"visible\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Patient role can list detail and download only through self-service endpoints")
+    void patientCanUseOwnedSharedDocumentEndpoints() throws Exception {
+        UUID documentId = UUID.randomUUID();
+        token("patient-token", "ROLE_PATIENT");
+        PatientClinicalDocumentResponse response = new PatientClinicalDocumentResponse(
+                documentId,
+                new ClinicalProfessionalResponse(UUID.randomUUID(), "Dra. Ana"),
+                "Radiografía",
+                ClinicalDocumentType.RADIOGRAPHY,
+                "Control",
+                LocalDate.of(2026, 10, 2),
+                "radiografia.pdf",
+                6L,
+                "application/pdf",
+                true,
+                Instant.now(),
+                Instant.now(),
+                Instant.now());
+        when(clinicalDocumentService.findVisibleDocumentsForPatient(any(), any(), eq(0), eq(20)))
+                .thenReturn(new PageImpl<>(List.of(response)));
+        when(clinicalDocumentService.findVisibleDocumentForPatient(any(), eq(documentId)))
+                .thenReturn(response);
+        when(clinicalDocumentService.downloadVisibleDocumentForPatient(any(), eq(documentId)))
+                .thenReturn(new ClinicalDocumentDownload(
+                        new ByteArrayInputStream("shared".getBytes(StandardCharsets.UTF_8)),
+                        "radiografia.pdf", "application/pdf", 6L));
+
+        mockMvc.perform(get("/api/v1/patients/me/documents")
+                .header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(documentId.toString()))
+                .andExpect(jsonPath("$.content[0].patientId").doesNotExist())
+                .andExpect(jsonPath("$.content[0].storageObjectKey").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/patients/me/documents/{documentId}", documentId)
+                .header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(documentId.toString()));
+
+        mockMvc.perform(get("/api/v1/patients/me/documents/{documentId}/download", documentId)
+                .header("Authorization", "Bearer patient-token"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(content().string("shared"));
+    }
+
+    @Test
+    @DisplayName("Staff role without PATIENT cannot use patient document self-service")
+    void staffCannotUsePatientDocumentSelfService() throws Exception {
+        token("staff-token", "CLINICAL_RECORD_READ");
+        mockMvc.perform(get("/api/v1/patients/me/documents")
+                .header("Authorization", "Bearer staff-token"))
+                .andExpect(status().isForbidden());
     }
 
     private void token(String token, String... authorities) {
