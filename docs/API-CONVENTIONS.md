@@ -401,6 +401,10 @@ Endpoints for managing patient clinical document metadata:
 | `GET` | `/api/v1/patients/{patientId}/documents` | `CLINICAL_RECORD_READ` | `200 OK` | Paginated list of documents for an existing patient. Supports optional filter `?type=...` and stable sorting by `documentDate DESC, createdAt DESC, id DESC`. Unknown patient returns `404 Not Found`. |
 | `GET` | `/api/v1/patients/{patientId}/documents/{documentId}` | `CLINICAL_RECORD_READ` | `200 OK` | Detail of a single document. Enforces ownership: if the document does not exist or belongs to another patient, returns `404 Not Found` without disclosing existence (anti-IDOR). |
 | `POST` | `/api/v1/patients/{patientId}/documents` | `CLINICAL_RECORD_WRITE` | `201 Created` | Registers clinical document metadata. Author is taken exclusively from the authenticated JWT user. Returns `Location: /api/v1/patients/{patientId}/documents/{id}` and `ClinicalDocumentResponse`. |
+| `PATCH` | `/api/v1/patients/{patientId}/documents/{documentId}/visibility` | `CLINICAL_RECORD_WRITE` | `200 OK` | Idempotently shares or unshares the document. Body: `{ "visible": true|false }`. Sharing actor and time come from the authenticated user and server clock. |
+| `GET` | `/api/v1/patients/me/documents` | `PATIENT` | `200 OK` | Paginated list containing only the authenticated patient's shared documents. Supports optional `type`, `page`, and `size`. |
+| `GET` | `/api/v1/patients/me/documents/{documentId}` | `PATIENT` | `200 OK` | Returns only an owned, shared document. Private, foreign, and unknown ids all return the same `404 Not Found`. |
+| `GET` | `/api/v1/patients/me/documents/{documentId}/download` | `PATIENT` | `200 OK` | Revalidates ownership and visibility before reading the private object from R2. Internal storage keys are never returned. |
 
 Supported categories (`ClinicalDocumentType`):
 - `RADIOGRAPHY`: Dental X-rays (panoramic, periapical, bitewing, etc.)

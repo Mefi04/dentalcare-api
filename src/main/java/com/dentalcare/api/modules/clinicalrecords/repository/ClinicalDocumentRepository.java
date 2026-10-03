@@ -14,14 +14,24 @@ import java.util.UUID;
 @Repository
 public interface ClinicalDocumentRepository extends JpaRepository<ClinicalDocument, UUID> {
 
-    @EntityGraph(attributePaths = {"author"})
+    @EntityGraph(attributePaths = {"author", "sharedBy"})
     Page<ClinicalDocument> findByPatient_Id(UUID patientId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"author"})
+    @EntityGraph(attributePaths = {"author", "sharedBy"})
     Page<ClinicalDocument> findByPatient_IdAndType(UUID patientId, ClinicalDocumentType type, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"author"})
+    @EntityGraph(attributePaths = {"author", "sharedBy"})
     Optional<ClinicalDocument> findByIdAndPatient_Id(UUID id, UUID patientId);
+
+    @EntityGraph(attributePaths = {"author"})
+    Page<ClinicalDocument> findByPatient_IdAndPatientVisibleTrue(UUID patientId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"author"})
+    Page<ClinicalDocument> findByPatient_IdAndPatientVisibleTrueAndType(
+            UUID patientId, ClinicalDocumentType type, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"author"})
+    Optional<ClinicalDocument> findByIdAndPatient_IdAndPatientVisibleTrue(UUID id, UUID patientId);
 
     Optional<ClinicalDocument> findByStorageObjectKey(String storageObjectKey);
 
