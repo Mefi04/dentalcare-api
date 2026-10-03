@@ -64,6 +64,16 @@ public class ClinicalDocument {
     @Column(name = "content_type", length = 100)
     private String contentType;
 
+    @Column(name = "patient_visible", nullable = false)
+    private boolean patientVisible;
+
+    @Column(name = "shared_at")
+    private Instant sharedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shared_by")
+    private User sharedBy;
+
     public ClinicalDocument() {}
 
     public ClinicalDocument(UUID id, Patient patient, User author, String title,
@@ -90,6 +100,9 @@ public class ClinicalDocument {
         setFileName(fileName);
         setFileSize(fileSize);
         setContentType(contentType);
+        this.patientVisible = false;
+        this.sharedAt = null;
+        this.sharedBy = null;
     }
 
     public UUID getId() { return id; }
@@ -105,6 +118,9 @@ public class ClinicalDocument {
     public String getFileName() { return fileName; }
     public Long getFileSize() { return fileSize; }
     public String getContentType() { return contentType; }
+    public boolean isPatientVisible() { return patientVisible; }
+    public Instant getSharedAt() { return sharedAt; }
+    public User getSharedBy() { return sharedBy; }
 
     public void setTitle(String title) { this.title = title; }
     public void setType(ClinicalDocumentType type) { this.type = type; }
@@ -120,6 +136,25 @@ public class ClinicalDocument {
         this.fileSize = fileSize;
     }
     public void setContentType(String contentType) { this.contentType = contentType; }
+
+    public void updatePatientVisibility(boolean visible, User actor, Instant now) {
+        if (now == null) {
+            throw new IllegalArgumentException("Visibility timestamp is required");
+        }
+        if (visible) {
+            if (actor == null) {
+                throw new IllegalArgumentException("Sharing actor is required");
+            }
+            this.patientVisible = true;
+            this.sharedAt = now;
+            this.sharedBy = actor;
+        } else {
+            this.patientVisible = false;
+            this.sharedAt = null;
+            this.sharedBy = null;
+        }
+        this.updatedAt = now;
+    }
 
     public boolean hasFile() {
         return storageObjectKey != null && !storageObjectKey.isBlank();

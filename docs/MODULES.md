@@ -59,6 +59,8 @@ Responsible for:
 - diagnoses
 - clinical evolution
 - clinical attentions and history
+- clinical document metadata and private R2 files
+- explicit, audited sharing of selected clinical documents with the owning patient
 
 ## treatments
 

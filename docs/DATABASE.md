@@ -289,6 +289,11 @@ optional `description` (VARCHAR(1000)), `document_date` (DATE NOT NULL), and aud
 Indexes support chronological pagination by patient (`idx_clinical_documents_patient_date`) and filtering by type (`idx_clinical_documents_type`).
 Queries strictly enforce `patient_id` alongside `id` to prevent IDOR vulnerabilities.
 
+Changeset `024-add-patient-visibility-to-clinical-documents` adds opt-in patient sharing to the same table.
+`patient_visible` is `FALSE` by default. A database constraint requires `shared_at` and `shared_by` together only
+while a document is visible; `shared_by` references `users` with `ON DELETE RESTRICT`. A partial index supports
+the patient-visible chronological listing. No object-storage key is exposed through patient DTOs.
+
 ## Files
 
 Large clinical files must not be stored directly as binary database columns unless explicitly required.
