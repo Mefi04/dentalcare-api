@@ -30,6 +30,7 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;
@@ -198,6 +199,58 @@ class R2ClinicalDocumentStorageTests {
         assertThatThrownBy(() -> storage.store(command))
                 .isInstanceOf(DocumentStorageUnavailableException.class)
                 .hasMessage("Storage service is currently unavailable");
+    }
+
+    @Test
+    @DisplayName("store handles non-repeatable stream without mark/reset failure")
+    void store_nonRepeatableStream_uploadsSuccessfully() {
+        UUID patientId = UUID.randomUUID();
+        byte[] bytes = "non-repeatable test stream".getBytes(StandardCharsets.UTF_8);
+        InputStream nonMarkStream = new java.io.FilterInputStream(new ByteArrayInputStream(bytes)) {
+            @Override
+            public boolean markSupported() {
+                return false;
+            }
+        };
+        UploadDocumentCommand command = new UploadDocumentCommand(
+                patientId,
+                "documento.pdf",
+                "application/pdf",
+                bytes.length,
+                nonMarkStream
+        );
+
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
+
+        StoredDocument result = storage.store(command);
+
+        assertThat(result).isNotNull();
+        assertThat(result.fileName()).isEqualTo("documento.pdf");
+        assertThat(result.fileSize()).isEqualTo((long) bytes.length);
+    }
+
+    @Test
+    @DisplayName("store translates IOException on reading stream to DocumentStorageException")
+    void store_ioExceptionOnReadStream_throwsDocumentStorageException() {
+        UUID patientId = UUID.randomUUID();
+        InputStream faultyStream = new InputStream() {
+            @Override
+            public int read() throws IOException {
+                throw new IOException("Simulated I/O failure");
+            }
+        };
+        UploadDocumentCommand command = new UploadDocumentCommand(
+                patientId,
+                "broken.pdf",
+                "application/pdf",
+                100L,
+                faultyStream
+        );
+
+        assertThatThrownBy(() -> storage.store(command))
+                .isInstanceOf(DocumentStorageException.class)
+                .hasMessage("Failed to read document content");
     }
 
     @Test

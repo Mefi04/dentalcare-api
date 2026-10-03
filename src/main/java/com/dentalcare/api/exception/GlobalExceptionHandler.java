@@ -51,6 +51,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageException.class)
     ResponseEntity<ApiErrorResponse> handleDocumentStorage(
             com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageException exception, HttpServletRequest request) {
+        LOGGER.error("Document storage failure while processing {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage(), exception);
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage(), request, Map.of());
     }
 

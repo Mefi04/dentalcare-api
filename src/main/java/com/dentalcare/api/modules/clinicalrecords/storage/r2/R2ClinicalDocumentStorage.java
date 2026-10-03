@@ -26,6 +26,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -55,29 +56,33 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
         String sanitizedName = sanitizeFileName(command.originalFileName());
 
         try {
+            byte[] bytes = command.inputStream().readAllBytes();
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(properties.getBucket())
                     .key(objectKey)
                     .contentType(command.contentType())
-                    .contentLength(command.contentLength())
+                    .contentLength((long) bytes.length)
                     .build();
 
-            s3Client.putObject(putRequest, RequestBody.fromInputStream(command.inputStream(), command.contentLength()));
+            s3Client.putObject(putRequest, RequestBody.fromBytes(bytes));
 
             return new StoredDocument(
                     objectKey,
                     sanitizedName,
-                    command.contentLength(),
+                    (long) bytes.length,
                     command.contentType()
             );
+        } catch (IOException exception) {
+            LOGGER.error("Failed to read document stream: {}", exception.getMessage(), exception);
+            throw new DocumentStorageException("Failed to read document content", exception);
         } catch (S3Exception exception) {
-            LOGGER.error("Failed to store document in R2 storage: status={}", exception.statusCode());
+            LOGGER.error("Failed to store document in R2 storage: status={}", exception.statusCode(), exception);
             throw translateAwsException("Failed to store document in storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during upload: {}", exception.getMessage());
+            LOGGER.error("R2 storage client error during upload: {}", exception.getMessage(), exception);
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error during document upload to storage");
+            LOGGER.error("Unexpected error during document upload to storage: {}", exception.getMessage(), exception);
             throw new DocumentStorageException("Failed to store document in storage", exception);
         }
     }
@@ -110,13 +115,13 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
             if (exception.statusCode() == 404) {
                 throw new DocumentNotFoundInStorageException("Document not found in storage", exception);
             }
-            LOGGER.error("Failed to retrieve document from R2 storage: status={}", exception.statusCode());
+            LOGGER.error("Failed to retrieve document from R2 storage: status={}", exception.statusCode(), exception);
             throw translateAwsException("Failed to retrieve document from storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during download: {}", exception.getMessage());
+            LOGGER.error("R2 storage client error during download: {}", exception.getMessage(), exception);
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error retrieving document from storage");
+            LOGGER.error("Unexpected error retrieving document from storage: {}", exception.getMessage(), exception);
             throw new DocumentStorageException("Failed to retrieve document from storage", exception);
         }
     }
@@ -148,13 +153,13 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
             if (exception.statusCode() == 404) {
                 throw new DocumentNotFoundInStorageException("Document not found in storage", exception);
             }
-            LOGGER.error("Failed to check metadata in R2 storage: status={}", exception.statusCode());
+            LOGGER.error("Failed to check metadata in R2 storage: status={}", exception.statusCode(), exception);
             throw translateAwsException("Failed to retrieve document metadata from storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during headObject: {}", exception.getMessage());
+            LOGGER.error("R2 storage client error during headObject: {}", exception.getMessage(), exception);
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error checking document metadata in storage");
+            LOGGER.error("Unexpected error checking document metadata in storage: {}", exception.getMessage(), exception);
             throw new DocumentStorageException("Failed to check document metadata in storage", exception);
         }
     }
@@ -179,13 +184,13 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
             if (exception.statusCode() == 404) {
                 return false;
             }
-            LOGGER.error("Failed to check existence in R2 storage: status={}", exception.statusCode());
+            LOGGER.error("Failed to check existence in R2 storage: status={}", exception.statusCode(), exception);
             throw translateAwsException("Failed to check document existence in storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during exists check: {}", exception.getMessage());
+            LOGGER.error("R2 storage client error during exists check: {}", exception.getMessage(), exception);
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error checking document existence in storage");
+            LOGGER.error("Unexpected error checking document existence in storage: {}", exception.getMessage(), exception);
             throw new DocumentStorageException("Failed to check document existence in storage", exception);
         }
     }
@@ -207,13 +212,13 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
             if (exception.statusCode() == 404) {
                 return;
             }
-            LOGGER.error("Failed to delete document from R2 storage: status={}", exception.statusCode());
+            LOGGER.error("Failed to delete document from R2 storage: status={}", exception.statusCode(), exception);
             throw translateAwsException("Failed to delete document from storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during delete: {}", exception.getMessage());
+            LOGGER.error("R2 storage client error during delete: {}", exception.getMessage(), exception);
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error deleting document from storage");
+            LOGGER.error("Unexpected error deleting document from storage: {}", exception.getMessage(), exception);
             throw new DocumentStorageException("Failed to delete document from storage", exception);
         }
     }

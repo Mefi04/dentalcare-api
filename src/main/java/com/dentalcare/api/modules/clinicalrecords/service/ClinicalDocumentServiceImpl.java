@@ -111,6 +111,7 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
     }
 
     @Override
+    @Transactional
     public ClinicalDocumentResponse uploadDocument(UUID patientId,
                                                    UploadClinicalDocumentRequest request,
                                                    UUID authenticatedUserId) {
