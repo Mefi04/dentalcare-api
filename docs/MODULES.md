@@ -72,6 +72,8 @@ Responsible for:
 - consents
 - treatment completion
 - persistent execution history for approved plan procedures
+- immutable, versioned budgets calculated from approved plan items
+- versioned consent documents with explicit acceptance and revocation audit
 
 ## prescriptions
 

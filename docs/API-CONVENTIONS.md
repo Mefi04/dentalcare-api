@@ -266,6 +266,28 @@ contains `name`, optional `tooth`, positive `quantity`, and positive `unitPrice`
 The patient always comes from the path. Item positions are assigned by the backend from request order.
 Clients cannot supply status, positions, totals, subtotals, or audit timestamps.
 
+## Treatment budget and consent endpoints
+
+Budgets are immutable snapshots of an approved plan. The backend derives patient, item data, prices, subtotal,
+total, version, status, timestamps, and authenticated actors. An approved budget is final; a rejected budget
+remains in history and permits generation of the next version. Approval never creates a Billing charge.
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `POST` | `/api/v1/treatment-plans/{planId}/budgets` | `TREATMENT_BUDGET_CREATE` | `201 Created` | Generates a pending snapshot from an approved plan. Duplicate active budget returns `409 Conflict`. |
+| `GET` | `/api/v1/treatment-plans/{planId}/budgets` | `TREATMENT_BUDGET_READ` | `200 OK` | Lists every version, newest first. |
+| `GET` | `/api/v1/treatment-budgets/{budgetId}` | `TREATMENT_BUDGET_READ` | `200 OK` | Returns one snapshot and its ordered items. |
+| `PATCH` | `/api/v1/treatment-budgets/{budgetId}/approve` | `TREATMENT_BUDGET_DECIDE` | `200 OK` | Performs `PENDING -> APPROVED`. |
+| `PATCH` | `/api/v1/treatment-budgets/{budgetId}/reject` | `TREATMENT_BUDGET_DECIDE` | `200 OK` | Performs `PENDING -> REJECTED`. |
+| `POST` | `/api/v1/treatment-plans/{planId}/consents` | `TREATMENT_CONSENT_CREATE` | `201 Created` | Stores immutable `documentVersion` and `consentText` as pending. |
+| `GET` | `/api/v1/treatment-plans/{planId}/consents` | `TREATMENT_CONSENT_READ` | `200 OK` | Lists consent history, newest first. |
+| `GET` | `/api/v1/treatment-consents/{consentId}` | `TREATMENT_CONSENT_READ` | `200 OK` | Returns the exact versioned consent and audit actors. |
+| `PATCH` | `/api/v1/treatment-consents/{consentId}/accept` | `TREATMENT_CONSENT_ACCEPT` | `200 OK` | Explicitly performs `PENDING -> ACCEPTED`; navigation never implies acceptance. |
+| `PATCH` | `/api/v1/treatment-consents/{consentId}/revoke` | `TREATMENT_CONSENT_REVOKE` | `200 OK` | Revokes a pending or accepted consent and records actor/time. |
+
+Invalid transitions return `409 Conflict`; missing resources return `404 Not Found`; validation errors return
+`400 Bad Request`. Clients never submit patient ids, monetary totals, statuses, actors, or timestamps.
+
 ## Inventory endpoints
 
 | Method | Path | Authorization | Success | Notes |

@@ -61,6 +61,12 @@ class DentalCareApplicationTests {
     TreatmentPlanRepository treatmentPlanRepository;
 
     @MockitoBean
+    com.dentalcare.api.modules.treatments.repository.TreatmentBudgetRepository treatmentBudgetRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.treatments.repository.TreatmentConsentRepository treatmentConsentRepository;
+
+    @MockitoBean
     JpaDashboardMetricsRepository dashboardMetricsRepository;
 
     @MockitoBean

@@ -175,6 +175,20 @@ non-negative position unique within the plan. Subtotals and plan totals are deri
 `quantity * unit_price`; neither value is stored. Changeset `011-create-treatment-plans-core` seeds
 `TREATMENT_PLAN_READ`, `TREATMENT_PLAN_CREATE`, `TREATMENT_PLAN_UPDATE`, and `TREATMENT_PLAN_APPROVE`.
 
+## Treatment budgets and consents
+
+Changeset `025-create-treatment-budgets-consents` adds immutable financial snapshots in `treatment_budgets`
+and `treatment_budget_items`. A budget derives its patient, items, prices, subtotal, and total from one approved
+plan; clients cannot submit those values. `(treatment_plan_id, version)` is unique and a partial unique index
+permits only one `PENDING` or `APPROVED` budget per plan. Rejected budgets remain as audit history and allow a
+new version. Budget approval records the authenticated deciding user and does not create Billing charges.
+
+`treatment_consents` stores the exact consent text and document version linked to the real plan and, when one
+exists, its latest approved budget. Consent text is immutable. Status and actor/timestamp constraints enforce
+the explicit lifecycle `PENDING -> ACCEPTED -> REVOKED` (or direct revocation while pending), and a partial
+unique index permits only one pending or accepted consent per plan. Foreign keys preserve plan, patient,
+budget, and user traceability; plan/patient history indexes support efficient reads.
+
 ## Inventory catalog core
 
 The inventory catalog persists articles in `inventory_items`:

@@ -438,6 +438,12 @@ Administrative treatment-plan operations use dedicated clinical authorities:
 the update contract. The professional catalog exposes only user id and full name; it does not expose account,
 identity, credential, role, authority, or audit data.
 
+Treatment budget and consent operations use dedicated authorities. Read access belongs to administrator,
+dentist, and assistant roles. Dentists and assistants may generate a budget or prepare a consent, while only a
+dentist may approve/reject a budget or explicitly accept/revoke a consent. Every mutation derives its actor
+from the verified JWT. The patient is always derived from the referenced plan, preventing clients from
+substituting a foreign patient id. These administrative contracts expose no credential or internal JPA data.
+
 Administrative appointment endpoints are isolated under `/api/v1/appointments`. `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, and `ASSISTANT` may read the agenda and update appointment status. Creating and rescheduling appointments is limited to `ADMINISTRATOR` and `SECRETARY`. `PATIENT` and `CASHIER` cannot use the administrative contract. Patient-owned appointment operations remain under `/api/v1/patients/me/appointments` and continue to derive ownership exclusively from the JWT principal.
 
 ### Login flow
