@@ -120,6 +120,12 @@ class DentalCareApplicationTests {
     @MockitoBean
     com.dentalcare.api.modules.inventory.repository.PurchaseItemRepository purchaseItemRepository;
 
+    @MockitoBean
+    com.dentalcare.api.modules.settings.repository.ClinicSettingsRepository clinicSettingsRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.settings.repository.ProcedureCatalogItemRepository procedureCatalogItemRepository;
+
     @Test
     void contextLoads() {
     }
