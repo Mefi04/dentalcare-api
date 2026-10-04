@@ -11,6 +11,7 @@ import com.dentalcare.api.modules.billing.model.PaymentMethod;
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.billing.service.BillingServiceImpl;
+import com.dentalcare.api.modules.billing.service.CashShiftService;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
@@ -66,6 +67,9 @@ class PatientBillingControllerSecurityTests {
 
     @MockitoBean
     private Clock clock;
+
+    @MockitoBean
+    private CashShiftService cashShiftService;
 
     private UUID userId;
     private Patient patient;

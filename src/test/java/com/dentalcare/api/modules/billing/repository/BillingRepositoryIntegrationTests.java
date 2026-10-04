@@ -195,7 +195,14 @@ class BillingRepositoryIntegrationTests {
                 "BILLING_CHARGE_CREATE:ADMINISTRATOR",
                 "BILLING_CHARGE_CREATE:CASHIER",
                 "BILLING_PAYMENT_CREATE:ADMINISTRATOR",
-                "BILLING_PAYMENT_CREATE:CASHIER");
+                "BILLING_PAYMENT_CREATE:CASHIER",
+                "BILLING_CASH_MANAGE:ADMINISTRATOR",
+                "BILLING_CASH_MANAGE:CASHIER",
+                "BILLING_CASH_READ_ALL:ADMINISTRATOR",
+                "BILLING_RECEIPT_CREATE:ADMINISTRATOR",
+                "BILLING_RECEIPT_CREATE:CASHIER",
+                "BILLING_PLAN_MANAGE:ADMINISTRATOR",
+                "BILLING_PLAN_MANAGE:CASHIER");
     }
 
     private Charge charge(Patient patient, String concept, String amount, Instant createdAt) {

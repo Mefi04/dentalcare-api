@@ -46,11 +46,23 @@ public class Payment {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "registered_by_user_id", updatable = false)
+    private UUID registeredByUserId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cash_shift_id", updatable = false)
+    private CashShift cashShift;
+
     protected Payment() {
     }
 
     public Payment(UUID id, Patient patient, Charge charge, PaymentKind kind, PaymentMethod method,
                    BigDecimal amount, Instant createdAt) {
+        this(id, patient, charge, kind, method, amount, createdAt, null, null);
+    }
+
+    public Payment(UUID id, Patient patient, Charge charge, PaymentKind kind, PaymentMethod method,
+                   BigDecimal amount, Instant createdAt, UUID registeredByUserId, CashShift cashShift) {
         this.id = id;
         this.patient = patient;
         this.charge = charge;
@@ -58,6 +70,8 @@ public class Payment {
         this.method = method;
         this.amount = amount;
         this.createdAt = createdAt;
+        this.registeredByUserId = registeredByUserId;
+        this.cashShift = cashShift;
     }
 
     public UUID getId() { return id; }
@@ -67,6 +81,8 @@ public class Payment {
     public PaymentMethod getMethod() { return method; }
     public BigDecimal getAmount() { return amount; }
     public Instant getCreatedAt() { return createdAt; }
+    public UUID getRegisteredByUserId() { return registeredByUserId; }
+    public CashShift getCashShift() { return cashShift; }
 
     @Override
     public boolean equals(Object other) {

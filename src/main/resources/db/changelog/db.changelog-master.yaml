@@ -49,3 +49,9 @@ databaseChangeLog:
       file: db/changelog/changes/024-add-patient-visibility-to-clinical-documents.sql
   - include:
       file: db/changelog/changes/025-create-treatment-budgets-consents.sql
+  - include:
+      file: db/changelog/changes/026-create-billing-cash-shifts.sql
+  - include:
+      file: db/changelog/changes/027-create-billing-receipts.sql
+  - include:
+      file: db/changelog/changes/028-create-billing-payment-plans.sql

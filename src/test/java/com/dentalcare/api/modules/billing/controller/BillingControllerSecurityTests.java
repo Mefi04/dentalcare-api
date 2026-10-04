@@ -182,8 +182,8 @@ class BillingControllerSecurityTests {
                     .andExpect(status().isForbidden());
         }
 
-        token("cashier-token", "ROLE_CASHIER", "BILLING_PAYMENT_CREATE");
-        when(billingService.registerPayment(eq(patientId), any())).thenReturn(new PaymentResponse(
+        UUID cashierId = token("cashier-token", "ROLE_CASHIER", "BILLING_PAYMENT_CREATE");
+        when(billingService.registerPayment(eq(patientId), any(), eq(cashierId))).thenReturn(new PaymentResponse(
                 UUID.randomUUID(), chargeId, PaymentKind.PARTIAL_PAYMENT, PaymentMethod.CASH,
                 new BigDecimal("50.00"), NOW));
         mockMvc.perform(post("/api/v1/patients/{patientId}/payments", patientId)
@@ -195,7 +195,7 @@ class BillingControllerSecurityTests {
                 .andExpect(jsonPath("$.method").value("CASH"));
 
         ArgumentCaptor<CreatePaymentRequest> request = ArgumentCaptor.forClass(CreatePaymentRequest.class);
-        verify(billingService).registerPayment(eq(patientId), request.capture());
+        verify(billingService).registerPayment(eq(patientId), request.capture(), eq(cashierId));
         assertThat(request.getValue().chargeId()).isEqualTo(chargeId);
         assertThat(request.getValue().amount()).isEqualByComparingTo("50.00");
         assertThat(request.getValue().method()).isEqualTo(PaymentMethod.CASH);
@@ -221,7 +221,7 @@ class BillingControllerSecurityTests {
                     .andExpect(jsonPath("$.message").value("Request is malformed or contains an invalid value"));
         }
 
-        verify(billingService, never()).registerPayment(any(), any());
+        verify(billingService, never()).registerPayment(any(), any(), any());
     }
 
     @Test
@@ -230,7 +230,7 @@ class BillingControllerSecurityTests {
         token("cashier-token", "BILLING_PAYMENT_CREATE");
         String body = "{\"chargeId\":\"%s\",\"amount\":10,\"method\":\"CASH\"}".formatted(UUID.randomUUID());
 
-        when(billingService.registerPayment(eq(patientId), any()))
+        when(billingService.registerPayment(eq(patientId), any(), any()))
                 .thenThrow(new ConflictException("Payment amount exceeds the pending balance of the charge"))
                 .thenThrow(new ResourceNotFoundException("Charge not found"));
 
@@ -257,9 +257,11 @@ class BillingControllerSecurityTests {
                 .andExpect(jsonPath("$.fieldErrors." + field).exists());
     }
 
-    private void token(String token, String... authorities) {
+    private UUID token(String token, String... authorities) {
+        UUID userId = UUID.randomUUID();
         when(jwtService.parseAccessToken(token))
-                .thenReturn(new JwtService.AccessTokenClaims(UUID.randomUUID(), List.of(authorities)));
+                .thenReturn(new JwtService.AccessTokenClaims(userId, List.of(authorities)));
+        return userId;
     }
 
     private ChargeResponse charge() {

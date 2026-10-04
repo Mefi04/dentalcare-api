@@ -11,9 +11,11 @@ import com.dentalcare.api.modules.billing.dto.response.ChargeResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeStatus;
 import com.dentalcare.api.modules.billing.dto.response.PaymentResponse;
 import com.dentalcare.api.modules.billing.mapper.BillingMapper;
+import com.dentalcare.api.modules.billing.model.CashShift;
 import com.dentalcare.api.modules.billing.model.Charge;
 import com.dentalcare.api.modules.billing.model.Payment;
 import com.dentalcare.api.modules.billing.model.PaymentKind;
+import com.dentalcare.api.modules.billing.model.PaymentMethod;
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
@@ -41,17 +43,20 @@ public class BillingServiceImpl implements BillingService {
     private final PaymentRepository paymentRepository;
     private final PatientRepository patientRepository;
     private final BillingMapper billingMapper;
+    private final CashShiftService cashShiftService;
     private final Clock clock;
 
     public BillingServiceImpl(ChargeRepository chargeRepository,
                               PaymentRepository paymentRepository,
                               PatientRepository patientRepository,
                               BillingMapper billingMapper,
+                              CashShiftService cashShiftService,
                               Clock clock) {
         this.chargeRepository = chargeRepository;
         this.paymentRepository = paymentRepository;
         this.patientRepository = patientRepository;
         this.billingMapper = billingMapper;
+        this.cashShiftService = cashShiftService;
         this.clock = clock;
     }
 
@@ -96,7 +101,7 @@ public class BillingServiceImpl implements BillingService {
 
     @Override
     @Transactional
-    public PaymentResponse registerPayment(UUID patientId, CreatePaymentRequest request) {
+    public PaymentResponse registerPayment(UUID patientId, CreatePaymentRequest request, UUID actorUserId) {
         requirePatientId(patientId);
         if (request == null) {
             throw new BadRequestException("Payment is required");
@@ -104,9 +109,20 @@ public class BillingServiceImpl implements BillingService {
         if (request.method() == null) {
             throw new BadRequestException("Payment method is required");
         }
+        if (actorUserId == null) {
+            throw new BadRequestException("Authenticated user id is required");
+        }
         BigDecimal amount = normalizeAmount(request.amount());
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
+
+        // Lock the open shift before the charge. Close locks only that shift row and reads cash
+        // totals while holding it, so a cash payment is either included in the expected amount
+        // or rejected once the shift is CLOSED. Non-cash payments do not take this lock.
+        CashShift cashShift = null;
+        if (request.method() == PaymentMethod.CASH) {
+            cashShift = cashShiftService.requireOpenShiftForUpdate(actorUserId);
+        }
 
         Charge charge = null;
         PaymentKind kind = PaymentKind.ADVANCE;
@@ -125,7 +141,8 @@ public class BillingServiceImpl implements BillingService {
         }
 
         Payment payment = paymentRepository.saveAndFlush(new Payment(
-                UUID.randomUUID(), patient, charge, kind, request.method(), amount, clock.instant()));
+                UUID.randomUUID(), patient, charge, kind, request.method(), amount, clock.instant(),
+                actorUserId, cashShift));
         return billingMapper.toPaymentResponse(payment);
     }
 

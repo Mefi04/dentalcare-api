@@ -4,17 +4,22 @@ import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.billing.dto.request.CreateChargeRequest;
 import com.dentalcare.api.modules.billing.dto.request.CreatePaymentRequest;
+import com.dentalcare.api.modules.billing.dto.request.OpenCashShiftRequest;
 import com.dentalcare.api.modules.billing.dto.response.AccountStatementResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeStatus;
 import com.dentalcare.api.modules.billing.dto.response.PaymentResponse;
 import com.dentalcare.api.modules.billing.mapper.BillingMapper;
+import com.dentalcare.api.modules.billing.mapper.CashShiftMapper;
 import com.dentalcare.api.modules.billing.model.PaymentKind;
 import com.dentalcare.api.modules.billing.model.PaymentMethod;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.users.model.User;
+import com.dentalcare.api.modules.users.model.UserStatus;
+import com.dentalcare.api.modules.users.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -42,6 +47,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -54,7 +60,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-@Import({BillingServiceImpl.class, BillingMapper.class, BillingServiceIntegrationTests.ClockConfiguration.class})
+@Import({BillingServiceImpl.class, CashShiftServiceImpl.class, BillingMapper.class, CashShiftMapper.class,
+        BillingServiceIntegrationTests.ClockConfiguration.class})
 class BillingServiceIntegrationTests {
 
     private static final Instant NOW = Instant.parse("2026-09-29T12:00:00Z");
@@ -73,13 +80,24 @@ class BillingServiceIntegrationTests {
     private BillingService billingService;
 
     @Autowired
+    private CashShiftService cashShiftService;
+
+    @Autowired
     private PatientRepository patientRepository;
 
     @Autowired
     private PaymentRepository paymentRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    private static final AtomicInteger users = new AtomicInteger();
+
+    private UUID cashierId;
+
     @Test
     void concurrentPaymentsNeverExceedTheChargeAmount() throws Exception {
+        openCashierShift();
         Patient patient = createPatient("PAC-BS-001", "9000000000401");
         ChargeResponse charge = billingService.createCharge(patient.getId(),
                 new CreateChargeRequest("Ortodoncia", new BigDecimal("100.00")));
@@ -120,6 +138,7 @@ class BillingServiceIntegrationTests {
 
     @Test
     void registersMovementsAndReadsConsistentStatementFromDatabase() {
+        openCashierShift();
         Patient patient = createPatient("PAC-BS-002", "9000000000402");
         ChargeResponse charge = billingService.createCharge(patient.getId(),
                 new CreateChargeRequest("Limpieza", new BigDecimal("250.00")));
@@ -152,6 +171,7 @@ class BillingServiceIntegrationTests {
 
     @Test
     void paymentCannotTargetAnotherPatientsCharge() {
+        openCashierShift();
         Patient owner = createPatient("PAC-BS-003", "9000000000403");
         Patient other = createPatient("PAC-BS-004", "9000000000404");
         ChargeResponse charge = billingService.createCharge(owner.getId(),
@@ -167,7 +187,18 @@ class BillingServiceIntegrationTests {
 
     private PaymentResponse pay(Patient patient, UUID chargeId, String amount) {
         return billingService.registerPayment(patient.getId(),
-                new CreatePaymentRequest(chargeId, new BigDecimal(amount), PaymentMethod.CASH));
+                new CreatePaymentRequest(chargeId, new BigDecimal(amount), PaymentMethod.CASH), cashierId);
+    }
+
+    private void openCashierShift() {
+        int n = users.incrementAndGet();
+        String cui = String.format("7%012d", n);
+        User user = userRepository.saveAndFlush(new User(
+                UUID.randomUUID(), "billing-cashier-" + n, "Cajero",
+                "billing-cashier-" + n + "@example.test", cui, "hash",
+                UserStatus.ACTIVE, NOW, NOW));
+        cashierId = user.getId();
+        cashShiftService.open(cashierId, new OpenCashShiftRequest(new BigDecimal("0.00"), null));
     }
 
     private Patient createPatient(String code, String dpi) {

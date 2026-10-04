@@ -120,6 +120,18 @@ class DentalCareApplicationTests {
     @MockitoBean
     com.dentalcare.api.modules.inventory.repository.PurchaseItemRepository purchaseItemRepository;
 
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.CashShiftRepository cashShiftRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.CashMovementRepository cashMovementRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.ReceiptRepository receiptRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.PaymentPlanRepository paymentPlanRepository;
+
     @Test
     void contextLoads() {
     }
