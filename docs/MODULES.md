@@ -115,9 +115,12 @@ Responsible for read-only administrative reports. Its dashboard aggregates persi
 
 Responsible for:
 
-- clinic configuration
-- catalogs
+- the singleton clinic configuration
+- the administrative operational procedure catalog
 - configurable application data
+
+The procedure catalog is independent from inventory articles, treatment-plan snapshots, budget snapshots,
+and executed treatment procedures. Staff users and roles remain owned by the `users` module.
 
 ## Module rules
 

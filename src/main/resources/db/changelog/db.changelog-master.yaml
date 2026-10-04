@@ -50,6 +50,8 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/025-create-treatment-budgets-consents.sql
   - include:
+      file: db/changelog/changes/026-create-clinic-settings-procedure-catalog.sql
+  - include:
       file: db/changelog/changes/026-create-billing-cash-shifts.sql
   - include:
       file: db/changelog/changes/027-create-billing-receipts.sql

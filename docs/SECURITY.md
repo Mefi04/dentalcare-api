@@ -104,6 +104,20 @@ identifiers. Download authorization is checked before accessing the private R2 o
 included in patient responses.
 Staff responsible for processing and check-in also comes exclusively from JWT.
 
+## Settings permission matrix
+
+| Permission | Roles | Scope |
+|---|---|---|
+| `SETTINGS_READ` | `ADMINISTRATOR` | Read the singleton clinic configuration and operational procedure catalog. |
+| `SETTINGS_WRITE` | `ADMINISTRATOR` | Update clinic data and create, update, activate, or deactivate catalog items. |
+
+Settings mutations derive `created_by` and `updated_by` exclusively from `AuthenticatedUser.userId()` in the
+validated access token. These actor fields, roles, and authorities are never accepted from request payloads.
+
+Only the existing administrator role receives these permissions. Other staff modules must not reuse settings
+permissions as a shortcut for consuming catalog data; any future cross-module contract requires its own approved
+authorization design.
+
 ## Refresh token and session
 
 The refresh token is an opaque, cryptographically secure random value, not a JWT. Its raw value is sent only to the client and is never persisted. The backend stores only a cryptographic hash suitable for deterministic token lookup.
