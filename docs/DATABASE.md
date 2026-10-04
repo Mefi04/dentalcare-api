@@ -4,6 +4,20 @@
 
 PostgreSQL (version 17+).
 
+## Clinic settings and operational procedure catalog
+
+Changeset `026-create-clinic-settings-procedure-catalog` creates `clinic_settings` as a database-enforced
+singleton (`SMALLINT` primary key constrained to `id = 1`). Liquibase inserts only the structural row and
+timestamps; institutional fields remain null until an administrator completes them through the API, so mock
+frontend values never become production data. Updates record the authenticated user in `updated_by`.
+
+`procedure_catalog_items` stores reusable administrative procedure definitions independently from inventory,
+treatment-plan items, immutable budget snapshots, and executed treatment procedures. Money uses
+`NUMERIC(12,2)`, duration uses integer minutes, and status is `ACTIVE` or `INACTIVE`. Functional unique indexes
+on normalized code and name protect case-insensitive uniqueness under concurrent writes. Foreign keys preserve
+the creating and updating users. Changeset 026 grants `SETTINGS_READ` and `SETTINGS_WRITE` only to the existing
+`ADMINISTRATOR` role.
+
 ## Provider
 
 Supabase.

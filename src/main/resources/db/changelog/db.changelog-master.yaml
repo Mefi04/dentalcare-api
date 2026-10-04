@@ -49,3 +49,5 @@ databaseChangeLog:
       file: db/changelog/changes/024-add-patient-visibility-to-clinical-documents.sql
   - include:
       file: db/changelog/changes/025-create-treatment-budgets-consents.sql
+  - include:
+      file: db/changelog/changes/026-create-clinic-settings-procedure-catalog.sql
