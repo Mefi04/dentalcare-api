@@ -66,6 +66,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Import({CashShiftServiceImpl.class, BillingServiceImpl.class, CashShiftMapper.class, BillingMapper.class,
+        com.dentalcare.api.modules.billing.ledger.ChargeLedger.class,
         CashShiftServiceIntegrationTests.ClockConfiguration.class})
 class CashShiftServiceIntegrationTests {
 

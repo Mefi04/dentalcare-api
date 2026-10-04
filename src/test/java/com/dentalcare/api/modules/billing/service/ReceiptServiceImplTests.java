@@ -12,6 +12,7 @@ import com.dentalcare.api.modules.billing.model.Receipt;
 import com.dentalcare.api.modules.billing.model.ReceiptStatus;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.billing.repository.ReceiptRepository;
+import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import org.hibernate.exception.ConstraintViolationException;
@@ -51,11 +52,15 @@ class ReceiptServiceImplTests {
     @Mock
     private ReceiptRepository receiptRepository;
 
+    @Mock
+    private RefundRepository refundRepository;
+
     private ReceiptService receiptService;
 
     @BeforeEach
     void setUp() {
-        receiptService = new ReceiptServiceImpl(paymentRepository, receiptRepository, new ReceiptMapper(), CLOCK);
+        receiptService = new ReceiptServiceImpl(paymentRepository, receiptRepository, refundRepository,
+                new ReceiptMapper(), CLOCK);
     }
 
     @Test
@@ -64,7 +69,7 @@ class ReceiptServiceImplTests {
         Charge charge = new Charge(UUID.randomUUID(), patient, "Limpieza", money("120.00"), NOW.minusSeconds(60));
         Payment payment = payment(patient, charge, PaymentKind.PARTIAL_PAYMENT, PaymentMethod.CARD, "40.00");
         UUID actorId = UUID.randomUUID();
-        when(paymentRepository.findByIdAndPatientId(payment.getId(), patient.getId())).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByIdAndPatientIdForUpdate(payment.getId(), patient.getId())).thenReturn(Optional.of(payment));
         when(receiptRepository.existsByPaymentId(payment.getId())).thenReturn(false);
         when(receiptRepository.nextReceiptNumber()).thenReturn(4L);
         when(receiptRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -92,7 +97,7 @@ class ReceiptServiceImplTests {
     void issuesAdvanceReceiptWithAnticipoConcept() {
         Patient patient = patient();
         Payment payment = payment(patient, null, PaymentKind.ADVANCE, PaymentMethod.CASH, "25.00");
-        when(paymentRepository.findByIdAndPatientId(payment.getId(), patient.getId())).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByIdAndPatientIdForUpdate(payment.getId(), patient.getId())).thenReturn(Optional.of(payment));
         when(receiptRepository.existsByPaymentId(payment.getId())).thenReturn(false);
         when(receiptRepository.nextReceiptNumber()).thenReturn(5L);
         when(receiptRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -109,7 +114,7 @@ class ReceiptServiceImplTests {
     void secondReceiptOfTheSamePaymentIsConflict() {
         Patient patient = patient();
         Payment payment = payment(patient, null, PaymentKind.ADVANCE, PaymentMethod.TRANSFER, "10.00");
-        when(paymentRepository.findByIdAndPatientId(payment.getId(), patient.getId())).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByIdAndPatientIdForUpdate(payment.getId(), patient.getId())).thenReturn(Optional.of(payment));
         when(receiptRepository.existsByPaymentId(payment.getId())).thenReturn(true);
 
         assertThatThrownBy(() -> receiptService.issue(patient.getId(), payment.getId(), UUID.randomUUID()))
@@ -124,7 +129,7 @@ class ReceiptServiceImplTests {
     void concurrentDuplicatePaymentConstraintIsConflict() {
         Patient patient = patient();
         Payment payment = payment(patient, null, PaymentKind.ADVANCE, PaymentMethod.CHECK, "10.00");
-        when(paymentRepository.findByIdAndPatientId(payment.getId(), patient.getId())).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByIdAndPatientIdForUpdate(payment.getId(), patient.getId())).thenReturn(Optional.of(payment));
         when(receiptRepository.existsByPaymentId(payment.getId())).thenReturn(false);
         when(receiptRepository.nextReceiptNumber()).thenReturn(6L);
         SQLException sqlException = new SQLException(
@@ -143,7 +148,7 @@ class ReceiptServiceImplTests {
         Patient owner = patient();
         UUID otherPatientId = UUID.randomUUID();
         Payment payment = payment(owner, null, PaymentKind.ADVANCE, PaymentMethod.CASH, "10.00");
-        when(paymentRepository.findByIdAndPatientId(payment.getId(), otherPatientId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByIdAndPatientIdForUpdate(payment.getId(), otherPatientId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> receiptService.issue(otherPatientId, payment.getId(), UUID.randomUUID()))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -156,11 +161,27 @@ class ReceiptServiceImplTests {
     void missingPaymentIsNotFound() {
         UUID patientId = UUID.randomUUID();
         UUID paymentId = UUID.randomUUID();
-        when(paymentRepository.findByIdAndPatientId(paymentId, patientId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByIdAndPatientIdForUpdate(paymentId, patientId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> receiptService.issue(patientId, paymentId, UUID.randomUUID()))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Payment not found");
+    }
+
+    @Test
+    void issueOfFullyRefundedPaymentIsConflict() {
+        Patient patient = patient();
+        Payment payment = payment(patient, null, PaymentKind.ADVANCE, PaymentMethod.CASH, "40.00");
+        when(paymentRepository.findByIdAndPatientIdForUpdate(payment.getId(), patient.getId()))
+                .thenReturn(Optional.of(payment));
+        when(refundRepository.sumAmountByPaymentId(payment.getId())).thenReturn(money("40.00"));
+
+        assertThatThrownBy(() -> receiptService.issue(patient.getId(), payment.getId(), UUID.randomUUID()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Payment is fully refunded");
+
+        verify(receiptRepository, never()).nextReceiptNumber();
+        verify(receiptRepository, never()).saveAndFlush(any());
     }
 
     @Test

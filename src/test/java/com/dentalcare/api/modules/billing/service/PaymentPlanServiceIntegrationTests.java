@@ -64,7 +64,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Import({PaymentPlanServiceImpl.class, PaymentPlanMapper.class, BillingServiceImpl.class, BillingMapper.class,
-        CashShiftServiceImpl.class, CashShiftMapper.class, PaymentPlanServiceIntegrationTests.ClockConfiguration.class})
+        CashShiftServiceImpl.class, CashShiftMapper.class,
+        com.dentalcare.api.modules.billing.ledger.ChargeLedger.class,
+        PaymentPlanServiceIntegrationTests.ClockConfiguration.class})
 class PaymentPlanServiceIntegrationTests {
 
     private static final Instant NOW = Instant.parse("2026-10-04T15:00:00Z");

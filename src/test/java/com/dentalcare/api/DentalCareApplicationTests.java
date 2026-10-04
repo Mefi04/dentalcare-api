@@ -132,6 +132,12 @@ class DentalCareApplicationTests {
     @MockitoBean
     com.dentalcare.api.modules.billing.repository.PaymentPlanRepository paymentPlanRepository;
 
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.ChargeAdjustmentRepository chargeAdjustmentRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.RefundRepository refundRepository;
+
     @Test
     void contextLoads() {
     }

@@ -9,14 +9,19 @@ import com.dentalcare.api.modules.billing.dto.response.InstallmentResponse;
 import com.dentalcare.api.modules.billing.dto.response.InstallmentStatus;
 import com.dentalcare.api.modules.billing.dto.response.PaymentPlanResponse;
 import com.dentalcare.api.modules.billing.dto.response.PaymentPlanViewStatus;
+import com.dentalcare.api.modules.billing.ledger.ChargeLedger;
+import com.dentalcare.api.modules.billing.ledger.ChargePosition;
 import com.dentalcare.api.modules.billing.mapper.PaymentPlanMapper;
 import com.dentalcare.api.modules.billing.model.Charge;
+import com.dentalcare.api.modules.billing.model.ChargeAdjustmentType;
 import com.dentalcare.api.modules.billing.model.Installment;
 import com.dentalcare.api.modules.billing.model.PaymentPlan;
 import com.dentalcare.api.modules.billing.model.PaymentPlanStatus;
+import com.dentalcare.api.modules.billing.repository.ChargeAdjustmentRepository;
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentPlanRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
+import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -45,17 +50,25 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
 
     private final ChargeRepository chargeRepository;
     private final PaymentRepository paymentRepository;
+    private final ChargeAdjustmentRepository chargeAdjustmentRepository;
+    private final RefundRepository refundRepository;
     private final PaymentPlanRepository paymentPlanRepository;
     private final PaymentPlanMapper paymentPlanMapper;
+    private final ChargeLedger chargeLedger;
     private final Clock clock;
 
     public PaymentPlanServiceImpl(ChargeRepository chargeRepository, PaymentRepository paymentRepository,
+                                  ChargeAdjustmentRepository chargeAdjustmentRepository,
+                                  RefundRepository refundRepository,
                                   PaymentPlanRepository paymentPlanRepository, PaymentPlanMapper paymentPlanMapper,
-                                  Clock clock) {
+                                  ChargeLedger chargeLedger, Clock clock) {
         this.chargeRepository = chargeRepository;
         this.paymentRepository = paymentRepository;
+        this.chargeAdjustmentRepository = chargeAdjustmentRepository;
+        this.refundRepository = refundRepository;
         this.paymentPlanRepository = paymentPlanRepository;
         this.paymentPlanMapper = paymentPlanMapper;
+        this.chargeLedger = chargeLedger;
         this.clock = clock;
     }
 
@@ -78,8 +91,17 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             throw new ConflictException("An active payment plan already exists for this charge");
         }
 
-        BigDecimal baselinePaid = scale(paymentRepository.sumAmountByChargeId(charge.getId()));
-        BigDecimal totalAmount = scale(charge.getAmount()).subtract(baselinePaid);
+        ChargePosition position = chargeLedger.position(
+                charge.getAmount(),
+                paymentRepository.sumAmountByChargeId(charge.getId()),
+                chargeAdjustmentRepository.sumDiscountByChargeId(charge.getId()),
+                refundRepository.sumAmountByChargeId(charge.getId()),
+                chargeAdjustmentRepository.existsByChargeIdAndType(charge.getId(), ChargeAdjustmentType.VOID));
+        if (position.voided()) {
+            throw new ConflictException("Charge is voided");
+        }
+        BigDecimal baselinePaid = position.netPaid();
+        BigDecimal totalAmount = position.pending();
         if (totalAmount.signum() <= 0) {
             throw new ConflictException("Charge has no pending balance");
         }
@@ -155,7 +177,9 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
     }
 
     private PaymentPlanResponse toResponse(PaymentPlan plan) {
-        BigDecimal paidOnCharge = scale(paymentRepository.sumAmountByChargeId(plan.getChargeId()));
+        BigDecimal paidOnCharge = chargeLedger.netPaid(
+                paymentRepository.sumAmountByChargeId(plan.getChargeId()),
+                refundRepository.sumAmountByChargeId(plan.getChargeId()));
         BigDecimal paidSincePlan = paidOnCharge.subtract(scale(plan.getBaselinePaid()));
         if (paidSincePlan.signum() < 0) {
             paidSincePlan = ZERO;

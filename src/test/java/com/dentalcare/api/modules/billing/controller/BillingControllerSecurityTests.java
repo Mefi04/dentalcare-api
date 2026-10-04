@@ -266,7 +266,8 @@ class BillingControllerSecurityTests {
 
     private ChargeResponse charge() {
         return new ChargeResponse(UUID.randomUUID(), "Consulta", new BigDecimal("150.00"),
-                new BigDecimal("0.00"), new BigDecimal("150.00"), ChargeStatus.PENDING, NOW);
+                new BigDecimal("0.00"), new BigDecimal("150.00"), ChargeStatus.PENDING, NOW,
+                new BigDecimal("0.00"), new BigDecimal("0.00"));
     }
 
     private AccountStatementResponse statement(UUID patientId) {

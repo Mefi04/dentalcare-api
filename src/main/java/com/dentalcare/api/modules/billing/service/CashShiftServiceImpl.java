@@ -15,6 +15,7 @@ import com.dentalcare.api.modules.billing.model.CashShiftStatus;
 import com.dentalcare.api.modules.billing.repository.CashMovementRepository;
 import com.dentalcare.api.modules.billing.repository.CashShiftRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
+import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -43,17 +44,20 @@ public class CashShiftServiceImpl implements CashShiftService {
     private final CashShiftRepository cashShiftRepository;
     private final CashMovementRepository cashMovementRepository;
     private final PaymentRepository paymentRepository;
+    private final RefundRepository refundRepository;
     private final CashShiftMapper cashShiftMapper;
     private final Clock clock;
 
     public CashShiftServiceImpl(CashShiftRepository cashShiftRepository,
                                 CashMovementRepository cashMovementRepository,
                                 PaymentRepository paymentRepository,
+                                RefundRepository refundRepository,
                                 CashShiftMapper cashShiftMapper,
                                 Clock clock) {
         this.cashShiftRepository = cashShiftRepository;
         this.cashMovementRepository = cashMovementRepository;
         this.paymentRepository = paymentRepository;
+        this.refundRepository = refundRepository;
         this.cashShiftMapper = cashShiftMapper;
         this.clock = clock;
     }
@@ -193,7 +197,8 @@ public class CashShiftServiceImpl implements CashShiftService {
         BigDecimal cash = scale(paymentRepository.sumCashAmountByCashShiftId(shift.getId()));
         BigDecimal income = scale(cashMovementRepository.sumIncomeByCashShiftId(shift.getId()));
         BigDecimal expense = scale(cashMovementRepository.sumExpenseByCashShiftId(shift.getId()));
-        return shift.getOpeningAmount().add(cash).add(income).subtract(expense);
+        BigDecimal refunds = scale(refundRepository.sumAmountByCashShiftId(shift.getId()));
+        return shift.getOpeningAmount().add(cash).add(income).subtract(expense).subtract(refunds);
     }
 
     private Pageable clamp(Pageable pageable, Sort defaultSort) {

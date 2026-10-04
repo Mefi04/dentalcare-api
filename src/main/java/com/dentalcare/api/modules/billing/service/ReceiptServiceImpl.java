@@ -11,11 +11,13 @@ import com.dentalcare.api.modules.billing.model.PaymentKind;
 import com.dentalcare.api.modules.billing.model.Receipt;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.billing.repository.ReceiptRepository;
+import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.util.UUID;
 
@@ -27,13 +29,15 @@ public class ReceiptServiceImpl implements ReceiptService {
 
     private final PaymentRepository paymentRepository;
     private final ReceiptRepository receiptRepository;
+    private final RefundRepository refundRepository;
     private final ReceiptMapper receiptMapper;
     private final Clock clock;
 
     public ReceiptServiceImpl(PaymentRepository paymentRepository, ReceiptRepository receiptRepository,
-                              ReceiptMapper receiptMapper, Clock clock) {
+                              RefundRepository refundRepository, ReceiptMapper receiptMapper, Clock clock) {
         this.paymentRepository = paymentRepository;
         this.receiptRepository = receiptRepository;
+        this.refundRepository = refundRepository;
         this.receiptMapper = receiptMapper;
         this.clock = clock;
     }
@@ -42,7 +46,7 @@ public class ReceiptServiceImpl implements ReceiptService {
     @Transactional
     public ReceiptResponse issue(UUID patientId, UUID paymentId, UUID actorUserId) {
         requireActor(actorUserId);
-        Payment payment = requirePayment(patientId, paymentId);
+        Payment payment = requirePaymentForIssue(patientId, paymentId);
         if (receiptRepository.existsByPaymentId(payment.getId())) {
             throw new ConflictException("A receipt has already been issued for this payment");
         }
@@ -75,11 +79,26 @@ public class ReceiptServiceImpl implements ReceiptService {
         return receiptMapper.toResponse(receipt);
     }
 
+    private Payment requirePaymentForIssue(UUID patientId, UUID paymentId) {
+        Payment payment = requirePayment(patientId, paymentId, true);
+        BigDecimal refunded = refundRepository.sumAmountByPaymentId(payment.getId());
+        if (refunded != null && refunded.compareTo(payment.getAmount()) >= 0) {
+            throw new ConflictException("Payment is fully refunded");
+        }
+        return payment;
+    }
+
     private Payment requirePayment(UUID patientId, UUID paymentId) {
+        return requirePayment(patientId, paymentId, false);
+    }
+
+    private Payment requirePayment(UUID patientId, UUID paymentId, boolean lock) {
         if (patientId == null || paymentId == null) {
             throw new BadRequestException("Patient id and payment id are required");
         }
-        return paymentRepository.findByIdAndPatientId(paymentId, patientId)
+        return (lock
+                ? paymentRepository.findByIdAndPatientIdForUpdate(paymentId, patientId)
+                : paymentRepository.findByIdAndPatientId(paymentId, patientId))
                 .orElseThrow(() -> new ResourceNotFoundException("Payment not found"));
     }
 

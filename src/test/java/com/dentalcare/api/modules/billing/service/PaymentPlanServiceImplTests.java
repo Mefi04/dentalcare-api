@@ -8,14 +8,18 @@ import com.dentalcare.api.modules.billing.dto.request.CreatePaymentPlanRequest;
 import com.dentalcare.api.modules.billing.dto.response.InstallmentStatus;
 import com.dentalcare.api.modules.billing.dto.response.PaymentPlanResponse;
 import com.dentalcare.api.modules.billing.dto.response.PaymentPlanViewStatus;
+import com.dentalcare.api.modules.billing.ledger.ChargeLedger;
 import com.dentalcare.api.modules.billing.mapper.PaymentPlanMapper;
 import com.dentalcare.api.modules.billing.model.Charge;
+import com.dentalcare.api.modules.billing.model.ChargeAdjustmentType;
 import com.dentalcare.api.modules.billing.model.Installment;
 import com.dentalcare.api.modules.billing.model.PaymentPlan;
 import com.dentalcare.api.modules.billing.model.PaymentPlanStatus;
+import com.dentalcare.api.modules.billing.repository.ChargeAdjustmentRepository;
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentPlanRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
+import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import org.hibernate.exception.ConstraintViolationException;
@@ -39,6 +43,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,14 +64,24 @@ class PaymentPlanServiceImplTests {
     private PaymentRepository paymentRepository;
 
     @Mock
+    private ChargeAdjustmentRepository chargeAdjustmentRepository;
+
+    @Mock
+    private RefundRepository refundRepository;
+
+    @Mock
     private PaymentPlanRepository paymentPlanRepository;
 
     private PaymentPlanService paymentPlanService;
 
     @BeforeEach
     void setUp() {
+        lenient().when(chargeAdjustmentRepository.sumDiscountByChargeId(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(refundRepository.sumAmountByChargeId(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(chargeAdjustmentRepository.existsByChargeIdAndType(any(), any())).thenReturn(false);
         paymentPlanService = new PaymentPlanServiceImpl(
-                chargeRepository, paymentRepository, paymentPlanRepository, new PaymentPlanMapper(), CLOCK);
+                chargeRepository, paymentRepository, chargeAdjustmentRepository, refundRepository,
+                paymentPlanRepository, new PaymentPlanMapper(), new ChargeLedger(), CLOCK);
     }
 
     @Test
@@ -341,6 +356,41 @@ class PaymentPlanServiceImplTests {
     }
 
     @Test
+    void createUsesNetPaidAndNetPending() {
+        Patient patient = patient();
+        Charge charge = charge(patient, "100.00");
+        stubCharge(patient, charge, "40.00");
+        when(chargeAdjustmentRepository.sumDiscountByChargeId(charge.getId())).thenReturn(new BigDecimal("15.00"));
+        when(refundRepository.sumAmountByChargeId(charge.getId())).thenReturn(new BigDecimal("10.00"));
+        when(paymentPlanRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentPlanResponse response = paymentPlanService.create(
+                patient.getId(), charge.getId(), UUID.randomUUID(), new CreatePaymentPlanRequest(2, TODAY));
+
+        ArgumentCaptor<PaymentPlan> saved = ArgumentCaptor.forClass(PaymentPlan.class);
+        verify(paymentPlanRepository).saveAndFlush(saved.capture());
+        assertThat(saved.getValue().getBaselinePaid()).isEqualByComparingTo("30.00");
+        assertThat(saved.getValue().getTotalAmount()).isEqualByComparingTo("55.00");
+        assertThat(response.totalAmount()).isEqualByComparingTo("55.00");
+    }
+
+    @Test
+    void createOnVoidedChargeIsConflict() {
+        Patient patient = patient();
+        Charge charge = charge(patient, "100.00");
+        stubCharge(patient, charge, "0.00");
+        when(chargeAdjustmentRepository.existsByChargeIdAndType(charge.getId(), ChargeAdjustmentType.VOID))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> paymentPlanService.create(
+                patient.getId(), charge.getId(), UUID.randomUUID(), new CreatePaymentPlanRequest(2, TODAY)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Charge is voided");
+
+        verify(paymentPlanRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
     void planOfAnotherPatientIsNotFound() {
         UUID patientId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
@@ -353,8 +403,9 @@ class PaymentPlanServiceImplTests {
     }
 
     private PaymentPlanService serviceAt(Instant instant) {
-        return new PaymentPlanServiceImpl(chargeRepository, paymentRepository, paymentPlanRepository,
-                new PaymentPlanMapper(), Clock.fixed(instant, ZoneOffset.UTC));
+        return new PaymentPlanServiceImpl(chargeRepository, paymentRepository, chargeAdjustmentRepository,
+                refundRepository, paymentPlanRepository, new PaymentPlanMapper(), new ChargeLedger(),
+                Clock.fixed(instant, ZoneOffset.UTC));
     }
 
     private void stubCharge(Patient patient, Charge charge, String paid) {

@@ -85,6 +85,12 @@ public class Receipt {
     public Instant getVoidedAt() { return voidedAt; }
     public String getVoidReason() { return voidReason; }
 
+    public void voidReceipt(Instant voidedAt, String reason) {
+        this.status = ReceiptStatus.VOID;
+        this.voidedAt = voidedAt;
+        this.voidReason = reason;
+    }
+
     @Override
     public boolean equals(Object other) {
         return this == other || (other instanceof Receipt receipt && Objects.equals(id, receipt.id));

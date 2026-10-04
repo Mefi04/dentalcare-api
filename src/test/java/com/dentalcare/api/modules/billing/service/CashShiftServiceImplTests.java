@@ -15,6 +15,7 @@ import com.dentalcare.api.modules.billing.model.CashShiftStatus;
 import com.dentalcare.api.modules.billing.repository.CashMovementRepository;
 import com.dentalcare.api.modules.billing.repository.CashShiftRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
+import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +58,9 @@ class CashShiftServiceImplTests {
     @Mock
     private PaymentRepository paymentRepository;
 
+    @Mock
+    private RefundRepository refundRepository;
+
     private final UUID actorId = UUID.randomUUID();
 
     private CashShiftServiceImpl service;
@@ -64,10 +68,11 @@ class CashShiftServiceImplTests {
     @BeforeEach
     void setUp() {
         service = new CashShiftServiceImpl(cashShiftRepository, cashMovementRepository, paymentRepository,
-                new CashShiftMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
+                refundRepository, new CashShiftMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
         lenient().when(cashShiftRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(cashMovementRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(paymentRepository.sumCashAmountByCashShiftId(any())).thenReturn(new BigDecimal("0.00"));
+        lenient().when(refundRepository.sumAmountByCashShiftId(any())).thenReturn(new BigDecimal("0.00"));
         lenient().when(cashMovementRepository.sumIncomeByCashShiftId(any())).thenReturn(new BigDecimal("0.00"));
         lenient().when(cashMovementRepository.sumExpenseByCashShiftId(any())).thenReturn(new BigDecimal("0.00"));
     }
@@ -185,6 +190,22 @@ class CashShiftServiceImplTests {
         assertThat(response.closedAt()).isEqualTo(NOW);
         assertThat(response.closingNotes()).isEqualTo("cuadre");
         assertThat(shift.getExpectedAmount()).isEqualByComparingTo("150.00");
+    }
+
+    @Test
+    void cashRefundReducesExpectedAmount() {
+        CashShift shift = openShift(actorId, "100.00");
+        when(cashShiftRepository.findByIdAndUserIdForUpdate(shift.getId(), actorId)).thenReturn(Optional.of(shift));
+        when(paymentRepository.sumCashAmountByCashShiftId(shift.getId())).thenReturn(new BigDecimal("40.00"));
+        when(cashMovementRepository.sumIncomeByCashShiftId(shift.getId())).thenReturn(new BigDecimal("15.00"));
+        when(cashMovementRepository.sumExpenseByCashShiftId(shift.getId())).thenReturn(new BigDecimal("5.00"));
+        when(refundRepository.sumAmountByCashShiftId(shift.getId())).thenReturn(new BigDecimal("10.00"));
+
+        CashShiftResponse response = service.close(actorId, shift.getId(),
+                new CloseCashShiftRequest(new BigDecimal("140.00"), "con devolucion"));
+
+        assertThat(response.expectedAmount()).isEqualByComparingTo("140.00");
+        assertThat(shift.getExpectedAmount()).isEqualByComparingTo("140.00");
     }
 
     @Test

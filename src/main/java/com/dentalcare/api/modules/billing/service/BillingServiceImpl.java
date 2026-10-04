@@ -10,14 +10,21 @@ import com.dentalcare.api.modules.billing.dto.response.AccountSummaryResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeStatus;
 import com.dentalcare.api.modules.billing.dto.response.PaymentResponse;
+import com.dentalcare.api.modules.billing.ledger.ChargeLedger;
+import com.dentalcare.api.modules.billing.ledger.ChargePosition;
 import com.dentalcare.api.modules.billing.mapper.BillingMapper;
 import com.dentalcare.api.modules.billing.model.CashShift;
 import com.dentalcare.api.modules.billing.model.Charge;
+import com.dentalcare.api.modules.billing.model.ChargeAdjustment;
+import com.dentalcare.api.modules.billing.model.ChargeAdjustmentType;
 import com.dentalcare.api.modules.billing.model.Payment;
 import com.dentalcare.api.modules.billing.model.PaymentKind;
 import com.dentalcare.api.modules.billing.model.PaymentMethod;
+import com.dentalcare.api.modules.billing.model.Refund;
+import com.dentalcare.api.modules.billing.repository.ChargeAdjustmentRepository;
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
+import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import org.springframework.stereotype.Service;
@@ -26,9 +33,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -41,21 +51,30 @@ public class BillingServiceImpl implements BillingService {
 
     private final ChargeRepository chargeRepository;
     private final PaymentRepository paymentRepository;
+    private final ChargeAdjustmentRepository chargeAdjustmentRepository;
+    private final RefundRepository refundRepository;
     private final PatientRepository patientRepository;
     private final BillingMapper billingMapper;
+    private final ChargeLedger chargeLedger;
     private final CashShiftService cashShiftService;
     private final Clock clock;
 
     public BillingServiceImpl(ChargeRepository chargeRepository,
                               PaymentRepository paymentRepository,
+                              ChargeAdjustmentRepository chargeAdjustmentRepository,
+                              RefundRepository refundRepository,
                               PatientRepository patientRepository,
                               BillingMapper billingMapper,
+                              ChargeLedger chargeLedger,
                               CashShiftService cashShiftService,
                               Clock clock) {
         this.chargeRepository = chargeRepository;
         this.paymentRepository = paymentRepository;
+        this.chargeAdjustmentRepository = chargeAdjustmentRepository;
+        this.refundRepository = refundRepository;
         this.patientRepository = patientRepository;
         this.billingMapper = billingMapper;
+        this.chargeLedger = chargeLedger;
         this.cashShiftService = cashShiftService;
         this.clock = clock;
     }
@@ -96,7 +115,7 @@ public class BillingServiceImpl implements BillingService {
 
         Charge charge = chargeRepository.saveAndFlush(
                 new Charge(UUID.randomUUID(), patient, concept, amount, clock.instant()));
-        return toChargeResponse(charge, ZERO);
+        return toChargeResponse(charge, chargeLedger.position(charge.getAmount(), ZERO, ZERO, ZERO, false));
     }
 
     @Override
@@ -130,14 +149,17 @@ public class BillingServiceImpl implements BillingService {
             // Locking the charge serializes concurrent payments, so their sum can never exceed its amount.
             charge = chargeRepository.findByIdAndPatientIdForUpdate(request.chargeId(), patientId)
                     .orElseThrow(() -> new ResourceNotFoundException("Charge not found"));
-            BigDecimal pending = charge.getAmount().subtract(paymentRepository.sumAmountByChargeId(charge.getId()));
-            if (pending.signum() <= 0) {
+            ChargePosition position = positionOf(charge);
+            if (position.voided()) {
+                throw new ConflictException("Charge is voided");
+            }
+            if (position.pending().signum() <= 0) {
                 throw new ConflictException("Charge is already paid");
             }
-            if (amount.compareTo(pending) > 0) {
+            if (amount.compareTo(position.pending()) > 0) {
                 throw new ConflictException("Payment amount exceeds the pending balance of the charge");
             }
-            kind = amount.compareTo(pending) == 0 ? PaymentKind.PAYMENT : PaymentKind.PARTIAL_PAYMENT;
+            kind = amount.compareTo(position.pending()) == 0 ? PaymentKind.PAYMENT : PaymentKind.PARTIAL_PAYMENT;
         }
 
         Payment payment = paymentRepository.saveAndFlush(new Payment(
@@ -149,41 +171,83 @@ public class BillingServiceImpl implements BillingService {
     private AccountStatementResponse buildStatement(UUID patientId) {
         List<Charge> charges = chargeRepository.findByPatient_IdOrderByCreatedAtAscIdAsc(patientId);
         List<Payment> payments = paymentRepository.findByPatient_IdOrderByCreatedAtAscIdAsc(patientId);
+        List<ChargeAdjustment> adjustments = chargeAdjustmentRepository.findByPatientIdOrderByCreatedAtAscIdAsc(patientId);
+        List<Refund> refunds = refundRepository.findByPatientIdOrderByCreatedAtAscIdAsc(patientId);
 
-        Map<UUID, BigDecimal> paidByCharge = new HashMap<>();
-        BigDecimal paid = ZERO;
-        BigDecimal advances = ZERO;
+        Map<UUID, Payment> paymentsById = new HashMap<>();
+        Map<UUID, BigDecimal> grossByCharge = new HashMap<>();
+        BigDecimal advanceGross = ZERO;
         for (Payment payment : payments) {
+            paymentsById.put(payment.getId(), payment);
             if (payment.getKind() == PaymentKind.ADVANCE) {
-                advances = advances.add(payment.getAmount());
+                advanceGross = advanceGross.add(payment.getAmount());
             } else {
-                paid = paid.add(payment.getAmount());
-                paidByCharge.merge(payment.getCharge().getId(), payment.getAmount(), BigDecimal::add);
+                grossByCharge.merge(payment.getCharge().getId(), payment.getAmount(), BigDecimal::add);
             }
         }
-        BigDecimal charged = charges.stream().map(Charge::getAmount).reduce(ZERO, BigDecimal::add);
-        AccountSummaryResponse summary = new AccountSummaryResponse(
-                charged, paid, advances, charged.subtract(paid).subtract(advances));
 
+        Map<UUID, BigDecimal> discountByCharge = new HashMap<>();
+        Set<UUID> voidedCharges = new HashSet<>();
+        for (ChargeAdjustment adjustment : adjustments) {
+            if (adjustment.getType() == ChargeAdjustmentType.VOID) {
+                voidedCharges.add(adjustment.getChargeId());
+            } else if (adjustment.getAmount() != null) {
+                discountByCharge.merge(adjustment.getChargeId(), adjustment.getAmount(), BigDecimal::add);
+            }
+        }
+
+        Map<UUID, BigDecimal> refundedByCharge = new HashMap<>();
+        BigDecimal advanceRefunded = ZERO;
+        for (Refund refund : refunds) {
+            Payment payment = paymentsById.get(refund.getPaymentId());
+            if (payment == null || payment.getKind() == PaymentKind.ADVANCE || payment.getCharge() == null) {
+                advanceRefunded = advanceRefunded.add(refund.getAmount());
+            } else {
+                refundedByCharge.merge(payment.getCharge().getId(), refund.getAmount(), BigDecimal::add);
+            }
+        }
+
+        BigDecimal charged = ZERO;
+        BigDecimal paid = ZERO;
+        List<ChargeResponse> chargeResponses = new ArrayList<>();
+        for (Charge charge : charges) {
+            ChargePosition position = chargeLedger.position(
+                    charge.getAmount(),
+                    grossByCharge.getOrDefault(charge.getId(), ZERO),
+                    discountByCharge.getOrDefault(charge.getId(), ZERO),
+                    refundedByCharge.getOrDefault(charge.getId(), ZERO),
+                    voidedCharges.contains(charge.getId()));
+            if (!position.voided()) {
+                charged = charged.add(charge.getAmount().subtract(position.discount()));
+            }
+            paid = paid.add(position.netPaid());
+            chargeResponses.add(toChargeResponse(charge, position));
+        }
+        BigDecimal advances = advanceGross.subtract(advanceRefunded);
         return new AccountStatementResponse(
                 patientId,
-                summary,
-                charges.stream()
-                        .map(charge -> toChargeResponse(charge, paidByCharge.getOrDefault(charge.getId(), ZERO)))
-                        .toList(),
+                new AccountSummaryResponse(charged, paid, advances, charged.subtract(paid).subtract(advances)),
+                chargeResponses,
                 payments.stream().map(billingMapper::toPaymentResponse).toList());
     }
 
-    private ChargeResponse toChargeResponse(Charge charge, BigDecimal paid) {
-        BigDecimal pending = charge.getAmount().subtract(paid);
-        return billingMapper.toChargeResponse(charge, paid, pending, statusOf(paid, pending));
+    private ChargePosition positionOf(Charge charge) {
+        return chargeLedger.position(
+                charge.getAmount(),
+                paymentRepository.sumAmountByChargeId(charge.getId()),
+                chargeAdjustmentRepository.sumDiscountByChargeId(charge.getId()),
+                refundRepository.sumAmountByChargeId(charge.getId()),
+                chargeAdjustmentRepository.existsByChargeIdAndType(charge.getId(), ChargeAdjustmentType.VOID));
     }
 
-    private ChargeStatus statusOf(BigDecimal paid, BigDecimal pending) {
-        if (pending.signum() <= 0) {
-            return ChargeStatus.PAID;
-        }
-        return paid.signum() > 0 ? ChargeStatus.PARTIALLY_PAID : ChargeStatus.PENDING;
+    private ChargeResponse toChargeResponse(Charge charge, ChargePosition position) {
+        return billingMapper.toChargeResponse(
+                charge, position.netPaid(), position.pending(), statusOf(position),
+                position.discount(), position.refunded());
+    }
+
+    private ChargeStatus statusOf(ChargePosition position) {
+        return position.status();
     }
 
     private String normalizeConcept(String value) {

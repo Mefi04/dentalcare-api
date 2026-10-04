@@ -11,5 +11,7 @@ public record ChargeResponse(
         BigDecimal paid,
         BigDecimal pending,
         ChargeStatus status,
-        Instant createdAt) {
+        Instant createdAt,
+        BigDecimal discount,
+        BigDecimal refunded) {
 }
