@@ -123,6 +123,12 @@ Responsible for:
 The procedure catalog is independent from inventory articles, treatment-plan snapshots, budget snapshots,
 and executed treatment procedures. Staff users and roles remain owned by the `users` module.
 
+## publicinfo
+
+Provides the read-only public facade for the clinic web site. It consumes the singleton clinic configuration
+and active procedure catalog from `settings`; it owns no persistence, clinic data, or procedure data.
+Its response DTOs deliberately expose only visitor-safe fields.
+
 ## Module rules
 
 Business logic must remain within the appropriate module.
