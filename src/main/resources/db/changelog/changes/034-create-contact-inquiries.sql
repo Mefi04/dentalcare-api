@@ -16,7 +16,7 @@ CREATE TABLE contact_inquiries (
     CONSTRAINT chk_contact_inquiries_name CHECK (BTRIM(name) <> ''),
     CONSTRAINT chk_contact_inquiries_email CHECK (BTRIM(email) <> ''),
     CONSTRAINT chk_contact_inquiries_message CHECK (BTRIM(message) <> ''),
-    CONSTRAINT chk_contact_inquiries_reason CHECK (reason IN ('GENERAL', 'SERVICES', 'PRICING', 'OTHER')),
+    CONSTRAINT chk_contact_inquiries_reason CHECK (reason IN ('GENERAL', 'SERVICES', 'PROFESSIONALS', 'LOCATIONS', 'APPOINTMENT_HELP', 'ACCOUNT_ACTIVATION', 'OTHER')),
     CONSTRAINT chk_contact_inquiries_status CHECK (status IN ('NEW', 'IN_REVIEW', 'RESOLVED')),
     CONSTRAINT chk_contact_inquiries_privacy CHECK (privacy_accepted = TRUE),
     CONSTRAINT chk_contact_inquiries_timestamps CHECK (updated_at >= created_at),
