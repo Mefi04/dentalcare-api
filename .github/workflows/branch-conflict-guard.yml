@@ -1,0 +1,199 @@
+name: Branch Conflict Guard
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - edited
+
+concurrency:
+  group: branch-conflict-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze branch integration
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Analyze mergeability and branch drift
+        id: branch_check
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+
+          MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          AHEAD=$(git rev-list --count "${BASE_SHA}..${HEAD_SHA}")
+          BEHIND=$(git rev-list --count "${HEAD_SHA}..${BASE_SHA}")
+
+          git diff --name-only "${MERGE_BASE}..${BASE_SHA}" | sort -u > base-changed.txt
+          git diff --name-only "${MERGE_BASE}..${HEAD_SHA}" | sort -u > head-changed.txt
+          comm -12 base-changed.txt head-changed.txt > overlapping-files.txt || true
+          OVERLAP_COUNT=$(wc -l < overlapping-files.txt | tr -d ' ')
+
+          set +e
+          git checkout --detach "$BASE_SHA" >/dev/null 2>&1
+          git -c user.name='DentalCare Branch Guard' -c user.email='actions@github.com' merge --no-commit --no-ff "$HEAD_SHA" > merge-attempt.log 2>&1
+          MERGE_EXIT=$?
+          set -e
+
+          CONFLICT=false
+          : > conflict-files.txt
+          if [ "$MERGE_EXIT" -ne 0 ]; then
+            CONFLICT=true
+            git diff --name-only --diff-filter=U | sort -u > conflict-files.txt || true
+          fi
+          git merge --abort >/dev/null 2>&1 || true
+
+          HIGH_RISK=false
+          if [ "$CONFLICT" = 'false' ] && [ "$BEHIND" -gt 0 ] && [ "$OVERLAP_COUNT" -gt 0 ]; then
+            HIGH_RISK=true
+          fi
+
+          if [ "$CONFLICT" = 'true' ]; then
+            STATUS='❌ Conflicto real de merge'
+            RECOMMENDATION="La rama debe actualizarse con ${BASE_REF} y resolver los conflictos antes del merge."
+          elif [ "$HIGH_RISK" = 'true' ]; then
+            STATUS='⚠️ Riesgo alto de conflicto lógico'
+            RECOMMENDATION="La rama está atrasada y toca archivos que también cambiaron en ${BASE_REF}. Actualízala y vuelve a ejecutar CI antes del merge."
+          elif [ "$BEHIND" -gt 0 ]; then
+            STATUS='⚠️ Rama desactualizada, sin solapamiento detectado'
+            RECOMMENDATION="Conviene actualizar la rama con ${BASE_REF}, aunque no se detectaron archivos modificados por ambos lados."
+          else
+            STATUS='✅ Sin conflicto de integración detectado'
+            RECOMMENDATION='La rama está alineada con la base para esta comprobación.'
+          fi
+
+          {
+            echo '<!-- dentalcare-branch-conflict-guard -->'
+            echo '## 🔀 DentalCare Branch Conflict Guard'
+            echo
+            echo "**PR #${PR_NUMBER}:** \`${HEAD_REF}\` → \`${BASE_REF}\`"
+            echo
+            echo "**Estado:** ${STATUS}"
+            echo
+            echo '### Sincronización de ramas'
+            echo
+            echo "- Commits de la rama por delante de \`${BASE_REF}\`: **${AHEAD}**"
+            echo "- Commits de la rama por detrás de \`${BASE_REF}\`: **${BEHIND}**"
+            echo "- Archivos modificados por ambos lados desde el merge-base: **${OVERLAP_COUNT}**"
+            echo
+            if [ -s conflict-files.txt ]; then
+              echo '### ❌ Archivos con conflicto real'
+              echo
+              sed -n '1,30p' conflict-files.txt | sed 's/^/- `/' | sed 's/$/`/'
+              echo
+            fi
+            if [ -s overlapping-files.txt ]; then
+              echo '### ⚠️ Archivos solapados entre la rama y la base'
+              echo
+              sed -n '1,30p' overlapping-files.txt | sed 's/^/- `/' | sed 's/$/`/'
+              [ "$OVERLAP_COUNT" -gt 30 ] && echo "- … y $((OVERLAP_COUNT - 30)) archivo(s) más." || true
+              echo
+            fi
+            echo '### Recomendación'
+            echo
+            echo "${RECOMMENDATION}"
+            echo
+            echo '> `mergeable` de GitHub solo confirma si Git puede construir un merge. Este check también detecta ramas atrasadas y solapamiento de archivos para reducir conflictos lógicos.'
+          } > branch-conflict-report.md
+
+          {
+            echo "conflict=${CONFLICT}"
+            echo "high_risk=${HIGH_RISK}"
+            echo "ahead=${AHEAD}"
+            echo "behind=${BEHIND}"
+            echo "overlap_count=${OVERLAP_COUNT}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Add report to job summary
+        if: always()
+        shell: bash
+        run: test ! -f branch-conflict-report.md || cat branch-conflict-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload branch report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-conflict-report-${{ github.event.pull_request.number }}
+          path: branch-conflict-report.md
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce branch integration safety
+        shell: bash
+        env:
+          CONFLICT: ${{ steps.branch_check.outputs.conflict }}
+          HIGH_RISK: ${{ steps.branch_check.outputs.high_risk }}
+        run: |
+          set -euo pipefail
+          if [ "${CONFLICT:-false}" = 'true' ]; then
+            echo 'A real Git merge conflict was detected.'
+            exit 1
+          fi
+          if [ "${HIGH_RISK:-false}" = 'true' ]; then
+            echo 'The branch is behind the base and both sides modified the same files.'
+            exit 1
+          fi
+          echo 'Branch integration check passed.'
+
+  comment:
+    name: Publish branch status
+    needs: analyze
+    if: ${{ always() && github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Download branch report
+        uses: actions/download-artifact@v4
+        with:
+          name: branch-conflict-report-${{ github.event.pull_request.number }}
+
+      - name: Publish or update branch status comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          test -s branch-conflict-report.md
+          MARKER='<!-- dentalcare-branch-conflict-guard -->'
+          COMMENT_ID=$(gh api "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" | head -n 1 || true)
+          if [ -n "${COMMENT_ID}" ]; then
+            gh api --method PATCH "repos/${REPOSITORY}/issues/comments/${COMMENT_ID}" -f body="$(cat branch-conflict-report.md)" >/dev/null
+          else
+            gh api --method POST "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$(cat branch-conflict-report.md)" >/dev/null
+          fi
