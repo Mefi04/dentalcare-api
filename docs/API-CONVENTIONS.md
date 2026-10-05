@@ -286,6 +286,10 @@ remains in history and permits generation of the next version. Approval never cr
 | `GET` | `/api/v1/treatment-budgets/{budgetId}` | `TREATMENT_BUDGET_READ` | `200 OK` | Returns one snapshot and its ordered items. |
 | `PATCH` | `/api/v1/treatment-budgets/{budgetId}/approve` | `TREATMENT_BUDGET_DECIDE` | `200 OK` | Performs `PENDING -> APPROVED`. |
 | `PATCH` | `/api/v1/treatment-budgets/{budgetId}/reject` | `TREATMENT_BUDGET_DECIDE` | `200 OK` | Performs `PENDING -> REJECTED`. |
+| `GET` | `/api/v1/patients/me/treatment-budgets` | `ROLE_PATIENT` | `200 OK` | Lists only clinic-approved budgets owned by the authenticated patient. |
+| `GET` | `/api/v1/patients/me/treatment-budgets/{budgetId}` | `ROLE_PATIENT` | `200 OK` | Returns an owned clinic-approved snapshot; missing, unpublished, and foreign IDs share a generic `404`. |
+| `PATCH` | `/api/v1/patients/me/treatment-budgets/{budgetId}/accept` | `ROLE_PATIENT` | `200 OK` | Persists the authenticated patient's one-time `ACCEPTED` decision. Repeated decisions return `409`. |
+| `PATCH` | `/api/v1/patients/me/treatment-budgets/{budgetId}/reject` | `ROLE_PATIENT` | `200 OK` | Persists the authenticated patient's one-time `REJECTED` decision. Repeated decisions return `409`. |
 | `POST` | `/api/v1/treatment-plans/{planId}/consents` | `TREATMENT_CONSENT_CREATE` | `201 Created` | Stores immutable `documentVersion` and `consentText` as pending. |
 | `GET` | `/api/v1/treatment-plans/{planId}/consents` | `TREATMENT_CONSENT_READ` | `200 OK` | Lists consent history, newest first. |
 | `GET` | `/api/v1/treatment-consents/{consentId}` | `TREATMENT_CONSENT_READ` | `200 OK` | Returns the exact versioned consent and audit actors. |

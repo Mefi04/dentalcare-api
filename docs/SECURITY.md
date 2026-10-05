@@ -461,6 +461,12 @@ dentist may approve/reject a budget or explicitly accept/revoke a consent. Every
 from the verified JWT. The patient is always derived from the referenced plan, preventing clients from
 substituting a foreign patient id. These administrative contracts expose no credential or internal JPA data.
 
+Patient budget self-service is isolated under `/api/v1/patients/me/treatment-budgets` and requires
+`ROLE_PATIENT`. Ownership is resolved from the verified JWT; no patient id is accepted from the client.
+Only clinic-approved budgets are visible. Foreign, unpublished, and unknown identifiers return the same
+generic `404`, and the portal DTO omits patient ids and internal clinic actors. Accept/reject is a separate,
+locked, one-time patient decision; it never grants the administrative `TREATMENT_BUDGET_DECIDE` authority.
+
 Administrative appointment endpoints are isolated under `/api/v1/appointments`. `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, and `ASSISTANT` may read the agenda and update appointment status. Creating and rescheduling appointments is limited to `ADMINISTRATOR` and `SECRETARY`. `PATIENT` and `CASHIER` cannot use the administrative contract. Patient-owned appointment operations remain under `/api/v1/patients/me/appointments` and continue to derive ownership exclusively from the JWT principal.
 
 ### Login flow
