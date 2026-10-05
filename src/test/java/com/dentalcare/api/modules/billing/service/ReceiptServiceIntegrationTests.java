@@ -15,6 +15,7 @@ import com.dentalcare.api.modules.billing.repository.ReceiptRepository;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.settings.service.ClinicSettingsService;
 import com.dentalcare.api.modules.users.model.User;
 import com.dentalcare.api.modules.users.model.UserStatus;
 import com.dentalcare.api.modules.users.repository.UserRepository;
@@ -29,6 +30,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -92,6 +94,9 @@ class ReceiptServiceIntegrationTests {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private ClinicSettingsService clinicSettingsService;
 
     private static final AtomicInteger sequence = new AtomicInteger();
 

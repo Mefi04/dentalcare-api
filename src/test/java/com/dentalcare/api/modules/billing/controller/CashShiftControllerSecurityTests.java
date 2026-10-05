@@ -75,10 +75,13 @@ class CashShiftControllerSecurityTests {
     }
 
     @Test
-    void endpointsRejectCallerWithoutCashManageAuthority() throws Exception {
+    void readAllAuthorityAllowsListingsButNotCashManagement() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID shiftId = UUID.randomUUID();
         authenticate("reader-token", userId, "BILLING_READ", "BILLING_CASH_READ_ALL");
+        when(cashShiftService.listShifts(eq(userId), eq(true), any())).thenReturn(new PageImpl<>(List.of()));
+        when(cashShiftService.listMovements(eq(userId), eq(true), eq(shiftId), any()))
+                .thenReturn(new PageImpl<>(List.of()));
 
         mockMvc.perform(get("/api/v1/billing/cash-shifts/current").header("Authorization", "Bearer reader-token"))
                 .andExpect(status().isForbidden());
@@ -86,7 +89,10 @@ class CashShiftControllerSecurityTests {
                         .contentType("application/json").content("{\"openingAmount\":10.00}"))
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/v1/billing/cash-shifts").header("Authorization", "Bearer reader-token"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/billing/cash-shifts/{shiftId}/movements", shiftId)
+                        .header("Authorization", "Bearer reader-token"))
+                .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/billing/cash-shifts/{shiftId}/movements", shiftId)
                         .header("Authorization", "Bearer reader-token")
                         .contentType("application/json")
@@ -94,7 +100,8 @@ class CashShiftControllerSecurityTests {
                 .andExpect(status().isForbidden());
 
         verify(cashShiftService, never()).open(any(), any());
-        verify(cashShiftService, never()).listShifts(any(), eq(true), any());
+        verify(cashShiftService).listShifts(eq(userId), eq(true), any());
+        verify(cashShiftService).listMovements(eq(userId), eq(true), eq(shiftId), any());
     }
 
     @Test

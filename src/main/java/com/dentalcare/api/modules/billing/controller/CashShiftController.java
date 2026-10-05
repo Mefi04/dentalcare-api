@@ -72,7 +72,7 @@ public class CashShiftController {
     @Operation(summary = "List cash shifts",
             description = "Without BILLING_CASH_READ_ALL only the authenticated user's shifts are returned.")
     @GetMapping
-    @PreAuthorize("hasAuthority('BILLING_CASH_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('BILLING_CASH_MANAGE', 'BILLING_CASH_READ_ALL')")
     public ResponseEntity<Page<CashShiftResponse>> list(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @RequestParam(defaultValue = "0") int page,
@@ -94,7 +94,7 @@ public class CashShiftController {
 
     @Operation(summary = "List manual movements of a cash shift")
     @GetMapping("/{shiftId}/movements")
-    @PreAuthorize("hasAuthority('BILLING_CASH_MANAGE')")
+    @PreAuthorize("hasAnyAuthority('BILLING_CASH_MANAGE', 'BILLING_CASH_READ_ALL')")
     public ResponseEntity<Page<CashMovementResponse>> listMovements(
             @AuthenticationPrincipal AuthenticatedUser principal,
             @PathVariable UUID shiftId,
