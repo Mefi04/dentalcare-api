@@ -62,6 +62,17 @@ public class TreatmentBudget {
     @JoinColumn(name = "decided_by")
     private User decidedBy;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "patient_decision", nullable = false, length = 20)
+    private PatientBudgetDecision patientDecision;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "patient_decided_by")
+    private User patientDecidedBy;
+
+    @Column(name = "patient_decided_at")
+    private Instant patientDecidedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -89,6 +100,7 @@ public class TreatmentBudget {
         this.subtotal = subtotal;
         this.total = total;
         this.status = TreatmentBudgetStatus.PENDING;
+        this.patientDecision = PatientBudgetDecision.PENDING;
         this.generatedBy = generatedBy;
         this.createdAt = createdAt;
         this.updatedAt = createdAt;
@@ -116,6 +128,20 @@ public class TreatmentBudget {
         updatedAt = at;
     }
 
+    public void acceptByPatient(User actor, Instant at) {
+        patientDecision = PatientBudgetDecision.ACCEPTED;
+        patientDecidedBy = actor;
+        patientDecidedAt = at;
+        updatedAt = at;
+    }
+
+    public void rejectByPatient(User actor, Instant at) {
+        patientDecision = PatientBudgetDecision.REJECTED;
+        patientDecidedBy = actor;
+        patientDecidedAt = at;
+        updatedAt = at;
+    }
+
     public UUID getId() { return id; }
     public TreatmentPlan getTreatmentPlan() { return treatmentPlan; }
     public Patient getPatient() { return patient; }
@@ -126,6 +152,9 @@ public class TreatmentBudget {
     public TreatmentBudgetStatus getStatus() { return status; }
     public User getGeneratedBy() { return generatedBy; }
     public User getDecidedBy() { return decidedBy; }
+    public PatientBudgetDecision getPatientDecision() { return patientDecision; }
+    public User getPatientDecidedBy() { return patientDecidedBy; }
+    public Instant getPatientDecidedAt() { return patientDecidedAt; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public Instant getDecidedAt() { return decidedAt; }
