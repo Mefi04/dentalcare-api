@@ -13,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -23,6 +25,18 @@ public interface TreatmentProcedureRepository extends JpaRepository<TreatmentPro
 
     @EntityGraph(attributePaths = {"treatmentPlan", "treatmentPlanItem", "patient", "professional"})
     Page<TreatmentProcedure> findByPatient_Id(UUID patientId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"treatmentPlan", "treatmentPlanItem", "professional"})
+    @Query("SELECT procedure FROM TreatmentProcedure procedure " +
+            "WHERE procedure.treatmentPlan.id IN :planIds ORDER BY procedure.performedAt ASC, procedure.id ASC")
+    List<TreatmentProcedure> findByTreatmentPlanIds(@Param("planIds") Collection<UUID> planIds);
+
+    @EntityGraph(attributePaths = {"treatmentPlan", "treatmentPlanItem", "professional"})
+    @Query("SELECT procedure FROM TreatmentProcedure procedure " +
+            "WHERE procedure.treatmentPlan.id = :planId AND procedure.patient.id = :patientId " +
+            "ORDER BY procedure.performedAt ASC, procedure.id ASC")
+    List<TreatmentProcedure> findOwnedByPlanId(@Param("planId") UUID planId,
+                                               @Param("patientId") UUID patientId);
 
     @EntityGraph(attributePaths = {"treatmentPlan", "treatmentPlanItem", "patient", "professional"})
     @Query("SELECT procedure FROM TreatmentProcedure procedure WHERE procedure.id = :id")

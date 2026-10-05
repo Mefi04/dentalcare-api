@@ -65,6 +65,7 @@ class TreatmentPlanRepositoryIntegrationTests {
         User dentist = dentist("8000000000101");
         TreatmentPlan older = plan(owner, dentist, "Anterior", NOW.minusSeconds(60));
         older.replaceItems(List.of(item("Segundo", 1), item("Primero", 0)));
+        older.approve(NOW.minusSeconds(30));
         TreatmentPlan newer = plan(owner, dentist, "Nuevo", NOW);
         newer.addItem(item("Único", 0));
         TreatmentPlan foreign = plan(other, dentist, "Otro", NOW.plusSeconds(60));
@@ -82,6 +83,11 @@ class TreatmentPlanRepositoryIntegrationTests {
         assertThat(detailed.getItems()).extracting(TreatmentPlanItem::getName)
                 .containsExactly("Primero", "Segundo");
         assertThat(treatmentPlanRepository.findDetailedByIdForUpdate(older.getId())).isPresent();
+        var approvedIds = treatmentPlanRepository.findApprovedIdsByPatientId(owner.getId(),
+                PageRequest.of(0, 20, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
+        assertThat(approvedIds.getContent()).containsExactly(older.getId());
+        assertThat(treatmentPlanRepository.findDetailedByIdIn(approvedIds.getContent()))
+                .extracting(TreatmentPlan::getId).containsExactly(older.getId());
     }
 
     @Test

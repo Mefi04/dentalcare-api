@@ -153,6 +153,8 @@ Mobile clients (Expo / React Native) use dedicated endpoints under `/api/v1/auth
 | `GET` | `/api/v1/patients/me/appointments/professionals` | `ROLE_PATIENT` | `200 OK` | Lists active dentists available for patient self-service booking. Excludes sensitive staff fields. |
 | `PATCH` | `/api/v1/patients/me/appointments/{appointmentId}/cancel` | `ROLE_PATIENT` | `200 OK` | Cancels an appointment owned by the authenticated patient. Transitions status from `SCHEDULED` to `CANCELLED`. Rejects invalid transitions (`COMPLETED`, `CANCELLED`) with `409 Conflict`. Non-existent or foreign appointments return `404 Not Found`. Does not accept request body or patient ID parameter. |
 | `GET` | `/api/v1/patients/me/account-statement` | `ROLE_PATIENT` | `200 OK` | Returns the authenticated patient's `AccountStatementResponse` (see Billing endpoints). Identity is resolved solely from the JWT principal; caller-supplied `patientId` or `userId` parameters are ignored. |
+| `GET` | `/api/v1/patients/me/treatment-plans` | `ROLE_PATIENT` | `200 OK` | Lists only approved plans owned by the authenticated patient. Progress is derived from persisted completed procedure executions. |
+| `GET` | `/api/v1/patients/me/treatment-plans/{planId}` | `ROLE_PATIENT` | `200 OK` | Returns an owned approved plan with item-level execution progress. Missing, draft, and foreign plans return the same generic `404 Not Found`. |
 
 The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data. It exposes `portalAccessStatus` (`PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE`, `LOCKED`, or `null` if no portal account exists) derived directly from the linked user.
 
@@ -265,6 +267,11 @@ Create and update requests contain `name`, optional `observations`, `professiona
 contains `name`, optional `tooth`, positive `quantity`, and positive `unitPrice` with at most two decimals.
 The patient always comes from the path. Item positions are assigned by the backend from request order.
 Clients cannot supply status, positions, totals, subtotals, or audit timestamps.
+
+Patient self-service never reuses the administrative routes above. `PatientTreatmentPlanResponse` excludes
+`patientId`, prices, internal observations, clinical notes, completion notes, and audit actors. It exposes the
+professional display name, approved plan metadata, ordered procedures, persisted execution states, and progress
+derived as completed executions divided by planned quantity. Draft plans remain internal until approved.
 
 ## Treatment budget and consent endpoints
 

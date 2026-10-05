@@ -419,6 +419,8 @@ Patient self-service endpoints enable authenticated patients to inspect their ow
 - `GET /api/v1/patients/me/profile`: Returns personal contact and identity details with a masked DPI (`PatientProfileResponse`).
 - `GET /api/v1/patients/me/health`: Returns the patient's persisted health summary (`PatientHealthResponse`), or an `EMPTY` state when no clinical information exists.
 - `GET /api/v1/patients/me/account-statement`: Returns the patient's own charges, payments, and derived balance (`AccountStatementResponse`).
+- `GET /api/v1/patients/me/treatment-plans`: Returns only approved treatment plans linked to the JWT-owned patient.
+- `GET /api/v1/patients/me/treatment-plans/{planId}`: Returns a plan only when ownership matches; foreign and draft UUIDs produce the same generic `404`.
 
 Security and authorization rules:
 1. **Identity resolution authority**: The backend is the sole authority for identifying the patient. Identity is resolved exclusively via `JWT` → `AuthenticatedUser.userId()` → `PatientRepository.findByUser_Id(userId)`.
@@ -426,6 +428,7 @@ Security and authorization rules:
 3. **Role requirement**: All self-service endpoints require `ROLE_PATIENT` enforced via `@PreAuthorize("hasRole('PATIENT')")`. Staff roles (`ADMINISTRATOR`, `SECRETARY`, `DENTIST`, `ASSISTANT`, `CASHIER`) receive `403 Forbidden`. Requests without valid authentication receive `401 Unauthorized`.
 4. **Data protection and minimal exposure**: The `/me/profile` response exposes only the last four digits of the DPI (`*********XXXX`) and excludes sensitive administrative and user credentials (such as passwords, internal identifiers, billing tax IDs, or audit stamps).
 5. **Accurate semantics**: In `/me/health`, `lastUpdated` comes only from the persisted medical history and remains `null` when none exists. It is never derived from `Patient.updatedAt`, and no fictional clinical data is returned.
+6. **Treatment-plan isolation**: The patient role receives no administrative `TREATMENT_PLAN_READ` authority. The self-service DTO omits prices, internal observations, clinical notes, patient identifiers, and audit data; progress comes exclusively from persisted procedure executions.
 
 Administrative medical-history operations require explicit clinical authorities. `MEDICAL_HISTORY_READ` permits reading the subresource and `MEDICAL_HISTORY_UPDATE` permits creating or replacing it. Secretary, cashier, patient, or other roles without those authorities cannot use administrative clinical endpoints. Patient self-service remains read-only and resolves identity exclusively from the JWT principal.
 
