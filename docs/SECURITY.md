@@ -118,6 +118,10 @@ The anonymous public surface is restricted to `GET /api/v1/public/clinic` and
 `GET /api/v1/public/services`. It exposes visitor-safe projections of Settings data only; all Settings routes
 and every non-GET public route still require authentication and their existing authority checks remain unchanged.
 
+`GET /api/v1/public/professionals` and `GET /api/v1/public/professionals/{id}` are also anonymous read-only
+projections. They return only visible profiles whose linked user remains active and has the active `DENTIST` role.
+Profile administration stays under the existing administrator-only `/api/v1/users/**` surface.
+
 Only the existing administrator role receives these permissions. Other staff modules must not reuse settings
 permissions as a shortcut for consuming catalog data; any future cross-module contract requires its own approved
 authorization design.
