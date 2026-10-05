@@ -1,6 +1,8 @@
 package com.dentalcare.api.modules.auth.service;
 
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.auth.dto.request.ActivateAccountRequest;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
 import com.dentalcare.api.modules.auth.dto.response.ActivateAccountResponse;
@@ -16,6 +18,8 @@ import com.dentalcare.api.security.jwt.JwtProperties;
 import com.dentalcare.api.security.jwt.JwtService;
 import com.dentalcare.api.shared.validation.PasswordPolicy;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +30,8 @@ import java.util.UUID;
 
 @Service
 public class AuthServiceImpl implements AuthService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthServiceImpl.class);
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final String INVALID_CREDENTIALS = "Invalid credentials";
     private static final String AUTH_REQUIRED = "Authentication is required";
@@ -82,6 +88,7 @@ public class AuthServiceImpl implements AuthService {
         user.setStatus(UserStatus.ACTIVE);
         user.setUpdatedAt(clock.instant());
         userRepository.save(user);
+        if (auditService != null) auditService.success(AuditActions.AUTH_ACCOUNT_ACTIVATED, "AUTH", "User", user.getId(), user.getId());
 
         return new ActivateAccountResponse(UserStatus.ACTIVE, "Account activated successfully");
     }
@@ -90,10 +97,14 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public LoginResult login(LoginRequest request) {
         String cui = User.normalizeCui(request.cui());
-        User user = userRepository.findWithRolesAndPermissionsByCui(cui)
-                .orElseThrow(() -> new UnauthorizedException(INVALID_CREDENTIALS));
+        User user = userRepository.findWithRolesAndPermissionsByCui(cui).orElse(null);
+        if (user == null) {
+            auditLoginFailure(null);
+            throw new UnauthorizedException(INVALID_CREDENTIALS);
+        }
 
         if (user.getStatus() != UserStatus.ACTIVE || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            auditLoginFailure(user.getId());
             throw new UnauthorizedException(INVALID_CREDENTIALS);
         }
 
@@ -116,6 +127,7 @@ public class AuthServiceImpl implements AuthService {
         Instant expiresAt = clock.instant().plus(refreshExpiration);
 
         refreshTokenService.createSession(user, familyId, rawRefreshToken, expiresAt);
+        if (auditService != null) auditService.success(AuditActions.AUTH_LOGIN_SUCCEEDED, "AUTH", "User", user.getId(), user.getId());
 
         return new LoginResult(response, rawRefreshToken, refreshExpiration);
     }
@@ -203,5 +215,15 @@ public class AuthServiceImpl implements AuthService {
                 .filter(candidate -> candidate.getStatus() == UserStatus.ACTIVE)
                 .orElseThrow(() -> new UnauthorizedException(AUTH_REQUIRED));
         return mapper.toResponse(user);
+    }
+
+    private void auditLoginFailure(UUID knownUserId) {
+        if (auditService == null) return;
+        try {
+            auditService.failure(AuditActions.AUTH_LOGIN_FAILED, "AUTH", "User", knownUserId, knownUserId);
+        } catch (RuntimeException auditFailure) {
+            // Keep credential failures generic even when audit storage is temporarily unavailable.
+            LOGGER.warn("Failed to persist an authentication failure audit event");
+        }
     }
 }

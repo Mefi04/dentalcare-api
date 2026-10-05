@@ -4,6 +4,8 @@ import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.treatments.dto.request.CompleteTreatmentProcedureRequest;
 import com.dentalcare.api.modules.treatments.dto.request.CreateTreatmentProcedureRequest;
@@ -32,6 +34,7 @@ import java.util.UUID;
 
 @Service
 public class TreatmentProcedureServiceImpl implements TreatmentProcedureService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
     private static final int MAX_PAGE_SIZE = 100;
     private static final Sort HISTORY_ORDER = Sort.by(
             Sort.Order.desc("performedAt"), Sort.Order.desc("id"));
@@ -92,7 +95,9 @@ public class TreatmentProcedureServiceImpl implements TreatmentProcedureService 
                 item.getName(), item.getTooth(), Math.toIntExact(completed + 1),
                 optional(request.clinicalObservations()), TreatmentProcedureStatus.IN_PROGRESS,
                 clock.instant());
-        return mapper.toResponse(procedures.saveAndFlush(procedure));
+        var saved=procedures.saveAndFlush(procedure);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_PROCEDURE_REGISTERED,"TREATMENTS","TreatmentProcedure",saved.getId(),professionalId);
+        return mapper.toResponse(saved);
     }
 
     @Override
@@ -111,7 +116,9 @@ public class TreatmentProcedureServiceImpl implements TreatmentProcedureService 
             throw new AccessDeniedException("Only the professional who started the procedure can complete it");
         }
         procedure.complete(optional(request == null ? null : request.completionNotes()), clock.instant());
-        return mapper.toResponse(procedures.saveAndFlush(procedure));
+        var saved=procedures.saveAndFlush(procedure);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_PROCEDURE_COMPLETED,"TREATMENTS","TreatmentProcedure",saved.getId(),professionalId);
+        return mapper.toResponse(saved);
     }
 
     @Override
