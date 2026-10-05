@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.billing.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.billing.dto.request.CreateChargeRequest;
 import com.dentalcare.api.modules.billing.dto.request.CreatePaymentRequest;
 import com.dentalcare.api.modules.billing.dto.response.AccountStatementResponse;
@@ -43,6 +45,7 @@ import java.util.UUID;
 
 @Service
 public class BillingServiceImpl implements BillingService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final int MAX_CONCEPT_LENGTH = 200;
     private static final int MONEY_SCALE = 2;
@@ -115,6 +118,7 @@ public class BillingServiceImpl implements BillingService {
 
         Charge charge = chargeRepository.saveAndFlush(
                 new Charge(UUID.randomUUID(), patient, concept, amount, clock.instant()));
+        if (auditService != null) auditService.success(AuditActions.BILLING_CHARGE_CREATED, "BILLING", "Charge", charge.getId(), null);
         return toChargeResponse(charge, chargeLedger.position(charge.getAmount(), ZERO, ZERO, ZERO, false));
     }
 
@@ -165,6 +169,7 @@ public class BillingServiceImpl implements BillingService {
         Payment payment = paymentRepository.saveAndFlush(new Payment(
                 UUID.randomUUID(), patient, charge, kind, request.method(), amount, clock.instant(),
                 actorUserId, cashShift));
+        if (auditService != null) auditService.success(AuditActions.BILLING_PAYMENT_CREATED, "BILLING", "Payment", payment.getId(), actorUserId);
         return billingMapper.toPaymentResponse(payment);
     }
 

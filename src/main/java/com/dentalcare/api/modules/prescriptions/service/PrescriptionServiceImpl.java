@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.prescriptions.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.modules.prescriptions.dto.request.CreatePrescriptionRequest;
@@ -24,6 +26,7 @@ import java.util.UUID;
 
 @Service
 public class PrescriptionServiceImpl implements PrescriptionService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
     private static final int MAX_PAGE_SIZE = 100;
     private static final Sort ORDER = Sort.by(Sort.Order.desc("issuedAt"), Sort.Order.desc("id"));
 
@@ -57,7 +60,9 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                 required(request.medication()), required(request.presentation()), required(request.dosage()),
                 required(request.frequency()), required(request.duration()), optional(request.instructions()),
                 clock.instant(), PrescriptionStatus.ISSUED);
-        return mapper.toResponse(prescriptions.saveAndFlush(value));
+        var saved=prescriptions.saveAndFlush(value);
+        if(auditService!=null)auditService.success(AuditActions.PRESCRIPTION_ISSUED,"PRESCRIPTIONS","Prescription",saved.getId(),professionalId);
+        return mapper.toResponse(saved);
     }
 
     @Override

@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.billing.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.billing.dto.request.CreateRefundRequest;
 import com.dentalcare.api.modules.billing.dto.response.RefundResponse;
 import com.dentalcare.api.modules.billing.mapper.RefundMapper;
@@ -33,6 +35,7 @@ import java.util.UUID;
 
 @Service
 public class RefundServiceImpl implements RefundService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final int MAX_REASON_LENGTH = 500;
     private static final int MAX_IDEMPOTENCY_KEY_LENGTH = 100;
@@ -159,7 +162,7 @@ public class RefundServiceImpl implements RefundService {
             throw exception;
         }
         voidReceiptIfFullyRefunded(payment, alreadyRefunded.add(amount), reason);
-        // TODO(#114): publicar evento de auditoría
+        if (auditService != null) auditService.success(AuditActions.BILLING_REFUND_CREATED, "BILLING", "Refund", refund.getId(), actorUserId);
         return new RefundResult(refundMapper.toResponse(refund), false);
     }
 

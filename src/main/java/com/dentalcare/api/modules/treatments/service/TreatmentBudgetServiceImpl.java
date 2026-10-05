@@ -4,6 +4,8 @@ import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.treatments.dto.response.TreatmentBudgetResponse;
 import com.dentalcare.api.modules.treatments.mapper.TreatmentBudgetMapper;
 import com.dentalcare.api.modules.treatments.model.TreatmentBudget;
@@ -29,6 +31,7 @@ import java.util.UUID;
 
 @Service
 public class TreatmentBudgetServiceImpl implements TreatmentBudgetService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
     private static final List<TreatmentBudgetStatus> ACTIVE_STATUSES =
             List.of(TreatmentBudgetStatus.PENDING, TreatmentBudgetStatus.APPROVED);
 
@@ -79,7 +82,9 @@ public class TreatmentBudgetServiceImpl implements TreatmentBudgetService {
                 budgets.findMaxVersionByPlanId(planId) + 1,
                 plan.getUpdatedAt(), subtotal, subtotal, actor, now);
         budget.replaceItems(snapshots);
-        return mapper.toResponse(budgets.saveAndFlush(budget));
+        var saved=budgets.saveAndFlush(budget);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_BUDGET_GENERATED,"TREATMENTS","TreatmentBudget",saved.getId(),actorId);
+        return mapper.toResponse(saved);
     }
 
     @Override
@@ -103,7 +108,9 @@ public class TreatmentBudgetServiceImpl implements TreatmentBudgetService {
     public TreatmentBudgetResponse approve(UUID budgetId, UUID actorId) {
         TreatmentBudget budget = findPendingForDecision(budgetId);
         budget.approve(findActiveActor(actorId), clock.instant());
-        return mapper.toResponse(budgets.saveAndFlush(budget));
+        var saved=budgets.saveAndFlush(budget);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_BUDGET_APPROVED,"TREATMENTS","TreatmentBudget",saved.getId(),actorId);
+        return mapper.toResponse(saved);
     }
 
     @Override
@@ -111,7 +118,9 @@ public class TreatmentBudgetServiceImpl implements TreatmentBudgetService {
     public TreatmentBudgetResponse reject(UUID budgetId, UUID actorId) {
         TreatmentBudget budget = findPendingForDecision(budgetId);
         budget.reject(findActiveActor(actorId), clock.instant());
-        return mapper.toResponse(budgets.saveAndFlush(budget));
+        var saved=budgets.saveAndFlush(budget);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_BUDGET_REJECTED,"TREATMENTS","TreatmentBudget",saved.getId(),actorId);
+        return mapper.toResponse(saved);
     }
 
     private TreatmentBudget findPendingForDecision(UUID budgetId) {

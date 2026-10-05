@@ -8,6 +8,11 @@ import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
 import com.dentalcare.api.modules.auth.dto.response.UserResponse;
 import com.dentalcare.api.modules.auth.mapper.AuthUserMapper;
 import com.dentalcare.api.modules.auth.model.RefreshSession;
+import com.dentalcare.api.modules.audit.model.AuditEvent;
+import com.dentalcare.api.modules.audit.model.AuditResult;
+import com.dentalcare.api.modules.audit.repository.AuditEventRepository;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditServiceImpl;
 import com.dentalcare.api.modules.users.model.Permission;
 import com.dentalcare.api.modules.users.model.Role;
 import com.dentalcare.api.modules.users.model.User;
@@ -21,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -44,6 +50,9 @@ class AuthServiceImplTests {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private AuditEventRepository auditEventRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -82,6 +91,7 @@ class AuthServiceImplTests {
                 jwtProperties,
                 clock
         );
+        ReflectionTestUtils.setField(service, "auditService", new AuditServiceImpl(auditEventRepository, clock));
 
         user = new User(UUID.randomUUID(), "testuser", "user@example.com", "1234567890123", "hash", UserStatus.ACTIVE,
                 now.minus(Duration.ofDays(10)), now.minus(Duration.ofDays(10)));
@@ -134,6 +144,47 @@ class AuthServiceImplTests {
 
         verify(refreshTokenService, never()).createSession(any(), any(), any(), any());
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void failedLoginForExistingUserAuditsTargetWithoutAuthenticatedActor() {
+        when(userRepository.findWithRolesAndPermissionsByCui("1234567890123"))
+                .thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong-password", "hash")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.login(new LoginRequest("1234567890123", "wrong-password")))
+                .isInstanceOf(UnauthorizedException.class);
+
+        AuditEvent event = capturedAuditEvent();
+        assertThat(event.getActionCode()).isEqualTo(AuditActions.AUTH_LOGIN_FAILED);
+        assertThat(event.getResult()).isEqualTo(AuditResult.FAILURE);
+        assertThat(event.getEntityId()).isEqualTo(user.getId().toString());
+        assertThat(event.getActorUserId()).isNull();
+        assertThat(event.getDetail()).doesNotContain("1234567890123", "wrong-password", "hash");
+        verify(refreshTokenService, never()).createSession(any(), any(), any(), any());
+    }
+
+    @Test
+    void failedLoginForUnknownUserHasNoTargetOrAuthenticatedActor() {
+        when(userRepository.findWithRolesAndPermissionsByCui("0000000000000"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.login(new LoginRequest("0000000000000", "wrong-password")))
+                .isInstanceOf(UnauthorizedException.class);
+
+        AuditEvent event = capturedAuditEvent();
+        assertThat(event.getActionCode()).isEqualTo(AuditActions.AUTH_LOGIN_FAILED);
+        assertThat(event.getResult()).isEqualTo(AuditResult.FAILURE);
+        assertThat(event.getEntityId()).isNull();
+        assertThat(event.getActorUserId()).isNull();
+        assertThat(event.getDetail()).doesNotContain("0000000000000", "wrong-password");
+        verify(refreshTokenService, never()).createSession(any(), any(), any(), any());
+    }
+
+    private AuditEvent capturedAuditEvent() {
+        var captor=org.mockito.ArgumentCaptor.forClass(AuditEvent.class);
+        verify(auditEventRepository).save(captor.capture());
+        return captor.getValue();
     }
 
     @Test

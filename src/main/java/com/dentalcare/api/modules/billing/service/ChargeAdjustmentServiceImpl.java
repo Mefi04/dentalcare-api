@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.billing.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.billing.dto.request.CreateChargeDiscountRequest;
 import com.dentalcare.api.modules.billing.dto.request.VoidChargeRequest;
 import com.dentalcare.api.modules.billing.dto.response.ChargeAdjustmentResponse;
@@ -29,6 +31,7 @@ import java.util.UUID;
 
 @Service
 public class ChargeAdjustmentServiceImpl implements ChargeAdjustmentService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final int MAX_REASON_LENGTH = 500;
     private static final int MONEY_SCALE = 2;
@@ -89,7 +92,7 @@ public class ChargeAdjustmentServiceImpl implements ChargeAdjustmentService {
             throw new ConflictException("Discount exceeds the pending balance");
         }
         ChargeAdjustment adjustment = save(charge, ChargeAdjustmentType.DISCOUNT, amount, reason, actorUserId);
-        // TODO(#114): publicar evento de auditoría
+        if (auditService != null) auditService.success(AuditActions.BILLING_DISCOUNT_CREATED, "BILLING", "ChargeAdjustment", adjustment.getId(), actorUserId);
         return chargeAdjustmentMapper.toResponse(adjustment);
     }
 
@@ -116,7 +119,7 @@ public class ChargeAdjustmentServiceImpl implements ChargeAdjustmentService {
         }
         try {
             ChargeAdjustment adjustment = save(charge, ChargeAdjustmentType.VOID, null, reason, actorUserId);
-            // TODO(#114): publicar evento de auditoría
+            if (auditService != null) auditService.success(AuditActions.BILLING_CHARGE_VOIDED, "BILLING", "ChargeAdjustment", adjustment.getId(), actorUserId);
             return chargeAdjustmentMapper.toResponse(adjustment);
         } catch (DataIntegrityViolationException exception) {
             if (isDuplicateVoid(exception)) {

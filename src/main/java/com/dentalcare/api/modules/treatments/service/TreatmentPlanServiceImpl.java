@@ -1,5 +1,7 @@
 package com.dentalcare.api.modules.treatments.service;
 
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
@@ -31,6 +33,7 @@ import java.util.UUID;
 
 @Service
 public class TreatmentPlanServiceImpl implements TreatmentPlanService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final String DENTIST_ROLE = "DENTIST";
@@ -81,7 +84,9 @@ public class TreatmentPlanServiceImpl implements TreatmentPlanService {
                 normalizeRequired(request.name()), normalizeOptional(request.observations()),
                 TreatmentPlanStatus.DRAFT, now, now);
         plan.replaceItems(toItems(request.items()));
-        return treatmentPlanMapper.toResponse(treatmentPlanRepository.saveAndFlush(plan));
+        var saved=treatmentPlanRepository.saveAndFlush(plan);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_PLAN_CREATED,"TREATMENTS","TreatmentPlan",saved.getId(),null);
+        return treatmentPlanMapper.toResponse(saved);
     }
 
     @Override
@@ -109,7 +114,9 @@ public class TreatmentPlanServiceImpl implements TreatmentPlanService {
         treatmentPlanRepository.deleteItemsByTreatmentPlanId(plan.getId());
         plan = findForUpdate(planId);
         plan.replaceItems(toItems(request.items()));
-        return treatmentPlanMapper.toResponse(treatmentPlanRepository.saveAndFlush(plan));
+        var saved=treatmentPlanRepository.saveAndFlush(plan);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_PLAN_UPDATED,"TREATMENTS","TreatmentPlan",saved.getId(),null);
+        return treatmentPlanMapper.toResponse(saved);
     }
 
     @Override
@@ -121,7 +128,9 @@ public class TreatmentPlanServiceImpl implements TreatmentPlanService {
             throw new ConflictException("Treatment plan is already approved");
         }
         plan.approve(clock.instant());
-        return treatmentPlanMapper.toResponse(treatmentPlanRepository.saveAndFlush(plan));
+        var saved=treatmentPlanRepository.saveAndFlush(plan);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_PLAN_APPROVED,"TREATMENTS","TreatmentPlan",saved.getId(),null);
+        return treatmentPlanMapper.toResponse(saved);
     }
 
     @Override

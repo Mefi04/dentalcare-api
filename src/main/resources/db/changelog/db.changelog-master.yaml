@@ -59,3 +59,5 @@ databaseChangeLog:
       file: db/changelog/changes/029-create-billing-payment-plans.sql
   - include:
       file: db/changelog/changes/030-create-billing-adjustments-refunds.sql
+  - include:
+      file: db/changelog/changes/031-create-audit-events.sql
