@@ -12,7 +12,8 @@ import java.math.BigDecimal;
 @Component
 public class BillingMapper {
 
-    public ChargeResponse toChargeResponse(Charge charge, BigDecimal paid, BigDecimal pending, ChargeStatus status) {
+    public ChargeResponse toChargeResponse(Charge charge, BigDecimal paid, BigDecimal pending, ChargeStatus status,
+                                           BigDecimal discount, BigDecimal refunded) {
         return new ChargeResponse(
                 charge.getId(),
                 charge.getConcept(),
@@ -20,7 +21,9 @@ public class BillingMapper {
                 paid,
                 pending,
                 status,
-                charge.getCreatedAt());
+                charge.getCreatedAt(),
+                discount,
+                refunded);
     }
 
     public PaymentResponse toPaymentResponse(Payment payment) {

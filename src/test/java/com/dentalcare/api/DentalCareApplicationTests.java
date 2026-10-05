@@ -121,6 +121,24 @@ class DentalCareApplicationTests {
     com.dentalcare.api.modules.inventory.repository.PurchaseItemRepository purchaseItemRepository;
 
     @MockitoBean
+    com.dentalcare.api.modules.billing.repository.CashShiftRepository cashShiftRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.CashMovementRepository cashMovementRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.ReceiptRepository receiptRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.PaymentPlanRepository paymentPlanRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.ChargeAdjustmentRepository chargeAdjustmentRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.billing.repository.RefundRepository refundRepository;
+
+    @MockitoBean
     com.dentalcare.api.modules.settings.repository.ClinicSettingsRepository clinicSettingsRepository;
 
     @MockitoBean

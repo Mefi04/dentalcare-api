@@ -16,5 +16,5 @@ public interface BillingService {
 
     ChargeResponse createCharge(UUID patientId, CreateChargeRequest request);
 
-    PaymentResponse registerPayment(UUID patientId, CreatePaymentRequest request);
+    PaymentResponse registerPayment(UUID patientId, CreatePaymentRequest request, UUID actorUserId);
 }

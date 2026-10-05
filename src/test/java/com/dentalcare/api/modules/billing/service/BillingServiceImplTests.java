@@ -10,13 +10,21 @@ import com.dentalcare.api.modules.billing.dto.response.AccountSummaryResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeResponse;
 import com.dentalcare.api.modules.billing.dto.response.ChargeStatus;
 import com.dentalcare.api.modules.billing.dto.response.PaymentResponse;
+import com.dentalcare.api.modules.billing.ledger.ChargeLedger;
+import com.dentalcare.api.modules.billing.ledger.ChargePosition;
 import com.dentalcare.api.modules.billing.mapper.BillingMapper;
 import com.dentalcare.api.modules.billing.model.Charge;
+import com.dentalcare.api.modules.billing.model.CashShift;
+import com.dentalcare.api.modules.billing.model.ChargeAdjustment;
+import com.dentalcare.api.modules.billing.model.ChargeAdjustmentType;
 import com.dentalcare.api.modules.billing.model.Payment;
 import com.dentalcare.api.modules.billing.model.PaymentKind;
 import com.dentalcare.api.modules.billing.model.PaymentMethod;
+import com.dentalcare.api.modules.billing.model.Refund;
+import com.dentalcare.api.modules.billing.repository.ChargeAdjustmentRepository;
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
+import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
@@ -39,6 +47,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -56,14 +65,29 @@ class BillingServiceImplTests {
     private PaymentRepository paymentRepository;
 
     @Mock
+    private ChargeAdjustmentRepository chargeAdjustmentRepository;
+
+    @Mock
+    private RefundRepository refundRepository;
+
+    @Mock
     private PatientRepository patientRepository;
+
+    @Mock
+    private CashShiftService cashShiftService;
+
+    private final UUID actorId = UUID.randomUUID();
 
     private BillingServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new BillingServiceImpl(chargeRepository, paymentRepository, patientRepository,
-                new BillingMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
+        service = new BillingServiceImpl(chargeRepository, paymentRepository, chargeAdjustmentRepository,
+                refundRepository, patientRepository, new BillingMapper(), new ChargeLedger(), cashShiftService,
+                Clock.fixed(NOW, ZoneOffset.UTC));
+        lenient().when(chargeAdjustmentRepository.sumDiscountByChargeId(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(refundRepository.sumAmountByChargeId(any())).thenReturn(BigDecimal.ZERO);
+        lenient().when(chargeAdjustmentRepository.existsByChargeIdAndType(any(), any())).thenReturn(false);
     }
 
     @Test
@@ -241,13 +265,18 @@ class BillingServiceImplTests {
         when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         PaymentResponse response = service.registerPayment(patient.getId(),
-                new CreatePaymentRequest(null, money("200"), PaymentMethod.TRANSFER));
+                new CreatePaymentRequest(null, money("200"), PaymentMethod.TRANSFER), actorId);
 
+        ArgumentCaptor<Payment> saved = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).saveAndFlush(saved.capture());
         assertThat(response.kind()).isEqualTo(PaymentKind.ADVANCE);
         assertThat(response.chargeId()).isNull();
         assertThat(response.amount()).isEqualTo(money("200.00"));
         assertThat(response.method()).isEqualTo(PaymentMethod.TRANSFER);
         assertThat(response.createdAt()).isEqualTo(NOW);
+        assertThat(saved.getValue().getRegisteredByUserId()).isEqualTo(actorId);
+        assertThat(saved.getValue().getCashShift()).isNull();
+        verify(cashShiftService, never()).requireOpenShiftForUpdate(any());
         verifyNoInteractions(chargeRepository);
     }
 
@@ -256,15 +285,18 @@ class BillingServiceImplTests {
         Patient patient = patient();
         Charge charge = charge(patient, "Limpieza", "300.00");
         stubLockedCharge(patient, charge, "100.00");
+        CashShift shift = stubOpenShift();
         when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         PaymentResponse response = service.registerPayment(patient.getId(),
-                new CreatePaymentRequest(charge.getId(), money("50.00"), PaymentMethod.CASH));
+                new CreatePaymentRequest(charge.getId(), money("50.00"), PaymentMethod.CASH), actorId);
 
         ArgumentCaptor<Payment> saved = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository).saveAndFlush(saved.capture());
         assertThat(saved.getValue().getPatient()).isSameAs(patient);
         assertThat(saved.getValue().getCharge()).isSameAs(charge);
+        assertThat(saved.getValue().getCashShift()).isSameAs(shift);
+        assertThat(saved.getValue().getRegisteredByUserId()).isEqualTo(actorId);
         assertThat(response.kind()).isEqualTo(PaymentKind.PARTIAL_PAYMENT);
         assertThat(response.chargeId()).isEqualTo(charge.getId());
         assertThat(response.amount()).isEqualTo(money("50.00"));
@@ -278,9 +310,14 @@ class BillingServiceImplTests {
         when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         PaymentResponse response = service.registerPayment(patient.getId(),
-                new CreatePaymentRequest(charge.getId(), money("200.00"), PaymentMethod.CARD));
+                new CreatePaymentRequest(charge.getId(), money("200.00"), PaymentMethod.CARD), actorId);
 
+        ArgumentCaptor<Payment> saved = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).saveAndFlush(saved.capture());
         assertThat(response.kind()).isEqualTo(PaymentKind.PAYMENT);
+        assertThat(saved.getValue().getRegisteredByUserId()).isEqualTo(actorId);
+        assertThat(saved.getValue().getCashShift()).isNull();
+        verify(cashShiftService, never()).requireOpenShiftForUpdate(any());
     }
 
     @Test
@@ -288,9 +325,10 @@ class BillingServiceImplTests {
         Patient patient = patient();
         Charge charge = charge(patient, "Limpieza", "300.00");
         stubLockedCharge(patient, charge, "100.00");
+        stubOpenShift();
 
         assertThatThrownBy(() -> service.registerPayment(patient.getId(),
-                new CreatePaymentRequest(charge.getId(), money("200.01"), PaymentMethod.CASH)))
+                new CreatePaymentRequest(charge.getId(), money("200.01"), PaymentMethod.CASH), actorId))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Payment amount exceeds the pending balance of the charge");
 
@@ -302,13 +340,90 @@ class BillingServiceImplTests {
         Patient patient = patient();
         Charge charge = charge(patient, "Limpieza", "300.00");
         stubLockedCharge(patient, charge, "300.00");
+        stubOpenShift();
 
         assertThatThrownBy(() -> service.registerPayment(patient.getId(),
-                new CreatePaymentRequest(charge.getId(), money("0.01"), PaymentMethod.CASH)))
+                new CreatePaymentRequest(charge.getId(), money("0.01"), PaymentMethod.CASH), actorId))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Charge is already paid");
 
         verify(paymentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void registerPaymentOnVoidedChargeIsConflict() {
+        Patient patient = patient();
+        Charge charge = charge(patient, "Limpieza", "100.00");
+        stubLockedCharge(patient, charge, "0.00");
+        when(chargeAdjustmentRepository.existsByChargeIdAndType(charge.getId(), ChargeAdjustmentType.VOID))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> service.registerPayment(patient.getId(),
+                new CreatePaymentRequest(charge.getId(), money("10.00"), PaymentMethod.CARD), actorId))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Charge is voided");
+
+        verify(paymentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void registerPaymentUsesNetPendingAfterDiscount() {
+        Patient patient = patient();
+        Charge charge = charge(patient, "Limpieza", "100.00");
+        stubLockedCharge(patient, charge, "40.00");
+        when(chargeAdjustmentRepository.sumDiscountByChargeId(charge.getId())).thenReturn(money("10.00"));
+        when(refundRepository.sumAmountByChargeId(charge.getId())).thenReturn(money("15.00"));
+        when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentResponse response = service.registerPayment(patient.getId(),
+                new CreatePaymentRequest(charge.getId(), money("65.00"), PaymentMethod.CARD), actorId);
+
+        assertThat(response.kind()).isEqualTo(PaymentKind.PAYMENT);
+        assertThatThrownBy(() -> service.registerPayment(patient.getId(),
+                new CreatePaymentRequest(charge.getId(), money("65.01"), PaymentMethod.CARD), actorId))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Payment amount exceeds the pending balance of the charge");
+    }
+
+    @Test
+    void statementMatchesChargeLedger() {
+        Patient patient = patient();
+        Charge charge = charge(patient, "Limpieza", "100.00");
+        Charge voided = charge(patient, "Anulado", "50.00");
+        Payment partial = payment(patient, charge, PaymentKind.PARTIAL_PAYMENT, "40.00");
+        Payment advance = payment(patient, null, PaymentKind.ADVANCE, "20.00");
+        when(patientRepository.existsById(patient.getId())).thenReturn(true);
+        when(chargeRepository.findByPatient_IdOrderByCreatedAtAscIdAsc(patient.getId()))
+                .thenReturn(List.of(charge, voided));
+        when(paymentRepository.findByPatient_IdOrderByCreatedAtAscIdAsc(patient.getId()))
+                .thenReturn(List.of(partial, advance));
+        when(chargeAdjustmentRepository.findByPatientIdOrderByCreatedAtAscIdAsc(patient.getId())).thenReturn(List.of(
+                new ChargeAdjustment(UUID.randomUUID(), charge.getId(), patient.getId(), ChargeAdjustmentType.DISCOUNT,
+                        money("10.00"), "Cortesia", actorId, actorId, NOW),
+                new ChargeAdjustment(UUID.randomUUID(), voided.getId(), patient.getId(), ChargeAdjustmentType.VOID,
+                        null, "Error de cargo", actorId, actorId, NOW)));
+        when(refundRepository.findByPatientIdOrderByCreatedAtAscIdAsc(patient.getId())).thenReturn(List.of(
+                new Refund(UUID.randomUUID(), partial.getId(), patient.getId(), money("15.00"), "Devolucion",
+                        actorId, actorId, null, null, NOW),
+                new Refund(UUID.randomUUID(), advance.getId(), patient.getId(), money("5.00"), "Anticipo",
+                        actorId, actorId, null, null, NOW)));
+
+        AccountStatementResponse response = service.findAccountStatement(patient.getId());
+        ChargePosition position = new ChargeLedger().position(
+                money("100.00"), money("40.00"), money("10.00"), money("15.00"), false);
+        ChargeResponse row = response.charges().getFirst();
+
+        assertThat(row.paid()).isEqualByComparingTo(position.netPaid());
+        assertThat(row.discount()).isEqualByComparingTo(position.discount());
+        assertThat(row.refunded()).isEqualByComparingTo(position.refunded());
+        assertThat(row.pending()).isEqualByComparingTo(position.pending());
+        assertThat(row.status()).isEqualTo(position.status());
+        assertThat(row.pending()).isEqualByComparingTo(row.amount().subtract(row.discount()).subtract(row.paid()));
+        assertThat(response.charges().get(1).status()).isEqualTo(ChargeStatus.VOIDED);
+        assertThat(response.charges().get(1).pending()).isEqualByComparingTo("0.00");
+        assertThat(response.summary()).isEqualTo(new AccountSummaryResponse(
+                money("90.00"), position.netPaid(), money("15.00"),
+                money("90.00").subtract(position.netPaid()).subtract(money("15.00"))));
     }
 
     @Test
@@ -318,9 +433,10 @@ class BillingServiceImplTests {
         when(patientRepository.findById(patient.getId())).thenReturn(Optional.of(patient));
         when(chargeRepository.findByIdAndPatientIdForUpdate(foreignChargeId, patient.getId()))
                 .thenReturn(Optional.empty());
+        stubOpenShift();
 
         assertThatThrownBy(() -> service.registerPayment(patient.getId(),
-                new CreatePaymentRequest(foreignChargeId, money("10.00"), PaymentMethod.CASH)))
+                new CreatePaymentRequest(foreignChargeId, money("10.00"), PaymentMethod.CASH), actorId))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Charge not found");
 
@@ -333,11 +449,12 @@ class BillingServiceImplTests {
         when(patientRepository.findById(patientId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.registerPayment(patientId,
-                new CreatePaymentRequest(UUID.randomUUID(), money("10.00"), PaymentMethod.CASH)))
+                new CreatePaymentRequest(UUID.randomUUID(), money("10.00"), PaymentMethod.CASH), actorId))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Patient not found");
 
         verifyNoInteractions(chargeRepository, paymentRepository);
+        verify(cashShiftService, never()).requireOpenShiftForUpdate(any());
     }
 
     @Test
@@ -354,7 +471,13 @@ class BillingServiceImplTests {
         assertPaymentRejected(patientId, new CreatePaymentRequest(null, money("10.001"), PaymentMethod.CASH),
                 "Amount must not have more than 2 decimals");
 
-        verifyNoInteractions(patientRepository, chargeRepository, paymentRepository);
+        verifyNoInteractions(patientRepository, chargeRepository, paymentRepository, cashShiftService);
+    }
+
+    private CashShift stubOpenShift() {
+        CashShift shift = new CashShift(UUID.randomUUID(), actorId, money("0.00"), null, NOW);
+        when(cashShiftService.requireOpenShiftForUpdate(actorId)).thenReturn(shift);
+        return shift;
     }
 
     private void stubLockedCharge(Patient patient, Charge charge, String alreadyPaid) {
@@ -365,7 +488,7 @@ class BillingServiceImplTests {
     }
 
     private void assertPaymentRejected(UUID patientId, CreatePaymentRequest request, String message) {
-        assertThatThrownBy(() -> service.registerPayment(patientId, request))
+        assertThatThrownBy(() -> service.registerPayment(patientId, request, actorId))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessage(message);
     }

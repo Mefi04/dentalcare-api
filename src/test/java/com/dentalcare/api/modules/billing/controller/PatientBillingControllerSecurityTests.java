@@ -11,6 +11,7 @@ import com.dentalcare.api.modules.billing.model.PaymentMethod;
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.billing.service.BillingServiceImpl;
+import com.dentalcare.api.modules.billing.service.CashShiftService;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
@@ -44,7 +45,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = {PatientBillingController.class, BillingController.class},
         properties = "FRONTEND_URL=http://localhost:3000")
 @Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
-        RestAccessDeniedHandler.class, GlobalExceptionHandler.class, BillingServiceImpl.class, BillingMapper.class})
+        RestAccessDeniedHandler.class, GlobalExceptionHandler.class, BillingServiceImpl.class, BillingMapper.class,
+        com.dentalcare.api.modules.billing.ledger.ChargeLedger.class})
 class PatientBillingControllerSecurityTests {
 
     private static final Instant NOW = Instant.parse("2026-09-29T12:00:00Z");
@@ -66,6 +68,15 @@ class PatientBillingControllerSecurityTests {
 
     @MockitoBean
     private Clock clock;
+
+    @MockitoBean
+    private CashShiftService cashShiftService;
+
+    @MockitoBean
+    private com.dentalcare.api.modules.billing.repository.ChargeAdjustmentRepository chargeAdjustmentRepository;
+
+    @MockitoBean
+    private com.dentalcare.api.modules.billing.repository.RefundRepository refundRepository;
 
     private UUID userId;
     private Patient patient;
