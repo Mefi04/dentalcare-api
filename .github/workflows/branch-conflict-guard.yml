@@ -10,6 +10,11 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+  pull_request_target:
+    branches:
+      - develop
+      - main
+    types:
       - edited
 
 concurrency:
@@ -27,7 +32,7 @@ jobs:
       pull-requests: read
 
     steps:
-      - name: Checkout repository history
+      - name: Checkout trusted repository history
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -37,14 +42,21 @@ jobs:
         id: branch_check
         shell: bash
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
+          # Always compare against the current tip of the target branch instead
+          # of trusting a potentially stale base SHA from an older PR event.
+          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          BASE_SHA=$(git rev-parse "refs/remotes/origin/${BASE_REF}")
+          HEAD_SHA="${EVENT_HEAD_SHA}"
+
+          # The PR head is data only: it is never checked out or executed.
+          git fetch --no-tags origin "${HEAD_SHA}" >/dev/null 2>&1 || true
           git cat-file -e "${BASE_SHA}^{commit}"
           git cat-file -e "${HEAD_SHA}^{commit}"
 
@@ -103,6 +115,7 @@ jobs:
             echo "- Commits de la rama por delante de \`${BASE_REF}\`: **${AHEAD}**"
             echo "- Commits de la rama por detrás de \`${BASE_REF}\`: **${BEHIND}**"
             echo "- Archivos modificados por ambos lados desde el merge-base: **${OVERLAP_COUNT}**"
+            echo "- Base actual evaluada: \`${BASE_SHA}\`"
             echo
             if [ -s conflict-files.txt ]; then
               echo '### ❌ Archivos con conflicto real'
