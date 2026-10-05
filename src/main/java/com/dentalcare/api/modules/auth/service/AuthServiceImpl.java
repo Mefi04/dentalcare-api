@@ -220,7 +220,7 @@ public class AuthServiceImpl implements AuthService {
     private void auditLoginFailure(UUID knownUserId) {
         if (auditService == null) return;
         try {
-            auditService.failure(AuditActions.AUTH_LOGIN_FAILED, "AUTH", "User", knownUserId, knownUserId);
+            auditService.failure(AuditActions.AUTH_LOGIN_FAILED, "AUTH", "User", knownUserId, null);
         } catch (RuntimeException auditFailure) {
             // Keep credential failures generic even when audit storage is temporarily unavailable.
             LOGGER.warn("Failed to persist an authentication failure audit event");
