@@ -147,6 +147,9 @@ class DentalCareApplicationTests {
     @MockitoBean
     com.dentalcare.api.modules.users.repository.ProfessionalPublicProfileRepository professionalPublicProfileRepository;
 
+    @MockitoBean
+    com.dentalcare.api.modules.contactinquiries.repository.ContactInquiryRepository contactInquiryRepository;
+
     @Test
     void contextLoads() {
     }

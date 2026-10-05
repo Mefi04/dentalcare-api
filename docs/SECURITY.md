@@ -122,6 +122,11 @@ and every non-GET public route still require authentication and their existing a
 projections. They return only visible profiles whose linked user remains active and has the active `DENTIST` role.
 Profile administration stays under the existing administrator-only `/api/v1/users/**` surface.
 
+`POST /api/v1/public/contact-inquiries` is an anonymous, exact public route for general inquiries only. It does not
+create appointments, process emergencies, accept files, or collect structured clinical data. Input is persisted as
+plain text and is not logged. There is no distributed rate-limiting infrastructure yet; a deployment-level distributed
+rate limiter should be added as future anti-spam hardening without weakening the endpoint's validation limits.
+
 Only the existing administrator role receives these permissions. Other staff modules must not reuse settings
 permissions as a shortcut for consuming catalog data; any future cross-module contract requires its own approved
 authorization design.
