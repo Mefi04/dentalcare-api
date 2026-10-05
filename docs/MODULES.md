@@ -130,6 +130,11 @@ Provides the read-only public facade for the clinic web site. It consumes the si
 and active procedure catalog from `settings`; it owns no persistence, clinic data, or procedure data.
 Its response DTOs deliberately expose only visitor-safe fields.
 
+## contactinquiries
+
+Receives general public contact inquiries independently from patients, appointments, clinical records, and users.
+Only administrators can read or change an inquiry status after receipt.
+
 ## Module rules
 
 Business logic must remain within the appropriate module.
