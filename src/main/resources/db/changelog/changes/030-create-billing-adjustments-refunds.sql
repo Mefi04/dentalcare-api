@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset dentalcare:029-create-billing-adjustments-refunds
+--changeset dentalcare:030-create-billing-adjustments-refunds
 CREATE TABLE billing_charge_adjustments (
     id UUID PRIMARY KEY,
     charge_id UUID NOT NULL,

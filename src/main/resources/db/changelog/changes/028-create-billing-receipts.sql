@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset dentalcare:027-create-billing-receipts
+--changeset dentalcare:028-create-billing-receipts
 CREATE SEQUENCE billing_receipt_number_seq AS BIGINT START WITH 1 INCREMENT BY 1;
 
 ALTER TABLE billing_payments

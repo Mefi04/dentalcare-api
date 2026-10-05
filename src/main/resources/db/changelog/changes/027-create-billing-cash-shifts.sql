@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset dentalcare:026-create-billing-cash-shifts
+--changeset dentalcare:027-create-billing-cash-shifts
 -- One OPEN shift per user. Expected amount and difference are stored only when the shift is closed.
 CREATE TABLE billing_cash_shifts (
     id UUID PRIMARY KEY,

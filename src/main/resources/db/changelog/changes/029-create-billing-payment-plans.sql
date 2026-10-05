@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset dentalcare:028-create-billing-payment-plans
+--changeset dentalcare:029-create-billing-payment-plans
 CREATE TABLE billing_payment_plans (
     id UUID PRIMARY KEY,
     charge_id UUID NOT NULL,

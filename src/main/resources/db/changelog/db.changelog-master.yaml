@@ -52,10 +52,10 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/026-create-clinic-settings-procedure-catalog.sql
   - include:
-      file: db/changelog/changes/026-create-billing-cash-shifts.sql
+      file: db/changelog/changes/027-create-billing-cash-shifts.sql
   - include:
-      file: db/changelog/changes/027-create-billing-receipts.sql
+      file: db/changelog/changes/028-create-billing-receipts.sql
   - include:
-      file: db/changelog/changes/028-create-billing-payment-plans.sql
+      file: db/changelog/changes/029-create-billing-payment-plans.sql
   - include:
-      file: db/changelog/changes/029-create-billing-adjustments-refunds.sql
+      file: db/changelog/changes/030-create-billing-adjustments-refunds.sql
