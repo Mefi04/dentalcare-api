@@ -2,6 +2,7 @@ package com.dentalcare.api.modules.auth.service;
 
 import com.dentalcare.api.exception.UnauthorizedException;
 import com.dentalcare.api.modules.auth.dto.request.ActivateAccountRequest;
+import com.dentalcare.api.modules.auth.dto.request.ChangePasswordRequest;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
 import com.dentalcare.api.modules.auth.dto.response.ActivateAccountResponse;
 import com.dentalcare.api.modules.auth.dto.response.LoginResponse;
@@ -194,6 +195,24 @@ public class AuthServiceImpl implements AuthService {
                         refreshTokenService.revokeSession(session);
                     }
                 });
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(UUID userId, ChangePasswordRequest request) {
+        PasswordPolicy.validate(request.newPassword());
+        User user = userRepository.findById(userId)
+                .filter(candidate -> candidate.getStatus() == UserStatus.ACTIVE)
+                .orElseThrow(() -> new UnauthorizedException(AUTH_REQUIRED));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new UnauthorizedException(INVALID_CREDENTIALS);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setUpdatedAt(clock.instant());
+        userRepository.save(user);
+        refreshTokenService.revokeAllForUser(userId);
     }
 
     @Override

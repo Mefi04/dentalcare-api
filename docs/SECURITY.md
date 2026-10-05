@@ -545,3 +545,7 @@ the unmodified permission codes.
 Missing or invalid authentication produces `401 Unauthorized`. An authenticated caller who lacks a required role
 or permission produces `403 Forbidden`. Future modules must define and enforce their concrete permissions when
 their business operations are implemented; this infrastructure does not establish an exhaustive permission catalog.
+
+## Authenticated password change
+
+Authenticated patient password changes derive the account exclusively from the JWT principal. The API never accepts a target user id or CUI. The current password is verified against the stored BCrypt hash, the replacement uses the shared password policy, and all refresh sessions are revoked atomically after success. Existing access JWTs expire normally because the architecture is stateless. Clients must clear local tokens and require a new login after a successful change.

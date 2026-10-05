@@ -1,6 +1,7 @@
 package com.dentalcare.api.modules.auth.service;
 
 import com.dentalcare.api.modules.auth.dto.request.ActivateAccountRequest;
+import com.dentalcare.api.modules.auth.dto.request.ChangePasswordRequest;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
 import com.dentalcare.api.modules.auth.dto.response.ActivateAccountResponse;
 import com.dentalcare.api.modules.auth.dto.response.LoginResponse;
@@ -19,6 +20,8 @@ public interface AuthService {
     RefreshResult refresh(String rawRefreshToken);
 
     void logout(String rawRefreshToken);
+
+    void changePassword(UUID userId, ChangePasswordRequest request);
 
     UserResponse getCurrentUser(UUID userId);
 
