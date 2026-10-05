@@ -2,6 +2,8 @@ package com.dentalcare.api.modules.settings.service;
 
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.settings.dto.request.UpdateClinicSettingsRequest;
 import com.dentalcare.api.modules.settings.dto.response.ClinicSettingsResponse;
 import com.dentalcare.api.modules.settings.mapper.ClinicSettingsMapper;
@@ -16,6 +18,7 @@ import java.util.UUID;
 
 @Service
 public class ClinicSettingsServiceImpl implements ClinicSettingsService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
     private final ClinicSettingsRepository repository;
     private final UserRepository userRepository;
     private final ClinicSettingsMapper mapper;
@@ -43,7 +46,9 @@ public class ClinicSettingsServiceImpl implements ClinicSettingsService {
         settings.setReceiptPrefix(optionalUpper(request.receiptPrefix()));
         settings.setUpdatedBy(actorId);
         settings.setUpdatedAt(clock.instant());
-        return mapper.toResponse(repository.saveAndFlush(settings));
+        var response=mapper.toResponse(repository.saveAndFlush(settings));
+        if(auditService!=null)auditService.success(AuditActions.SETTINGS_CLINIC_UPDATED,"SETTINGS","ClinicSettings",null,actorId);
+        return response;
     }
 
     private ClinicSettings findSingleton() {

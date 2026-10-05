@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.clinicalrecords.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.clinicalrecords.dto.request.CreateClinicalDocumentRequest;
 import com.dentalcare.api.modules.clinicalrecords.dto.request.UploadClinicalDocumentRequest;
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentDownload;
@@ -39,6 +41,7 @@ import java.util.UUID;
 
 @Service
 public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ClinicalDocumentServiceImpl.class);
     private static final int MAX_PAGE_SIZE = 100;
@@ -108,6 +111,7 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
         );
 
         ClinicalDocument saved = clinicalDocumentRepository.save(document);
+        if(auditService!=null)auditService.success(AuditActions.DOCUMENT_CREATED,"CLINICAL_RECORDS","ClinicalDocument",saved.getId(),authenticatedUserId);
         return mapper.toResponse(saved);
     }
 
@@ -184,6 +188,8 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
             throw e;
         }
 
+        if(auditService!=null)auditService.success(AuditActions.DOCUMENT_CREATED,"CLINICAL_RECORDS","ClinicalDocument",saved.getId(),authenticatedUserId);
+
         return mapper.toResponse(saved);
     }
 
@@ -253,7 +259,9 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
         }
 
         document.updatePatientVisibility(visible, actor, clock.instant());
-        return mapper.toResponse(clinicalDocumentRepository.save(document));
+        var saved=clinicalDocumentRepository.save(document);
+        if(auditService!=null)auditService.success(AuditActions.DOCUMENT_VISIBILITY_CHANGED,"CLINICAL_RECORDS","ClinicalDocument",saved.getId(),authenticatedUserId);
+        return mapper.toResponse(saved);
     }
 
     @Override

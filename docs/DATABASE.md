@@ -197,7 +197,7 @@ plan; clients cannot submit those values. `(treatment_plan_id, version)` is uniq
 permits only one `PENDING` or `APPROVED` budget per plan. Rejected budgets remain as audit history and allow a
 new version. Budget approval records the authenticated deciding user and does not create Billing charges.
 
-Changeset `031-add-treatment-budget-patient-decision` keeps the clinic decision separate from the patient's
+Changeset `032-add-treatment-budget-patient-decision` keeps the clinic decision separate from the patient's
 one-time response. `patient_decision` follows `PENDING -> ACCEPTED|REJECTED`; its authenticated user and
 timestamp are mandatory only after a decision. Database checks enforce the lifecycle and chronology, while
 the patient/decision/date index supports portal reads without changing the administrative budget status.

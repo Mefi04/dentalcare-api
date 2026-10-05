@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset dentalcare:031-add-treatment-budget-patient-decision
+--changeset dentalcare:032-add-treatment-budget-patient-decision
 ALTER TABLE treatment_budgets
     ADD COLUMN patient_decision VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     ADD COLUMN patient_decided_by UUID,

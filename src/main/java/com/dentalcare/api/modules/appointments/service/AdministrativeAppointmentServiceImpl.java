@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.appointments.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.appointments.dto.request.CreateAdministrativeAppointmentRequest;
 import com.dentalcare.api.modules.appointments.dto.response.AdministrativeAppointmentResponse;
 import com.dentalcare.api.modules.appointments.mapper.AdministrativeAppointmentMapper;
@@ -23,6 +25,7 @@ import java.util.UUID;
 
 @Service
 public class AdministrativeAppointmentServiceImpl implements AdministrativeAppointmentService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final Sort APPOINTMENT_ORDER = Sort.by(
@@ -99,6 +102,7 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
         }
         Appointment appointment = appointmentService.create(
                 request.patientId(), request.professionalId(), request.scheduledAt());
+        if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_CREATED,"APPOINTMENTS","Appointment",appointment.getId(),null);
         return administrativeAppointmentMapper.toResponse(appointment);
     }
 
@@ -107,8 +111,9 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
     public AdministrativeAppointmentResponse reschedule(UUID appointmentId, Instant scheduledAt) {
         requireAppointmentId(appointmentId);
         Appointment appointment = findForUpdate(appointmentId);
-        return administrativeAppointmentMapper.toResponse(
-                appointmentService.reschedule(appointment, scheduledAt));
+        Appointment updated=appointmentService.reschedule(appointment, scheduledAt);
+        if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_RESCHEDULED,"APPOINTMENTS","Appointment",appointmentId,null);
+        return administrativeAppointmentMapper.toResponse(updated);
     }
 
     @Override
@@ -120,6 +125,7 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
         }
 
         Appointment appointment = findForUpdate(appointmentId);
+        if(auditService!=null)auditService.success(status==AppointmentStatus.CANCELLED?AuditActions.APPOINTMENT_CANCELLED:AuditActions.APPOINTMENT_STATUS_CHANGED,"APPOINTMENTS","Appointment",appointmentId,actorId);
         if (status == AppointmentStatus.CANCELLED) {
             AdministrativeAppointmentResponse response = administrativeAppointmentMapper.toResponse(
                     appointmentService.cancel(appointment));

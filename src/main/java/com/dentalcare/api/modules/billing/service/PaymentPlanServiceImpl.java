@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.billing.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.billing.dto.request.CancelPaymentPlanRequest;
 import com.dentalcare.api.modules.billing.dto.request.CreatePaymentPlanRequest;
 import com.dentalcare.api.modules.billing.dto.response.InstallmentResponse;
@@ -39,6 +41,7 @@ import java.util.UUID;
 
 @Service
 public class PaymentPlanServiceImpl implements PaymentPlanService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final int MIN_INSTALLMENTS = 2;
     private static final int MAX_INSTALLMENTS = 60;
@@ -118,7 +121,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
             }
             throw exception;
         }
-        // TODO(#114): publicar evento de auditoría
+        if (auditService != null) auditService.success(AuditActions.BILLING_PAYMENT_PLAN_CREATED, "BILLING", "PaymentPlan", plan.getId(), actorUserId);
         return toResponse(plan);
     }
 
@@ -159,7 +162,7 @@ public class PaymentPlanServiceImpl implements PaymentPlanService {
         }
         plan.cancel(actorUserId, reason, clock.instant());
         paymentPlanRepository.saveAndFlush(plan);
-        // TODO(#114): publicar evento de auditoría
+        if (auditService != null) auditService.success(AuditActions.BILLING_PAYMENT_PLAN_CANCELLED, "BILLING", "PaymentPlan", plan.getId(), actorUserId);
         return toResponse(plan);
     }
 

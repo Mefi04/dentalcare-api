@@ -1,6 +1,8 @@
 package com.dentalcare.api.modules.auth.service;
 
 import com.dentalcare.api.exception.BadRequestException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.auth.config.PasswordRecoveryProperties;
 import com.dentalcare.api.modules.auth.dto.request.ConfirmPasswordRecoveryRequest;
 import com.dentalcare.api.modules.auth.dto.request.PasswordRecoveryRequest;
@@ -30,6 +32,7 @@ import java.util.UUID;
 
 @Service
 public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     static final String REQUEST_MESSAGE =
             "If the account is eligible, a recovery code will be sent";
@@ -85,6 +88,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
     @Override
     @Transactional
     public PasswordRecoveryResponse requestRecovery(PasswordRecoveryRequest request) {
+        if (auditService != null) auditService.success(AuditActions.AUTH_PASSWORD_RECOVERY_REQUESTED, "AUTH", "User", null, null);
         String cui = User.normalizeCui(request.cui());
         Optional<User> userCandidate = userRepository.findByCuiForUpdate(cui);
         if (userCandidate.isEmpty() || userCandidate.get().getStatus() != UserStatus.ACTIVE) {
@@ -149,6 +153,7 @@ public class PasswordRecoveryServiceImpl implements PasswordRecoveryService {
         tokenRepository.save(token);
         revokeOutstandingTokens(user.getId(), now);
         refreshTokenService.revokeAllForUser(user.getId());
+        if (auditService != null) auditService.success(AuditActions.AUTH_PASSWORD_RECOVERY_COMPLETED, "AUTH", "User", user.getId(), user.getId());
         return new PasswordRecoveryResponse(SUCCESS_MESSAGE);
     }
 
