@@ -1,5 +1,6 @@
 package com.dentalcare.api.modules.auth.controller;
 
+import com.dentalcare.api.modules.auth.dto.request.ChangePasswordRequest;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
 import com.dentalcare.api.modules.auth.dto.request.MobileLogoutRequest;
 import com.dentalcare.api.modules.auth.dto.request.MobileRefreshRequest;
@@ -7,9 +8,12 @@ import com.dentalcare.api.modules.auth.dto.response.MobileLoginResponse;
 import com.dentalcare.api.modules.auth.dto.response.MobileRefreshResponse;
 import com.dentalcare.api.modules.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
+import com.dentalcare.api.security.service.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,6 +55,15 @@ public class MobileAuthController {
                 result.response().expiresIn()
         );
         return ResponseEntity.ok(response);
+    }
+
+    @Operation(summary = "Change the authenticated patient's password and revoke refresh sessions")
+    @PatchMapping("/password")
+    public ResponseEntity<Void> changePassword(
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(principal.userId(), request);
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Logout mobile client and invalidate refresh session")

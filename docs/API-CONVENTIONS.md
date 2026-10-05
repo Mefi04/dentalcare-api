@@ -408,6 +408,14 @@ in progress, or its approved quantity has been completed. A plan item from anoth
 Found`. Repeated completion returns `409 Conflict`; attempting to complete another dentist's execution returns
 `403 Forbidden`. History is immutable and ordered by `performedAt DESC, id DESC`.
 
+## Authenticated patient password change
+
+| Method | Path | Authorization | Success | Notes |
+|---|---|---|---|---|
+| `PATCH` | `/api/v1/auth/mobile/password` | Authenticated patient | `204 No Content` | Body: `currentPassword`, `newPassword`. The target user is derived only from the JWT. A successful change stores a BCrypt hash and revokes every refresh session for the user. |
+
+Incorrect current credentials return the generic `Invalid credentials` response. Existing stateless access tokens remain valid only until their normal short expiration; all refresh tokens are revoked, so clients must clear the local session after success and authenticate again.
+
 ## Patient password recovery endpoints
 
 Both endpoints are public so the App Móvil can recover an unauthenticated patient account. They never reveal
