@@ -15,6 +15,8 @@ import com.dentalcare.api.modules.billing.repository.ReceiptRepository;
 import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
+import com.dentalcare.api.modules.settings.dto.response.ClinicSettingsResponse;
+import com.dentalcare.api.modules.settings.service.ClinicSettingsService;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class ReceiptServiceImplTests {
@@ -55,12 +58,15 @@ class ReceiptServiceImplTests {
     @Mock
     private RefundRepository refundRepository;
 
+    @Mock
+    private ClinicSettingsService clinicSettingsService;
+
     private ReceiptService receiptService;
 
     @BeforeEach
     void setUp() {
         receiptService = new ReceiptServiceImpl(paymentRepository, receiptRepository, refundRepository,
-                new ReceiptMapper(), CLOCK);
+                new ReceiptMapper(), clinicSettingsService, CLOCK);
     }
 
     @Test
@@ -73,6 +79,7 @@ class ReceiptServiceImplTests {
         when(receiptRepository.existsByPaymentId(payment.getId())).thenReturn(false);
         when(receiptRepository.nextReceiptNumber()).thenReturn(4L);
         when(receiptRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(clinicSettingsService.get()).thenReturn(clinicSettings(null, null, null, null, null, null));
 
         ReceiptResponse response = receiptService.issue(patient.getId(), payment.getId(), actorId);
 
@@ -91,6 +98,49 @@ class ReceiptServiceImplTests {
         assertThat(response.concept()).isEqualTo("Limpieza");
         assertThat(response.receiptNumber()).isEqualTo(4L);
         assertThat(response.issuedByUserId()).isEqualTo(actorId);
+        assertThat(response.voidedAt()).isNull();
+        assertThat(response.voidReason()).isNull();
+        assertThat(response.clinic()).isNotNull();
+        assertThat(response.clinic().tradeName()).isNull();
+    }
+
+    @Test
+    void issuedReceiptIncludesCurrentClinicSettings() {
+        Patient patient = patient();
+        Payment payment = payment(patient, null, PaymentKind.ADVANCE, PaymentMethod.CASH, "25.00");
+        when(clinicSettingsService.get()).thenReturn(clinicSettings(
+                "DentalCare Central", "1234567-8", "5555-1234", "info@example.test", "Zona 1", "Guatemala"));
+        when(paymentRepository.findByIdAndPatientIdForUpdate(payment.getId(), patient.getId()))
+                .thenReturn(Optional.of(payment));
+        when(receiptRepository.existsByPaymentId(payment.getId())).thenReturn(false);
+        when(receiptRepository.nextReceiptNumber()).thenReturn(5L);
+        when(receiptRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ReceiptResponse response = receiptService.issue(patient.getId(), payment.getId(), UUID.randomUUID());
+
+        assertThat(response.clinic().tradeName()).isEqualTo("DentalCare Central");
+        assertThat(response.clinic().nit()).isEqualTo("1234567-8");
+        assertThat(response.clinic().phone()).isEqualTo("5555-1234");
+        assertThat(response.clinic().email()).isEqualTo("info@example.test");
+        assertThat(response.clinic().address()).isEqualTo("Zona 1");
+        assertThat(response.clinic().city()).isEqualTo("Guatemala");
+    }
+
+    @Test
+    void voidedReceiptReturnsPersistedVoidDetails() {
+        Patient patient = patient();
+        Payment payment = payment(patient, null, PaymentKind.ADVANCE, PaymentMethod.CASH, "10.00");
+        Receipt receipt = new Receipt(UUID.randomUUID(), 9L, payment.getId(), patient.getId(), "Anticipo",
+                payment.getAmount(), payment.getMethod(), UUID.randomUUID(), NOW.minusSeconds(60));
+        receipt.voidReceipt(NOW, "Duplicado");
+        when(paymentRepository.findByIdAndPatientId(payment.getId(), patient.getId())).thenReturn(Optional.of(payment));
+        when(receiptRepository.findByPaymentId(payment.getId())).thenReturn(Optional.of(receipt));
+
+        ReceiptResponse response = receiptService.findByPayment(patient.getId(), payment.getId());
+
+        assertThat(response.status()).isEqualTo(ReceiptStatus.VOID);
+        assertThat(response.voidedAt()).isEqualTo(NOW);
+        assertThat(response.voidReason()).isEqualTo("Duplicado");
     }
 
     @Test
@@ -216,5 +266,11 @@ class ReceiptServiceImplTests {
 
     private BigDecimal money(String amount) {
         return new BigDecimal(amount);
+    }
+
+    private ClinicSettingsResponse clinicSettings(String tradeName, String nit, String phone, String email,
+                                                  String address, String city) {
+        return new ClinicSettingsResponse((short) 1, tradeName, nit, phone, email, address, city,
+                null, null, null, NOW, NOW);
     }
 }

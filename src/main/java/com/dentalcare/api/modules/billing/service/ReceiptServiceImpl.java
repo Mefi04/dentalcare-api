@@ -12,6 +12,7 @@ import com.dentalcare.api.modules.billing.model.Receipt;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.billing.repository.ReceiptRepository;
 import com.dentalcare.api.modules.billing.repository.RefundRepository;
+import com.dentalcare.api.modules.settings.service.ClinicSettingsService;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -31,14 +32,17 @@ public class ReceiptServiceImpl implements ReceiptService {
     private final ReceiptRepository receiptRepository;
     private final RefundRepository refundRepository;
     private final ReceiptMapper receiptMapper;
+    private final ClinicSettingsService clinicSettingsService;
     private final Clock clock;
 
     public ReceiptServiceImpl(PaymentRepository paymentRepository, ReceiptRepository receiptRepository,
-                              RefundRepository refundRepository, ReceiptMapper receiptMapper, Clock clock) {
+                              RefundRepository refundRepository, ReceiptMapper receiptMapper,
+                              ClinicSettingsService clinicSettingsService, Clock clock) {
         this.paymentRepository = paymentRepository;
         this.receiptRepository = receiptRepository;
         this.refundRepository = refundRepository;
         this.receiptMapper = receiptMapper;
+        this.clinicSettingsService = clinicSettingsService;
         this.clock = clock;
     }
 
@@ -61,7 +65,7 @@ public class ReceiptServiceImpl implements ReceiptService {
                 actorUserId,
                 clock.instant());
         try {
-            return receiptMapper.toResponse(receiptRepository.saveAndFlush(receipt));
+            return toResponse(receiptRepository.saveAndFlush(receipt));
         } catch (DataIntegrityViolationException exception) {
             if (isDuplicatePaymentReceipt(exception)) {
                 throw new ConflictException("A receipt has already been issued for this payment");
@@ -76,7 +80,11 @@ public class ReceiptServiceImpl implements ReceiptService {
         Payment payment = requirePayment(patientId, paymentId);
         Receipt receipt = receiptRepository.findByPaymentId(payment.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Receipt not found"));
-        return receiptMapper.toResponse(receipt);
+        return toResponse(receipt);
+    }
+
+    private ReceiptResponse toResponse(Receipt receipt) {
+        return receiptMapper.toResponse(receipt, clinicSettingsService.get());
     }
 
     private Payment requirePaymentForIssue(UUID patientId, UUID paymentId) {

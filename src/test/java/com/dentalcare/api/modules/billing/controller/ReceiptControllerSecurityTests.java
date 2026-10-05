@@ -4,6 +4,7 @@ import com.dentalcare.api.config.CorsConfig;
 import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.exception.GlobalExceptionHandler;
 import com.dentalcare.api.modules.billing.dto.response.ReceiptResponse;
+import com.dentalcare.api.modules.billing.dto.response.ReceiptClinicResponse;
 import com.dentalcare.api.modules.billing.model.PaymentMethod;
 import com.dentalcare.api.modules.billing.model.ReceiptStatus;
 import com.dentalcare.api.modules.billing.service.ReceiptService;
@@ -100,7 +101,10 @@ class ReceiptControllerSecurityTests {
                 .andExpect(jsonPath("$.method").value("CARD"))
                 .andExpect(jsonPath("$.status").value("ISSUED"))
                 .andExpect(jsonPath("$.issuedAt").value("2026-10-04T15:00:00Z"))
-                .andExpect(jsonPath("$.issuedByUserId").value(actorId.toString()));
+                .andExpect(jsonPath("$.issuedByUserId").value(actorId.toString()))
+                .andExpect(jsonPath("$.voidedAt").doesNotExist())
+                .andExpect(jsonPath("$.voidReason").doesNotExist())
+                .andExpect(jsonPath("$.clinic.tradeName").value("Clínica"));
 
         verify(receiptService).issue(patientId, paymentId, actorId);
     }
@@ -136,6 +140,7 @@ class ReceiptControllerSecurityTests {
 
     private ReceiptResponse receipt(UUID patientId, UUID paymentId, UUID actorId) {
         return new ReceiptResponse(UUID.randomUUID(), 12L, paymentId, patientId, "Limpieza",
-                new BigDecimal("40.00"), PaymentMethod.CARD, ReceiptStatus.ISSUED, ISSUED_AT, actorId);
+                new BigDecimal("40.00"), PaymentMethod.CARD, ReceiptStatus.ISSUED, ISSUED_AT, actorId,
+                null, null, new ReceiptClinicResponse("Clínica", null, null, null, null, null));
     }
 }

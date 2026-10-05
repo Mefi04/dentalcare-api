@@ -17,5 +17,8 @@ public record ReceiptResponse(
         PaymentMethod method,
         ReceiptStatus status,
         Instant issuedAt,
-        UUID issuedByUserId) {
+        UUID issuedByUserId,
+        Instant voidedAt,
+        String voidReason,
+        ReceiptClinicResponse clinic) {
 }
