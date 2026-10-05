@@ -19,6 +19,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -45,6 +46,10 @@ public class ProcedureCatalogServiceImpl implements ProcedureCatalogService {
             spec=spec.and((root,q,cb)->cb.equal(cb.lower(root.get("category")),value));}
         if(status!=null) spec=spec.and((root,q,cb)->cb.equal(root.get("status"),status));
         return repository.findAll(spec,PageRequest.of(page,Math.min(size,MAX_PAGE_SIZE),DEFAULT_SORT)).map(mapper::toResponse);
+    }
+    @Override @Transactional(readOnly=true)
+    public List<ProcedureCatalogItemResponse> findActive(){
+        return repository.findByStatusOrderByNameAscIdAsc(ProcedureCatalogItemStatus.ACTIVE).stream().map(mapper::toResponse).toList();
     }
     @Override @Transactional(readOnly=true)
     public ProcedureCatalogItemResponse findById(UUID id){return mapper.toResponse(find(id));}

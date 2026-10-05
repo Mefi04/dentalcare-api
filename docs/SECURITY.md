@@ -114,6 +114,10 @@ Staff responsible for processing and check-in also comes exclusively from JWT.
 Settings mutations derive `created_by` and `updated_by` exclusively from `AuthenticatedUser.userId()` in the
 validated access token. These actor fields, roles, and authorities are never accepted from request payloads.
 
+The anonymous public surface is restricted to `GET /api/v1/public/clinic` and
+`GET /api/v1/public/services`. It exposes visitor-safe projections of Settings data only; all Settings routes
+and every non-GET public route still require authentication and their existing authority checks remain unchanged.
+
 Only the existing administrator role receives these permissions. Other staff modules must not reuse settings
 permissions as a shortcut for consuming catalog data; any future cross-module contract requires its own approved
 authorization design.
