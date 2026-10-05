@@ -16,7 +16,8 @@ import java.time.Clock; import java.util.Locale; import java.util.UUID;
     private final ContactInquiryRepository repository; private final ContactInquiryMapper mapper; private final UserRepository users; private final Clock clock;
     public ContactInquiryServiceImpl(ContactInquiryRepository repository,ContactInquiryMapper mapper,UserRepository users,Clock clock){this.repository=repository;this.mapper=mapper;this.users=users;this.clock=clock;}
     @Override @Transactional public ContactInquiryAcknowledgement create(CreateContactInquiryRequest request){
-        if(request==null)throw new BadRequestException("Contact inquiry is required"); var now=clock.instant();
+        if(request==null)throw new BadRequestException("Contact inquiry is required");
+        if(request.reason()==null)throw new BadRequestException("Reason is required"); var now=clock.instant();
         var inquiry=new ContactInquiry(UUID.randomUUID(),required(request.name(),"Name is required"),required(request.email(),"Email is required").toLowerCase(Locale.ROOT),optional(request.phone()),request.reason(),required(request.message(),"Message is required"),Boolean.TRUE.equals(request.privacyAccepted()),now);
         if(!inquiry.isPrivacyAccepted())throw new BadRequestException("Privacy policy acceptance is required"); repository.save(inquiry);
         return new ContactInquiryAcknowledgement(true,"Your general inquiry was received. This does not create an appointment and is not an emergency channel.");
