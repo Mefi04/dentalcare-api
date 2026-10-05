@@ -41,7 +41,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> {
                     authorize.requestMatchers(org.springframework.http.HttpMethod.GET,
                             "/api/v1/public/clinic",
-                            "/api/v1/public/services").permitAll();
+                            "/api/v1/public/services",
+                            "/api/v1/public/professionals",
+                            "/api/v1/public/professionals/*").permitAll();
                     authorize.requestMatchers(org.springframework.http.HttpMethod.POST,
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",

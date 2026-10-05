@@ -18,6 +18,7 @@ Responsible for:
 - roles
 - permissions
 - account status
+- public professional profiles linked one-to-one to real dentist users
 
 ## patients
 

@@ -5,6 +5,7 @@ import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.exception.GlobalExceptionHandler;
 import com.dentalcare.api.modules.publicinfo.dto.response.PublicClinicResponse;
 import com.dentalcare.api.modules.publicinfo.dto.response.PublicServiceResponse;
+import com.dentalcare.api.modules.publicinfo.dto.response.PublicProfessionalResponse;
 import com.dentalcare.api.modules.publicinfo.service.PublicInformationService;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
 import com.dentalcare.api.security.handler.RestAccessDeniedHandler;
@@ -73,5 +74,21 @@ class PublicInformationControllerSecurityTests {
         mvc.perform(delete("/api/v1/public/services")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/settings/clinic")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/settings/catalog")).andExpect(status().isUnauthorized());
+    }
+
+    @Test void anonymousVisitorGetsOnlyWhitelistedProfessionals() throws Exception {
+        var id = java.util.UUID.randomUUID();
+        when(service.getProfessionals()).thenReturn(List.of(new PublicProfessionalResponse(id, "Dra. López", "COL-1",
+                "Ortodoncia", "Atención especializada", 8, "Español", "https://cdn.test/photo.jpg")));
+        when(service.getProfessional(id)).thenReturn(new PublicProfessionalResponse(id, "Dra. López", "COL-1",
+                "Ortodoncia", "Atención especializada", 8, "Español", "https://cdn.test/photo.jpg"));
+        mvc.perform(get("/api/v1/public/professionals")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fullName").value("Dra. López"))
+                .andExpect(jsonPath("$[0].cui").doesNotExist()).andExpect(jsonPath("$[0].email").doesNotExist())
+                .andExpect(jsonPath("$[0].username").doesNotExist()).andExpect(jsonPath("$[0].roles").doesNotExist())
+                .andExpect(jsonPath("$[0].createdAt").doesNotExist()).andExpect(jsonPath("$[0].updatedBy").doesNotExist());
+        mvc.perform(get("/api/v1/public/professionals/{id}", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.professionalRegistration").value("COL-1"));
+        mvc.perform(post("/api/v1/public/professionals")).andExpect(status().isUnauthorized());
     }
 }

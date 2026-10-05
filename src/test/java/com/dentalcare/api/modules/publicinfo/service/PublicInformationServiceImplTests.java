@@ -6,6 +6,7 @@ import com.dentalcare.api.modules.settings.dto.response.ProcedureCatalogItemResp
 import com.dentalcare.api.modules.settings.model.ProcedureCatalogItemStatus;
 import com.dentalcare.api.modules.settings.service.ClinicSettingsService;
 import com.dentalcare.api.modules.settings.service.ProcedureCatalogService;
+import com.dentalcare.api.modules.users.service.ProfessionalPublicProfileService;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -19,7 +20,8 @@ class PublicInformationServiceImplTests {
     @Test void clinicProjectionUsesOnlyPublicFields() {
         var clinic = mock(ClinicSettingsService.class);
         var catalog = mock(ProcedureCatalogService.class);
-        var service = new PublicInformationServiceImpl(clinic, catalog, new PublicInformationMapper());
+        var profiles = mock(ProfessionalPublicProfileService.class);
+        var service = new PublicInformationServiceImpl(clinic, catalog, new PublicInformationMapper(), profiles);
         var now = Instant.parse("2026-10-04T12:00:00Z");
         when(clinic.get()).thenReturn(new ClinicSettingsResponse((short) 1, "DentalCare", "548796-2", "22224500",
                 "info@dentalcare.test", "Zone 10", "Guatemala", "Mon-Fri", "DC", UUID.randomUUID(), now, now));
@@ -31,7 +33,8 @@ class PublicInformationServiceImplTests {
     @Test void servicesProjectionUsesTheActiveCatalogReadModelOnly() {
         var clinic = mock(ClinicSettingsService.class);
         var catalog = mock(ProcedureCatalogService.class);
-        var service = new PublicInformationServiceImpl(clinic, catalog, new PublicInformationMapper());
+        var profiles = mock(ProfessionalPublicProfileService.class);
+        var service = new PublicInformationServiceImpl(clinic, catalog, new PublicInformationMapper(), profiles);
         var actor = UUID.randomUUID();
         var now = Instant.parse("2026-10-04T12:00:00Z");
         when(catalog.findActive()).thenReturn(List.of(new ProcedureCatalogItemResponse(UUID.randomUUID(), "CLEANING", "Cleaning",
