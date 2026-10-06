@@ -10,4 +10,3 @@ ALTER TABLE contact_inquiries ADD CONSTRAINT chk_contact_inquiries_reason
 
 --rollback ALTER TABLE contact_inquiries DROP CONSTRAINT IF EXISTS chk_contact_inquiries_reason;
 --rollback ALTER TABLE contact_inquiries ADD CONSTRAINT chk_contact_inquiries_reason CHECK (reason IN ('GENERAL', 'SERVICES', 'PRICING', 'OTHER'));
-

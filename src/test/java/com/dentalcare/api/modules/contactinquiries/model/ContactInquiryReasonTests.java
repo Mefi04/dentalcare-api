@@ -69,4 +69,3 @@ class ContactInquiryReasonTests {
         assertThat(ContactInquiryReason.fromValue(null)).isNull();
     }
 }
-
