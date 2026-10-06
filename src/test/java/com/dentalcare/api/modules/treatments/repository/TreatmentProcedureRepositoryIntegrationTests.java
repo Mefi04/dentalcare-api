@@ -85,6 +85,11 @@ class TreatmentProcedureRepositoryIntegrationTests {
         assertThat(procedures.countByTreatmentPlanItem_IdAndStatus(
                 fixture.item().getId(), TreatmentProcedureStatus.COMPLETED)).isEqualTo(1);
         assertThat(procedures.findDetailedByIdForUpdate(newer.getId())).isPresent();
+        assertThat(procedures.findByTreatmentPlanIds(List.of(fixture.plan().getId())))
+                .extracting(TreatmentProcedure::getId).containsExactly(older.getId(), newer.getId());
+        assertThat(procedures.findOwnedByPlanId(fixture.plan().getId(), fixture.patient().getId()))
+                .extracting(TreatmentProcedure::getId).containsExactly(older.getId(), newer.getId());
+        assertThat(procedures.findOwnedByPlanId(fixture.plan().getId(), UUID.randomUUID())).isEmpty();
     }
 
     @Test

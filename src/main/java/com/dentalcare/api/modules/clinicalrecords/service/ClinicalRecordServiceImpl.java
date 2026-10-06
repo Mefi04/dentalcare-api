@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.clinicalrecords.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.appointments.model.Appointment;
 import com.dentalcare.api.modules.appointments.model.AppointmentStatus;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
@@ -65,6 +67,7 @@ import java.util.UUID;
 
 @Service
 public class ClinicalRecordServiceImpl implements ClinicalRecordService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final Sort ATTENTION_ORDER = Sort.by(
@@ -159,6 +162,7 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
         );
 
         ClinicalAttention saved = clinicalAttentionRepository.save(attention);
+        if(auditService!=null)auditService.success(AuditActions.CLINICAL_RECORD_CREATED,"CLINICAL_RECORDS","ClinicalAttention",saved.getId(),authenticatedUserId);
         return mapper.toAttentionResponse(saved);
     }
 
@@ -247,6 +251,7 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
         );
 
         ClinicalDiagnosis saved = clinicalDiagnosisRepository.save(diagnosis);
+        if(auditService!=null)auditService.success(AuditActions.CLINICAL_RECORD_CREATED,"CLINICAL_RECORDS","ClinicalDiagnosis",saved.getId(),authenticatedUserId);
         return mapper.toDiagnosisResponse(saved);
     }
 
@@ -320,6 +325,7 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
         );
 
         ClinicalEvolutionNote saved = clinicalEvolutionNoteRepository.save(note);
+        if(auditService!=null)auditService.success(AuditActions.CLINICAL_RECORD_CREATED,"CLINICAL_RECORDS","ClinicalEvolutionNote",saved.getId(),authenticatedUserId);
         return mapper.toEvolutionResponse(saved);
     }
 
@@ -432,6 +438,7 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
         );
 
         OdontogramFinding saved = odontogramFindingRepository.save(odontogramFinding);
+        if(auditService!=null)auditService.success(AuditActions.CLINICAL_RECORD_CREATED,"CLINICAL_RECORDS","OdontogramFinding",saved.getId(),authenticatedUserId);
         return mapper.toFindingResponse(saved);
     }
 
@@ -651,6 +658,7 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
         );
 
         ClinicalPreparation saved = clinicalPreparationRepository.save(preparation);
+        if(auditService!=null)auditService.success(AuditActions.CLINICAL_RECORD_CREATED,"CLINICAL_RECORDS","ClinicalPreparation",saved.getId(),authenticatedUserId);
         MedicalHistory medicalHistory = medicalHistoryRepository.findByPatient_Id(patientId).orElse(null);
         return mapper.toPreparationResponse(saved, medicalHistory);
     }

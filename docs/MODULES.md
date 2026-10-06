@@ -18,6 +18,7 @@ Responsible for:
 - roles
 - permissions
 - account status
+- public professional profiles linked one-to-one to real dentist users
 
 ## patients
 
@@ -74,6 +75,7 @@ Responsible for:
 - persistent execution history for approved plan procedures
 - immutable, versioned budgets calculated from approved plan items
 - versioned consent documents with explicit acceptance and revocation audit
+- patient-owned, read-only treatment-plan views with progress derived from persisted procedure executions
 
 ## prescriptions
 
@@ -121,6 +123,17 @@ Responsible for:
 
 The procedure catalog is independent from inventory articles, treatment-plan snapshots, budget snapshots,
 and executed treatment procedures. Staff users and roles remain owned by the `users` module.
+
+## publicinfo
+
+Provides the read-only public facade for the clinic web site. It consumes the singleton clinic configuration
+and active procedure catalog from `settings`; it owns no persistence, clinic data, or procedure data.
+Its response DTOs deliberately expose only visitor-safe fields.
+
+## contactinquiries
+
+Receives general public contact inquiries independently from patients, appointments, clinical records, and users.
+Only administrators can read or change an inquiry status after receipt.
 
 ## Module rules
 

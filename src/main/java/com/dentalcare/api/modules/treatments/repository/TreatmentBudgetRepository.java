@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -40,4 +42,27 @@ public interface TreatmentBudgetRepository extends JpaRepository<TreatmentBudget
     @Query("SELECT COALESCE(MAX(budget.version), 0) FROM TreatmentBudget budget "
             + "WHERE budget.treatmentPlan.id = :planId")
     int findMaxVersionByPlanId(@Param("planId") UUID planId);
+
+    @Query("SELECT budget.id FROM TreatmentBudget budget WHERE budget.patient.id = :patientId "
+            + "AND budget.status = com.dentalcare.api.modules.treatments.model.TreatmentBudgetStatus.APPROVED")
+    Page<UUID> findPublishedIdsByPatientId(@Param("patientId") UUID patientId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"treatmentPlan", "items"})
+    @Query("SELECT DISTINCT budget FROM TreatmentBudget budget WHERE budget.id IN :ids")
+    List<TreatmentBudget> findPatientDetailedByIdIn(@Param("ids") List<UUID> ids);
+
+    @EntityGraph(attributePaths = {"treatmentPlan", "items"})
+    @Query("SELECT DISTINCT budget FROM TreatmentBudget budget WHERE budget.id = :budgetId "
+            + "AND budget.patient.id = :patientId AND budget.status = "
+            + "com.dentalcare.api.modules.treatments.model.TreatmentBudgetStatus.APPROVED")
+    Optional<TreatmentBudget> findPublishedOwnedById(@Param("budgetId") UUID budgetId,
+                                                      @Param("patientId") UUID patientId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"treatmentPlan", "items"})
+    @Query("SELECT DISTINCT budget FROM TreatmentBudget budget WHERE budget.id = :budgetId "
+            + "AND budget.patient.id = :patientId AND budget.status = "
+            + "com.dentalcare.api.modules.treatments.model.TreatmentBudgetStatus.APPROVED")
+    Optional<TreatmentBudget> findPublishedOwnedByIdForUpdate(@Param("budgetId") UUID budgetId,
+                                                               @Param("patientId") UUID patientId);
 }

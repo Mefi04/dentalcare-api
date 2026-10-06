@@ -1,5 +1,7 @@
 package com.dentalcare.api.modules.appointments.service;
 
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.exception.*;
 import com.dentalcare.api.modules.appointments.dto.response.WaitingRoomEntryResponse;
 import com.dentalcare.api.modules.appointments.mapper.WaitingRoomMapper;
@@ -18,6 +20,7 @@ import java.util.UUID;
 
 @Service
 public class WaitingRoomServiceImpl implements WaitingRoomService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
     static final ZoneId CLINIC_ZONE = ZoneId.of("America/Guatemala");
     private static final int MAX_PAGE_SIZE = 100;
     private static final Sort ORDER = Sort.by(Sort.Order.asc("arrivedAt"), Sort.Order.asc("id"));
@@ -81,7 +84,9 @@ public class WaitingRoomServiceImpl implements WaitingRoomService {
         }
         WaitingRoomEntry entry = new WaitingRoomEntry(UUID.randomUUID(), appointment, actor, clock.instant());
         try {
-            return mapper.toResponse(waitingRoom.saveAndFlush(entry));
+            var saved=waitingRoom.saveAndFlush(entry);
+            if(auditService!=null)auditService.success(AuditActions.WAITING_ROOM_CHECKED_IN,"APPOINTMENTS","WaitingRoomEntry",saved.getId(),actorId);
+            return mapper.toResponse(saved);
         } catch (DataIntegrityViolationException exception) {
             throw new ConflictException("Appointment is already checked in");
         }
@@ -103,7 +108,9 @@ public class WaitingRoomServiceImpl implements WaitingRoomService {
         };
         if (status != expected) throw new ConflictException("Invalid waiting room status transition");
         entry.advanceTo(status, actor, clock.instant());
-        return mapper.toResponse(waitingRoom.saveAndFlush(entry));
+        var saved=waitingRoom.saveAndFlush(entry);
+        if(auditService!=null)auditService.success(AuditActions.WAITING_ROOM_STATUS_CHANGED,"APPOINTMENTS","WaitingRoomEntry",saved.getId(),actorId);
+        return mapper.toResponse(saved);
     }
 
     @Override

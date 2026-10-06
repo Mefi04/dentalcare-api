@@ -1,6 +1,8 @@
 package com.dentalcare.api.modules.appointments.service;
 
 import com.dentalcare.api.exception.*;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestResponse;
 import com.dentalcare.api.modules.appointments.mapper.AppointmentRequestMapper;
 import com.dentalcare.api.modules.appointments.model.*;
@@ -19,6 +21,7 @@ import java.util.UUID;
 
 @Service
 public class AppointmentRequestServiceImpl implements AppointmentRequestService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
     private static final int MAX_PAGE_SIZE = 100;
     private static final Sort ORDER = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
 
@@ -49,7 +52,9 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         Instant now = clock.instant();
         AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), patient, professional,
                 requestedAt, AppointmentRequestStatus.PENDING, now, now);
-        return mapper.toResponse(requests.saveAndFlush(request));
+        AppointmentRequest saved=requests.saveAndFlush(request);
+        if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_REQUEST_CREATED,"APPOINTMENTS","AppointmentRequest",saved.getId(),userId);
+        return mapper.toResponse(saved);
     }
 
     @Override
@@ -145,6 +150,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         Appointment appointment = appointments.create(request.getPatient().getId(),
                 request.getRequestedProfessional().getId(), request.getRequestedAt());
         request.confirm(appointment, actor, clock.instant());
+        if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED,"APPOINTMENTS","AppointmentRequest",request.getId(),actorId);
         return mapper.toResponse(requests.saveAndFlush(request));
     }
 
@@ -160,6 +166,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         requireFuture(proposedAt, "Proposed date and time");
         User professional = professionalId == null ? request.getRequestedProfessional() : dentist(professionalId);
         request.propose(professional, proposedAt, actor, clock.instant());
+        if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED,"APPOINTMENTS","AppointmentRequest",request.getId(),actorId);
         return mapper.toResponse(requests.saveAndFlush(request));
     }
 
@@ -173,6 +180,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             throw new ConflictException("Closed appointment requests cannot be rejected");
         }
         request.reject(actor, clock.instant());
+        if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED,"APPOINTMENTS","AppointmentRequest",request.getId(),actorId);
         return mapper.toResponse(requests.saveAndFlush(request));
     }
 

@@ -153,6 +153,8 @@ Mobile clients (Expo / React Native) use dedicated endpoints under `/api/v1/auth
 | `GET` | `/api/v1/patients/me/appointments/professionals` | `ROLE_PATIENT` | `200 OK` | Lists active dentists available for patient self-service booking. Excludes sensitive staff fields. |
 | `PATCH` | `/api/v1/patients/me/appointments/{appointmentId}/cancel` | `ROLE_PATIENT` | `200 OK` | Cancels an appointment owned by the authenticated patient. Transitions status from `SCHEDULED` to `CANCELLED`. Rejects invalid transitions (`COMPLETED`, `CANCELLED`) with `409 Conflict`. Non-existent or foreign appointments return `404 Not Found`. Does not accept request body or patient ID parameter. |
 | `GET` | `/api/v1/patients/me/account-statement` | `ROLE_PATIENT` | `200 OK` | Returns the authenticated patient's `AccountStatementResponse` (see Billing endpoints). Identity is resolved solely from the JWT principal; caller-supplied `patientId` or `userId` parameters are ignored. |
+| `GET` | `/api/v1/patients/me/treatment-plans` | `ROLE_PATIENT` | `200 OK` | Lists only approved plans owned by the authenticated patient. Progress is derived from persisted completed procedure executions. |
+| `GET` | `/api/v1/patients/me/treatment-plans/{planId}` | `ROLE_PATIENT` | `200 OK` | Returns an owned approved plan with item-level execution progress. Missing, draft, and foreign plans return the same generic `404 Not Found`. |
 
 The standard `PatientResponse` is used for `/patients/me`; it never embeds user credentials, password hashes, roles, or refresh-session data. It exposes `portalAccessStatus` (`PENDING_ACTIVATION`, `ACTIVE`, `INACTIVE`, `LOCKED`, or `null` if no portal account exists) derived directly from the linked user.
 
@@ -266,6 +268,11 @@ contains `name`, optional `tooth`, positive `quantity`, and positive `unitPrice`
 The patient always comes from the path. Item positions are assigned by the backend from request order.
 Clients cannot supply status, positions, totals, subtotals, or audit timestamps.
 
+Patient self-service never reuses the administrative routes above. `PatientTreatmentPlanResponse` excludes
+`patientId`, prices, internal observations, clinical notes, completion notes, and audit actors. It exposes the
+professional display name, approved plan metadata, ordered procedures, persisted execution states, and progress
+derived as completed executions divided by planned quantity. Draft plans remain internal until approved.
+
 ## Treatment budget and consent endpoints
 
 Budgets are immutable snapshots of an approved plan. The backend derives patient, item data, prices, subtotal,
@@ -279,6 +286,10 @@ remains in history and permits generation of the next version. Approval never cr
 | `GET` | `/api/v1/treatment-budgets/{budgetId}` | `TREATMENT_BUDGET_READ` | `200 OK` | Returns one snapshot and its ordered items. |
 | `PATCH` | `/api/v1/treatment-budgets/{budgetId}/approve` | `TREATMENT_BUDGET_DECIDE` | `200 OK` | Performs `PENDING -> APPROVED`. |
 | `PATCH` | `/api/v1/treatment-budgets/{budgetId}/reject` | `TREATMENT_BUDGET_DECIDE` | `200 OK` | Performs `PENDING -> REJECTED`. |
+| `GET` | `/api/v1/patients/me/treatment-budgets` | `ROLE_PATIENT` | `200 OK` | Lists only clinic-approved budgets owned by the authenticated patient. |
+| `GET` | `/api/v1/patients/me/treatment-budgets/{budgetId}` | `ROLE_PATIENT` | `200 OK` | Returns an owned clinic-approved snapshot; missing, unpublished, and foreign IDs share a generic `404`. |
+| `PATCH` | `/api/v1/patients/me/treatment-budgets/{budgetId}/accept` | `ROLE_PATIENT` | `200 OK` | Persists the authenticated patient's one-time `ACCEPTED` decision. Repeated decisions return `409`. |
+| `PATCH` | `/api/v1/patients/me/treatment-budgets/{budgetId}/reject` | `ROLE_PATIENT` | `200 OK` | Persists the authenticated patient's one-time `REJECTED` decision. Repeated decisions return `409`. |
 | `POST` | `/api/v1/treatment-plans/{planId}/consents` | `TREATMENT_CONSENT_CREATE` | `201 Created` | Stores immutable `documentVersion` and `consentText` as pending. |
 | `GET` | `/api/v1/treatment-plans/{planId}/consents` | `TREATMENT_CONSENT_READ` | `200 OK` | Lists consent history, newest first. |
 | `GET` | `/api/v1/treatment-consents/{consentId}` | `TREATMENT_CONSENT_READ` | `200 OK` | Returns the exact versioned consent and audit actors. |

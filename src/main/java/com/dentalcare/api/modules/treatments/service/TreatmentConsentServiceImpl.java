@@ -4,6 +4,8 @@ import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.treatments.dto.request.PrepareTreatmentConsentRequest;
 import com.dentalcare.api.modules.treatments.dto.response.TreatmentConsentResponse;
 import com.dentalcare.api.modules.treatments.mapper.TreatmentConsentMapper;
@@ -30,6 +32,7 @@ import java.util.UUID;
 
 @Service
 public class TreatmentConsentServiceImpl implements TreatmentConsentService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
     private static final List<TreatmentConsentStatus> ACTIVE_STATUSES =
             List.of(TreatmentConsentStatus.PENDING, TreatmentConsentStatus.ACCEPTED);
 
@@ -76,7 +79,9 @@ public class TreatmentConsentServiceImpl implements TreatmentConsentService {
         TreatmentConsent consent = new TreatmentConsent(
                 UUID.randomUUID(), plan, plan.getPatient(), budget,
                 required(request.documentVersion()), required(request.consentText()), actor, now);
-        return mapper.toResponse(consents.saveAndFlush(consent));
+        var saved=consents.saveAndFlush(consent);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_CONSENT_PREPARED,"TREATMENTS","TreatmentConsent",saved.getId(),actorId);
+        return mapper.toResponse(saved);
     }
 
     @Override
@@ -104,7 +109,9 @@ public class TreatmentConsentServiceImpl implements TreatmentConsentService {
             throw new ConflictException("Only pending treatment consents can be accepted");
         }
         consent.accept(findActiveActor(actorId), clock.instant());
-        return mapper.toResponse(consents.saveAndFlush(consent));
+        var saved=consents.saveAndFlush(consent);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_CONSENT_ACCEPTED,"TREATMENTS","TreatmentConsent",saved.getId(),actorId);
+        return mapper.toResponse(saved);
     }
 
     @Override
@@ -115,7 +122,9 @@ public class TreatmentConsentServiceImpl implements TreatmentConsentService {
             throw new ConflictException("Treatment consent is already revoked");
         }
         consent.revoke(findActiveActor(actorId), clock.instant());
-        return mapper.toResponse(consents.saveAndFlush(consent));
+        var saved=consents.saveAndFlush(consent);
+        if(auditService!=null)auditService.success(AuditActions.TREATMENT_CONSENT_REVOKED,"TREATMENTS","TreatmentConsent",saved.getId(),actorId);
+        return mapper.toResponse(saved);
     }
 
     private TreatmentConsent findForUpdate(UUID consentId) {

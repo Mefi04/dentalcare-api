@@ -16,6 +16,8 @@ import com.dentalcare.api.modules.billing.repository.CashMovementRepository;
 import com.dentalcare.api.modules.billing.repository.CashShiftRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.billing.repository.RefundRepository;
+import com.dentalcare.api.modules.audit.service.AuditService;
+import com.dentalcare.api.modules.audit.service.AuditActions;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,7 @@ import java.util.UUID;
 
 @Service
 public class CashShiftServiceImpl implements CashShiftService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_CONCEPT_LENGTH = 200;
@@ -93,7 +96,7 @@ public class CashShiftServiceImpl implements CashShiftService {
             }
             throw exception;
         }
-        // TODO(#114): publicar evento de auditoría
+        if (auditService != null) auditService.success(AuditActions.BILLING_CASH_SHIFT_OPENED, "BILLING", "CashShift", shift.getId(), actorId);
         return toResponse(shift);
     }
 
@@ -113,7 +116,7 @@ public class CashShiftServiceImpl implements CashShiftService {
         BigDecimal difference = countedAmount.subtract(expectedAmount);
         shift.close(expectedAmount, countedAmount, difference, notes, clock.instant());
         cashShiftRepository.saveAndFlush(shift);
-        // TODO(#114): publicar evento de auditoría
+        if (auditService != null) auditService.success(AuditActions.BILLING_CASH_SHIFT_CLOSED, "BILLING", "CashShift", shift.getId(), actorId);
         return toResponse(shift);
     }
 
@@ -134,6 +137,7 @@ public class CashShiftServiceImpl implements CashShiftService {
         String concept = normalizeConcept(request.concept());
         CashMovement movement = cashMovementRepository.saveAndFlush(new CashMovement(
                 UUID.randomUUID(), shift, request.type(), amount, concept, actorId, clock.instant()));
+        if (auditService != null) auditService.success(AuditActions.BILLING_CASH_MOVEMENT_CREATED, "BILLING", "CashMovement", movement.getId(), actorId);
         return cashShiftMapper.toResponse(movement);
     }
 

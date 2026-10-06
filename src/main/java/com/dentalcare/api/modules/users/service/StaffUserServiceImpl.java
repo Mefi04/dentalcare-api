@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.users.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.users.dto.request.CreateStaffUserRequest;
 import com.dentalcare.api.modules.users.dto.request.UpdateStaffUserRequest;
 import com.dentalcare.api.modules.users.dto.request.UpdateUserStatusRequest;
@@ -31,6 +33,7 @@ import java.util.List;
 
 @Service
 public class StaffUserServiceImpl implements StaffUserService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
     static final Set<String> OFFICIAL_ROLES = Set.of("ADMINISTRATOR", "SECRETARY", "DENTIST", "ASSISTANT", "CASHIER");
     private static final int MAX_PAGE_SIZE = 100;
     private static final int TEMPORARY_PASSWORD_LENGTH = 16;
@@ -75,7 +78,9 @@ public class StaffUserServiceImpl implements StaffUserService {
         User user = new User(UUID.randomUUID(), username, fullName, email, cui,
                 passwordEncoder.encode(temporaryPassword), UserStatus.PENDING_ACTIVATION, now, now);
         user.setRoles(Set.of(role));
-        return new CreateStaffUserResponse(mapper.toResponse(save(user)), temporaryPassword);
+        var saved = save(user);
+        if (auditService != null) auditService.success(AuditActions.STAFF_CREATED, "USERS", "User", user.getId(), null);
+        return new CreateStaffUserResponse(mapper.toResponse(saved), temporaryPassword);
     }
 
     @Override
@@ -107,7 +112,9 @@ public class StaffUserServiceImpl implements StaffUserService {
         user.setEmail(email);
         user.setRoles(Set.of(resolveActiveRole(request.roleCode())));
         user.setUpdatedAt(clock.instant());
-        return mapper.toResponse(save(user));
+        var response = mapper.toResponse(save(user));
+        if (auditService != null) auditService.success(AuditActions.STAFF_UPDATED, "USERS", "User", id, null);
+        return response;
     }
 
     @Override
@@ -124,7 +131,9 @@ public class StaffUserServiceImpl implements StaffUserService {
         }
         user.setStatus(target);
         user.setUpdatedAt(clock.instant());
-        return mapper.toResponse(save(user));
+        var response = mapper.toResponse(save(user));
+        if (auditService != null) auditService.success(AuditActions.STAFF_STATUS_CHANGED, "USERS", "User", id, null);
+        return response;
     }
 
     @Override

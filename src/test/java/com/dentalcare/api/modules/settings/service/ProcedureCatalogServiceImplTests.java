@@ -45,6 +45,12 @@ class ProcedureCatalogServiceImplTests {
         service.findAll("proc","Consultation",ProcedureCatalogItemStatus.ACTIVE,2,500);
         ArgumentCaptor<Pageable> captor=ArgumentCaptor.forClass(Pageable.class);verify(repository).findAll(any(Specification.class),captor.capture());
         assertThat(captor.getValue().getPageNumber()).isEqualTo(2);assertThat(captor.getValue().getPageSize()).isEqualTo(100);}
+    @Test void activeListQueriesOnlyActiveCatalogItems(){
+        var active=item(ProcedureCatalogItemStatus.ACTIVE);
+        when(repository.findByStatusOrderByNameAscIdAsc(ProcedureCatalogItemStatus.ACTIVE)).thenReturn(List.of(active));
+        assertThat(service.findActive()).extracting(response -> response.status()).containsOnly(ProcedureCatalogItemStatus.ACTIVE);
+        verify(repository).findByStatusOrderByNameAscIdAsc(ProcedureCatalogItemStatus.ACTIVE);
+    }
     @Test void invalidPaginationIsRejected(){assertThatThrownBy(()->service.findAll(null,null,null,-1,20)).isInstanceOf(BadRequestException.class);}
     private CreateProcedureCatalogItemRequest request(String code,String name){return new CreateProcedureCatalogItemRequest(code,name,"Category",30,new BigDecimal("100.00"));}
     private ProcedureCatalogItem item(ProcedureCatalogItemStatus status){return new ProcedureCatalogItem(UUID.randomUUID(),"PROC-1","One","Category",30,

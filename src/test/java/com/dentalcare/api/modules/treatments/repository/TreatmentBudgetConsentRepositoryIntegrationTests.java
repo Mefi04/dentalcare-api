@@ -114,6 +114,27 @@ class TreatmentBudgetConsentRepositoryIntegrationTests {
                 "TREATMENT_CONSENT_REVOKE:DENTIST");
     }
 
+    @Test
+    void patientDecisionIsPersistedAndOwnershipQueriesDoNotLeakForeignBudgets() {
+        Fixture owner = fixture("9100000000003");
+        Fixture foreign = fixture("9100000000004");
+        TreatmentBudget budget = budget(owner, 1);
+        budget.approve(owner.dentist(), NOW.plusSeconds(10));
+        budgets.saveAndFlush(budget);
+        budget.acceptByPatient(owner.patientUser(), NOW.plusSeconds(20));
+        budgets.saveAndFlush(budget);
+        entityManager.clear();
+
+        TreatmentBudget loaded = budgets.findPublishedOwnedById(budget.getId(), owner.patient().getId())
+                .orElseThrow();
+        assertThat(loaded.getPatientDecision().name()).isEqualTo("ACCEPTED");
+        assertThat(loaded.getPatientDecidedBy().getId()).isEqualTo(owner.patientUser().getId());
+        assertThat(loaded.getPatientDecidedAt()).isEqualTo(NOW.plusSeconds(20));
+        assertThat(budgets.findPublishedOwnedById(budget.getId(), foreign.patient().getId())).isEmpty();
+        assertThat(budgets.findPublishedIdsByPatientId(owner.patient().getId(),
+                org.springframework.data.domain.PageRequest.of(0, 20))).containsExactly(budget.getId());
+    }
+
     private TreatmentBudget budget(Fixture fixture, int version) {
         TreatmentPlanItem source = fixture.plan().getItems().getFirst();
         TreatmentBudget budget = new TreatmentBudget(UUID.randomUUID(), fixture.plan(), fixture.patient(),
@@ -126,6 +147,13 @@ class TreatmentBudgetConsentRepositoryIntegrationTests {
     }
 
     private Fixture fixture(String suffix) {
+        Role patientRole = roles.findByCode("PATIENT").orElseThrow();
+        User patientUser = new User(UUID.randomUUID(), "patient-" + suffix, "Paciente prueba",
+                "patient-" + suffix + "@example.test", "8" + suffix.substring(1), "hash",
+                UserStatus.ACTIVE, NOW, NOW);
+        patientUser.setRoles(Set.of(patientRole));
+        patientUser = users.saveAndFlush(patientUser);
+
         Patient patient = new Patient();
         patient.setId(UUID.randomUUID());
         patient.setCode("PAC-" + suffix);
@@ -134,6 +162,7 @@ class TreatmentBudgetConsentRepositoryIntegrationTests {
         patient.setBirthDate(LocalDate.of(1990, 1, 1));
         patient.setGender(Gender.OTHER);
         patient.setPhone("5555-0000");
+        patient.setUser(patientUser);
         patient.setCreatedAt(NOW);
         patient.setUpdatedAt(NOW);
         patient = patients.saveAndFlush(patient);
@@ -150,8 +179,8 @@ class TreatmentBudgetConsentRepositoryIntegrationTests {
                 new BigDecimal("350.00"), 0));
         plan.approve(NOW.minusSeconds(30));
         plan = plans.saveAndFlush(plan);
-        return new Fixture(patient, dentist, plan);
+        return new Fixture(patient, patientUser, dentist, plan);
     }
 
-    private record Fixture(Patient patient, User dentist, TreatmentPlan plan) { }
+    private record Fixture(Patient patient, User patientUser, User dentist, TreatmentPlan plan) { }
 }

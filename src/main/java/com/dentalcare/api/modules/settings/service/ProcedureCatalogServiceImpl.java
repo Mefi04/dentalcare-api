@@ -3,6 +3,8 @@ package com.dentalcare.api.modules.settings.service;
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.settings.dto.request.CreateProcedureCatalogItemRequest;
 import com.dentalcare.api.modules.settings.dto.request.UpdateProcedureCatalogItemRequest;
 import com.dentalcare.api.modules.settings.dto.response.ProcedureCatalogItemResponse;
@@ -17,11 +19,13 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class ProcedureCatalogServiceImpl implements ProcedureCatalogService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
     private static final int MAX_PAGE_SIZE=100;
     private static final Sort DEFAULT_SORT=Sort.by(Sort.Order.asc("name"),Sort.Order.asc("id"));
     private final ProcedureCatalogItemRepository repository;
@@ -44,6 +48,10 @@ public class ProcedureCatalogServiceImpl implements ProcedureCatalogService {
         return repository.findAll(spec,PageRequest.of(page,Math.min(size,MAX_PAGE_SIZE),DEFAULT_SORT)).map(mapper::toResponse);
     }
     @Override @Transactional(readOnly=true)
+    public List<ProcedureCatalogItemResponse> findActive(){
+        return repository.findByStatusOrderByNameAscIdAsc(ProcedureCatalogItemStatus.ACTIVE).stream().map(mapper::toResponse).toList();
+    }
+    @Override @Transactional(readOnly=true)
     public ProcedureCatalogItemResponse findById(UUID id){return mapper.toResponse(find(id));}
     @Override @Transactional
     public ProcedureCatalogItemResponse create(CreateProcedureCatalogItemRequest request,UUID actorId){
@@ -51,19 +59,19 @@ public class ProcedureCatalogServiceImpl implements ProcedureCatalogService {
         ensureUnique(code,name,null); var now=clock.instant();
         var item=new ProcedureCatalogItem(UUID.randomUUID(),code,name,required(request.category()),request.durationMinutes(),
                 request.basePrice(),ProcedureCatalogItemStatus.ACTIVE,actorId,actorId,now,now);
-        return save(item);
+        var response=save(item); if(auditService!=null)auditService.success(AuditActions.SETTINGS_CATALOG_CHANGED,"SETTINGS","ProcedureCatalogItem",item.getId(),actorId); return response;
     }
     @Override @Transactional
     public ProcedureCatalogItemResponse update(UUID id,UpdateProcedureCatalogItemRequest request,UUID actorId){
         requireActor(actorId); ProcedureCatalogItem item=find(id); String code=normalizeCode(request.code()); String name=required(request.name());
         ensureUnique(code,name,id); item.setCode(code); item.setName(name); item.setCategory(required(request.category()));
         item.setDurationMinutes(request.durationMinutes()); item.setBasePrice(request.basePrice()); item.setUpdatedBy(actorId);
-        item.setUpdatedAt(clock.instant()); return save(item);
+        item.setUpdatedAt(clock.instant()); var response=save(item); if(auditService!=null)auditService.success(AuditActions.SETTINGS_CATALOG_CHANGED,"SETTINGS","ProcedureCatalogItem",id,actorId); return response;
     }
     @Override @Transactional
     public ProcedureCatalogItemResponse updateStatus(UUID id,ProcedureCatalogItemStatus status,UUID actorId){
         requireActor(actorId); if(status==null)throw new BadRequestException("Status is required"); ProcedureCatalogItem item=find(id);
-        item.setStatus(status); item.setUpdatedBy(actorId); item.setUpdatedAt(clock.instant()); return save(item);
+        item.setStatus(status); item.setUpdatedBy(actorId); item.setUpdatedAt(clock.instant()); var response=save(item); if(auditService!=null)auditService.success(AuditActions.SETTINGS_CATALOG_CHANGED,"SETTINGS","ProcedureCatalogItem",id,actorId); return response;
     }
     private ProcedureCatalogItem find(UUID id){if(id==null)throw new BadRequestException("Procedure catalog item id is required");
         return repository.findById(id).orElseThrow(()->new ResourceNotFoundException("Procedure catalog item not found"));}

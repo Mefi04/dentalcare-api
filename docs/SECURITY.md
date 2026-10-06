@@ -114,6 +114,19 @@ Staff responsible for processing and check-in also comes exclusively from JWT.
 Settings mutations derive `created_by` and `updated_by` exclusively from `AuthenticatedUser.userId()` in the
 validated access token. These actor fields, roles, and authorities are never accepted from request payloads.
 
+The anonymous public surface is restricted to `GET /api/v1/public/clinic` and
+`GET /api/v1/public/services`. It exposes visitor-safe projections of Settings data only; all Settings routes
+and every non-GET public route still require authentication and their existing authority checks remain unchanged.
+
+`GET /api/v1/public/professionals` and `GET /api/v1/public/professionals/{id}` are also anonymous read-only
+projections. They return only visible profiles whose linked user remains active and has the active `DENTIST` role.
+Profile administration stays under the existing administrator-only `/api/v1/users/**` surface.
+
+`POST /api/v1/public/contact-inquiries` is an anonymous, exact public route for general inquiries only. It does not
+create appointments, process emergencies, accept files, or collect structured clinical data. Input is persisted as
+plain text and is not logged. There is no distributed rate-limiting infrastructure yet; a deployment-level distributed
+rate limiter should be added as future anti-spam hardening without weakening the endpoint's validation limits.
+
 Only the existing administrator role receives these permissions. Other staff modules must not reuse settings
 permissions as a shortcut for consuming catalog data; any future cross-module contract requires its own approved
 authorization design.
@@ -419,6 +432,8 @@ Patient self-service endpoints enable authenticated patients to inspect their ow
 - `GET /api/v1/patients/me/profile`: Returns personal contact and identity details with a masked DPI (`PatientProfileResponse`).
 - `GET /api/v1/patients/me/health`: Returns the patient's persisted health summary (`PatientHealthResponse`), or an `EMPTY` state when no clinical information exists.
 - `GET /api/v1/patients/me/account-statement`: Returns the patient's own charges, payments, and derived balance (`AccountStatementResponse`).
+- `GET /api/v1/patients/me/treatment-plans`: Returns only approved treatment plans linked to the JWT-owned patient.
+- `GET /api/v1/patients/me/treatment-plans/{planId}`: Returns a plan only when ownership matches; foreign and draft UUIDs produce the same generic `404`.
 
 Security and authorization rules:
 1. **Identity resolution authority**: The backend is the sole authority for identifying the patient. Identity is resolved exclusively via `JWT` → `AuthenticatedUser.userId()` → `PatientRepository.findByUser_Id(userId)`.
@@ -426,6 +441,7 @@ Security and authorization rules:
 3. **Role requirement**: All self-service endpoints require `ROLE_PATIENT` enforced via `@PreAuthorize("hasRole('PATIENT')")`. Staff roles (`ADMINISTRATOR`, `SECRETARY`, `DENTIST`, `ASSISTANT`, `CASHIER`) receive `403 Forbidden`. Requests without valid authentication receive `401 Unauthorized`.
 4. **Data protection and minimal exposure**: The `/me/profile` response exposes only the last four digits of the DPI (`*********XXXX`) and excludes sensitive administrative and user credentials (such as passwords, internal identifiers, billing tax IDs, or audit stamps).
 5. **Accurate semantics**: In `/me/health`, `lastUpdated` comes only from the persisted medical history and remains `null` when none exists. It is never derived from `Patient.updatedAt`, and no fictional clinical data is returned.
+6. **Treatment-plan isolation**: The patient role receives no administrative `TREATMENT_PLAN_READ` authority. The self-service DTO omits prices, internal observations, clinical notes, patient identifiers, and audit data; progress comes exclusively from persisted procedure executions.
 
 Administrative medical-history operations require explicit clinical authorities. `MEDICAL_HISTORY_READ` permits reading the subresource and `MEDICAL_HISTORY_UPDATE` permits creating or replacing it. Secretary, cashier, patient, or other roles without those authorities cannot use administrative clinical endpoints. Patient self-service remains read-only and resolves identity exclusively from the JWT principal.
 
@@ -457,6 +473,12 @@ dentist, and assistant roles. Dentists and assistants may generate a budget or p
 dentist may approve/reject a budget or explicitly accept/revoke a consent. Every mutation derives its actor
 from the verified JWT. The patient is always derived from the referenced plan, preventing clients from
 substituting a foreign patient id. These administrative contracts expose no credential or internal JPA data.
+
+Patient budget self-service is isolated under `/api/v1/patients/me/treatment-budgets` and requires
+`ROLE_PATIENT`. Ownership is resolved from the verified JWT; no patient id is accepted from the client.
+Only clinic-approved budgets are visible. Foreign, unpublished, and unknown identifiers return the same
+generic `404`, and the portal DTO omits patient ids and internal clinic actors. Accept/reject is a separate,
+locked, one-time patient decision; it never grants the administrative `TREATMENT_BUDGET_DECIDE` authority.
 
 Administrative appointment endpoints are isolated under `/api/v1/appointments`. `ADMINISTRATOR`, `SECRETARY`, `DENTIST`, and `ASSISTANT` may read the agenda and update appointment status. Creating and rescheduling appointments is limited to `ADMINISTRATOR` and `SECRETARY`. `PATIENT` and `CASHIER` cannot use the administrative contract. Patient-owned appointment operations remain under `/api/v1/patients/me/appointments` and continue to derive ownership exclusively from the JWT principal.
 
