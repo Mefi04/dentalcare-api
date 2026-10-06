@@ -2,6 +2,8 @@ package com.dentalcare.api.modules.auth.service;
 
 import com.dentalcare.api.exception.BadRequestException;
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.modules.audit.service.AuditActions;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.auth.dto.request.ChangePasswordRequest;
 import com.dentalcare.api.modules.auth.mapper.AuthUserMapper;
 import com.dentalcare.api.modules.users.model.User;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -33,6 +36,7 @@ class AuthenticatedPasswordChangeServiceTests {
     @Mock PasswordEncoder encoder;
     @Mock JwtService jwt;
     @Mock RefreshTokenService refreshTokens;
+    @Mock AuditService auditService;
     private AuthServiceImpl service;
     private User user;
     private UUID userId;
@@ -46,6 +50,7 @@ class AuthenticatedPasswordChangeServiceTests {
         service = new AuthServiceImpl(users, encoder, jwt, new AuthUserMapper(), refreshTokens,
                 new JwtProperties("private", "public", Duration.ofMinutes(30), Duration.ofDays(7),
                         Duration.ofHours(24), false), Clock.fixed(now, ZoneOffset.UTC));
+        ReflectionTestUtils.setField(service, "auditService", auditService);
     }
 
     @Test
@@ -60,6 +65,7 @@ class AuthenticatedPasswordChangeServiceTests {
         assertThat(user.getUpdatedAt()).isEqualTo(now);
         verify(users).save(user);
         verify(refreshTokens).revokeAllForUser(userId);
+        verify(auditService).success(AuditActions.AUTH_PASSWORD_CHANGED, "AUTH", "User", userId, userId);
     }
 
     @Test
@@ -74,6 +80,7 @@ class AuthenticatedPasswordChangeServiceTests {
         assertThat(user.getPasswordHash()).isEqualTo("old-hash");
         verify(users, never()).save(any());
         verifyNoInteractions(refreshTokens);
+        verify(auditService, never()).success(anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test
