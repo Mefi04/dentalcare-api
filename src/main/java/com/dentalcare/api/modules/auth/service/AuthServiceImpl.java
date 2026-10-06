@@ -225,6 +225,9 @@ public class AuthServiceImpl implements AuthService {
         user.setUpdatedAt(clock.instant());
         userRepository.save(user);
         refreshTokenService.revokeAllForUser(userId);
+        if (auditService != null) {
+            auditService.success(AuditActions.AUTH_PASSWORD_CHANGED, "AUTH", "User", userId, userId);
+        }
     }
 
     @Override
