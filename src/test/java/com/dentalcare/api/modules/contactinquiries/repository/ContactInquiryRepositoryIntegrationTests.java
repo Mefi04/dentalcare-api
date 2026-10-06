@@ -92,4 +92,3 @@ class ContactInquiryRepositoryIntegrationTests {
         assertThat(page.getContent()).extracting(ContactInquiry::getId).contains(id);
     }
 }
-

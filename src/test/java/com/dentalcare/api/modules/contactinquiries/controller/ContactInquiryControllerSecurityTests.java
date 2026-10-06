@@ -217,4 +217,3 @@ class ContactInquiryControllerSecurityTests {
         when(jwt.parseAccessToken(raw)).thenReturn(new JwtService.AccessTokenClaims(id, List.of(auth)));
     }
 }
-
