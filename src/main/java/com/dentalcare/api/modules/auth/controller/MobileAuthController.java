@@ -12,6 +12,7 @@ import com.dentalcare.api.security.service.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -58,6 +59,7 @@ public class MobileAuthController {
     }
 
     @Operation(summary = "Change the authenticated patient's password and revoke refresh sessions")
+    @PreAuthorize("hasRole('PATIENT')")
     @PatchMapping("/password")
     public ResponseEntity<Void> changePassword(
             @AuthenticationPrincipal AuthenticatedUser principal,

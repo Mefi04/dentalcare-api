@@ -42,6 +42,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -107,6 +108,7 @@ class MobileAuthFlowIntegrationTests {
 
         when(userRepository.findWithRolesAndPermissionsByCui(CUI)).thenAnswer(inv -> Optional.of(user));
         when(userRepository.findWithRolesAndPermissionsById(user.getId())).thenAnswer(inv -> Optional.of(user));
+        when(userRepository.findById(user.getId())).thenAnswer(inv -> Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
         when(jwtService.createAccessToken(any(UUID.class), anyList())).thenAnswer(inv -> "jwt-" + UUID.randomUUID());
@@ -210,6 +212,33 @@ class MobileAuthFlowIntegrationTests {
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Authentication is required"))
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
+    void changedPasswordRejectsPreviousPasswordAndAllowsNewPassword() throws Exception {
+        String newPassword = "NewSecurePassword456!";
+        when(jwtService.parseAccessToken("patient-access")).thenReturn(
+                new JwtService.AccessTokenClaims(user.getId(), java.util.List.of("ROLE_PATIENT")));
+
+        mockMvc.perform(patch("/api/v1/auth/mobile/password")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer patient-access")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format(
+                                "{\"currentPassword\":\"%s\",\"newPassword\":\"%s\"}",
+                                PASSWORD, newPassword)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/auth/mobile/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format("{\"cui\":\"%s\",\"password\":\"%s\"}", CUI, PASSWORD)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid credentials"));
+
+        mockMvc.perform(post("/api/v1/auth/mobile/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format("{\"cui\":\"%s\",\"password\":\"%s\"}", CUI, newPassword)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").isNotEmpty());
     }
 
     @Test

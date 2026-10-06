@@ -51,6 +51,21 @@ class MobilePasswordChangeControllerTests {
     }
 
     @Test
+    void authenticatedAdministratorCannotChangePasswordThroughPatientEndpoint() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(jwtService.parseAccessToken("administrator")).thenReturn(
+                new JwtService.AccessTokenClaims(userId, List.of("ROLE_ADMINISTRATOR")));
+
+        mockMvc.perform(patch("/api/v1/auth/mobile/password")
+                        .header("Authorization", "Bearer administrator")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"CurrentPassword123!\",\"newPassword\":\"NewPassword456!\"}"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
     void unauthenticatedRequestReturns401() throws Exception {
         mockMvc.perform(patch("/api/v1/auth/mobile/password")
                         .contentType(MediaType.APPLICATION_JSON)
