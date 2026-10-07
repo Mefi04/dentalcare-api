@@ -14,16 +14,21 @@ public interface ProfessionalPublicProfileRepository extends JpaRepository<Profe
     Optional<ProfessionalPublicProfile> findByUser_Id(UUID userId);
 
     @Query("""
-            SELECT DISTINCT p FROM ProfessionalPublicProfile p JOIN FETCH p.user u JOIN u.roles r
+            SELECT p FROM ProfessionalPublicProfile p JOIN FETCH p.user u
             WHERE p.publicVisible = true AND u.status = com.dentalcare.api.modules.users.model.UserStatus.ACTIVE
-              AND r.code = 'DENTIST' AND r.active = true ORDER BY LOWER(u.fullName), p.id
+              AND EXISTS (
+                SELECT 1 FROM u.roles r WHERE r.code = 'DENTIST' AND r.active = true
+              )
+            ORDER BY LOWER(u.fullName), p.id
             """)
     List<ProfessionalPublicProfile> findAllPubliclyVisible();
 
     @Query("""
-            SELECT DISTINCT p FROM ProfessionalPublicProfile p JOIN FETCH p.user u JOIN u.roles r
+            SELECT p FROM ProfessionalPublicProfile p JOIN FETCH p.user u
             WHERE p.id = :id AND p.publicVisible = true AND u.status = com.dentalcare.api.modules.users.model.UserStatus.ACTIVE
-              AND r.code = 'DENTIST' AND r.active = true
+              AND EXISTS (
+                SELECT 1 FROM u.roles r WHERE r.code = 'DENTIST' AND r.active = true
+              )
             """)
     Optional<ProfessionalPublicProfile> findPubliclyVisibleById(@Param("id") UUID id);
 }
