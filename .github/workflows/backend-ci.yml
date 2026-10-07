@@ -48,5 +48,10 @@ jobs:
       - name: Run Maven verification
         run: mvn -B clean verify
 
+      - name: Validate published OpenAPI contract
+        run: |
+          test -s target/openapi/dentalcare-api.json
+          cmp docs/openapi/dentalcare-api.json target/openapi/dentalcare-api.json
+
       - name: Build backend Docker image
         run: docker build --tag dentalcare-api:ci .

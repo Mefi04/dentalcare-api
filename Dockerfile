@@ -3,6 +3,7 @@ WORKDIR /workspace
 COPY pom.xml .
 RUN mvn -B dependency:go-offline
 COPY src ./src
+COPY docs/openapi/dentalcare-api.json ./docs/openapi/dentalcare-api.json
 RUN mvn -B clean package
 
 FROM eclipse-temurin:21-jre-alpine AS runtime
