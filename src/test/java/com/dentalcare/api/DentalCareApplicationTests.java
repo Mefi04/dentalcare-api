@@ -150,6 +150,12 @@ class DentalCareApplicationTests {
     @MockitoBean
     com.dentalcare.api.modules.contactinquiries.repository.ContactInquiryRepository contactInquiryRepository;
 
+    @MockitoBean
+    com.dentalcare.api.modules.notifications.repository.PatientNotificationRepository patientNotificationRepository;
+
+    @MockitoBean
+    com.dentalcare.api.modules.notifications.repository.PatientNotificationPreferenceRepository patientNotificationPreferenceRepository;
+
     @Test
     void contextLoads() {
     }
