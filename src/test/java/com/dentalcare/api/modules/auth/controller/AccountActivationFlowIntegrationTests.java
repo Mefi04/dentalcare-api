@@ -73,6 +73,9 @@ class AccountActivationFlowIntegrationTests {
     @MockitoBean
     private JwtProperties jwtProperties;
 
+    @MockitoBean
+    private com.dentalcare.api.security.ratelimit.RateLimitService rateLimitService;
+
     private User user;
 
     @TestConfiguration

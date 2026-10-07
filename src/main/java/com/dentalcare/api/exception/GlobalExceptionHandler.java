@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -63,6 +64,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     ResponseEntity<ApiErrorResponse> handleUnauthorized(UnauthorizedException exception, HttpServletRequest request) {
         return buildResponse(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(com.dentalcare.api.security.ratelimit.RateLimitExceededException.class)
+    ResponseEntity<ApiErrorResponse> handleRateLimit(
+            com.dentalcare.api.security.ratelimit.RateLimitExceededException exception,
+            HttpServletRequest request) {
+        ApiErrorResponse body = new ApiErrorResponse(Instant.now(), HttpStatus.TOO_MANY_REQUESTS.value(),
+                HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase(), exception.getMessage(), request.getRequestURI(), Map.of());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(exception.getRetryAfterSeconds()))
+                .body(body);
     }
 
     @ExceptionHandler(AccessDeniedException.class)

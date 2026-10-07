@@ -9,6 +9,8 @@ import com.dentalcare.api.modules.auth.dto.response.UserResponse;
 import com.dentalcare.api.modules.auth.service.AuthService;
 import com.dentalcare.api.security.cookie.AuthCookieManager;
 import com.dentalcare.api.security.service.AuthenticatedUser;
+import com.dentalcare.api.security.ratelimit.RateLimitPolicy;
+import com.dentalcare.api.security.ratelimit.RateLimitService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -29,10 +31,12 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthCookieManager authCookieManager;
+    private final RateLimitService rateLimitService;
 
-    public AuthController(AuthService authService, AuthCookieManager authCookieManager) {
+    public AuthController(AuthService authService, AuthCookieManager authCookieManager, RateLimitService rateLimitService) {
         this.authService = authService;
         this.authCookieManager = authCookieManager;
+        this.rateLimitService = rateLimitService;
     }
 
     @Operation(summary = "Activate account with temporary password and set new permanent password")
@@ -46,6 +50,7 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
+        rateLimitService.checkIdentity(RateLimitPolicy.LOGIN, request.cui());
         AuthService.LoginResult result = authService.login(request);
         ResponseCookie cookie = authCookieManager.createRefreshCookie(
                 result.refreshToken(),

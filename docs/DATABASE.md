@@ -4,6 +4,13 @@
 
 PostgreSQL (version 17+).
 
+## Security rate-limit counters
+
+Changeset `037-create-security-rate-limits` creates `security_rate_limits`, a technical shared-counter table for
+multi-instance abuse protection. Its hashed bucket key is the primary key; PostgreSQL atomic upserts reset expired
+windows or increment active counters without lost updates. An expiration index supports opportunistic cleanup.
+No raw IP address, CUI, password, token, or request payload is persisted.
+
 ## Clinic settings and operational procedure catalog
 
 Changeset `026-create-clinic-settings-procedure-catalog` creates `clinic_settings` as a database-enforced
