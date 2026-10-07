@@ -124,8 +124,27 @@ Profile administration stays under the existing administrator-only `/api/v1/user
 
 `POST /api/v1/public/contact-inquiries` is an anonymous, exact public route for general inquiries only. It does not
 create appointments, process emergencies, accept files, or collect structured clinical data. Input is persisted as
-plain text and is not logged. There is no distributed rate-limiting infrastructure yet; a deployment-level distributed
-rate limiter should be added as future anti-spam hardening without weakening the endpoint's validation limits.
+plain text and is not logged.
+
+## Distributed rate limiting
+
+Authentication and anonymous contact entry points use PostgreSQL-backed fixed-window counters, so all application
+instances share the same limits. The protected routes are web/mobile login, password-recovery request, and public
+contact inquiry. Login and recovery apply both an IP bucket and a normalized-identity bucket; bucket keys contain
+only SHA-256 digests, never CUI values, passwords, request bodies, or tokens. Contact uses only an IP bucket.
+
+An exceeded bucket returns `429 Too Many Requests` with a generic message and `Retry-After`. The block is recorded
+as `SECURITY_RATE_LIMIT_BLOCKED` without request payload or identifier. Counters expire automatically and cannot
+permanently lock an account.
+
+Client IP defaults to the servlet connection address and ignores forwarding headers. `X-Forwarded-For` is considered
+only when the immediate peer matches a CIDR configured in `RATE_LIMIT_TRUSTED_PROXIES`; the resolver walks the chain
+from the trusted edge toward the first untrusted address. The reverse proxy must overwrite, not append to an
+untrusted client-provided header. Keep the setting empty when the application is directly internet-facing.
+
+Limits and windows are configured with `RATE_LIMIT_*` variables documented in `.env.example`. Disabling the feature
+is intended only for isolated troubleshooting. Production instances must share the same PostgreSQL database and
+configuration.
 
 Only the existing administrator role receives these permissions. Other staff modules must not reuse settings
 permissions as a shortcut for consuming catalog data; any future cross-module contract requires its own approved

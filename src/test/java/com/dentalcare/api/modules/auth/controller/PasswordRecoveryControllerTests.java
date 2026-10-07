@@ -36,6 +36,7 @@ class PasswordRecoveryControllerTests {
     @MockitoBean private PasswordRecoveryService passwordRecoveryService;
     @MockitoBean private JwtService jwtService;
     @MockitoBean private JwtProperties jwtProperties;
+    @MockitoBean private com.dentalcare.api.security.ratelimit.RateLimitService rateLimitService;
 
     @Test
     void publicRequestReturnsAcceptedGenericResponse() throws Exception {

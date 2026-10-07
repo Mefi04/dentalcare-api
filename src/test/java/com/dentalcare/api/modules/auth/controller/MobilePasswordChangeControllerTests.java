@@ -33,6 +33,7 @@ class MobilePasswordChangeControllerTests {
     @MockitoBean AuthService authService;
     @MockitoBean JwtService jwtService;
     @MockitoBean JwtProperties jwtProperties;
+    @MockitoBean com.dentalcare.api.security.ratelimit.RateLimitService rateLimitService;
 
     @Test
     void authenticatedPatientCanChangeOnlyOwnPassword() throws Exception {
