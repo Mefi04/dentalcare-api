@@ -70,6 +70,7 @@ class TreatmentPlanRepositoryIntegrationTests {
         newer.addItem(item("Único", 0));
         TreatmentPlan foreign = plan(other, dentist, "Otro", NOW.plusSeconds(60));
         foreign.addItem(item("Ajeno", 0));
+        foreign.approve(NOW.plusSeconds(30));
         treatmentPlanRepository.saveAllAndFlush(List.of(older, newer, foreign));
         entityManager.clear();
 
@@ -88,6 +89,9 @@ class TreatmentPlanRepositoryIntegrationTests {
         assertThat(approvedIds.getContent()).containsExactly(older.getId());
         assertThat(treatmentPlanRepository.findDetailedByIdIn(approvedIds.getContent()))
                 .extracting(TreatmentPlan::getId).containsExactly(older.getId());
+        assertThat(treatmentPlanRepository.findApprovedOwnedById(older.getId(), owner.getId())).isPresent();
+        assertThat(treatmentPlanRepository.findApprovedOwnedById(newer.getId(), owner.getId())).isEmpty();
+        assertThat(treatmentPlanRepository.findApprovedOwnedById(foreign.getId(), owner.getId())).isEmpty();
     }
 
     @Test
