@@ -3,6 +3,7 @@ package com.dentalcare.api.modules.treatments.controller;
 import com.dentalcare.api.config.CorsConfig;
 import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.exception.GlobalExceptionHandler;
+import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.treatments.dto.response.PatientTreatmentBudgetResponse;
 import com.dentalcare.api.modules.treatments.model.PatientBudgetDecision;
 import com.dentalcare.api.modules.treatments.service.PatientTreatmentBudgetService;
@@ -63,6 +64,8 @@ class PatientTreatmentBudgetControllerSecurityTests {
         when(service.reject(userId, budgetId)).thenReturn(response(budgetId, PatientBudgetDecision.REJECTED));
 
         mockMvc.perform(get("/api/v1/patients/me/treatment-budgets")
+                        .param("patientId", UUID.randomUUID().toString())
+                        .param("userId", UUID.randomUUID().toString())
                         .header("Authorization", "Bearer patient"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(budgetId.toString()))
@@ -82,6 +85,20 @@ class PatientTreatmentBudgetControllerSecurityTests {
         verify(service).findMineById(userId, budgetId);
         verify(service).accept(userId, budgetId);
         verify(service).reject(userId, budgetId);
+    }
+
+    @Test
+    void foreignUnapprovedAndUnknownBudgetIdsShareSafeNotFoundResponse() throws Exception {
+        UUID userId = UUID.randomUUID();
+        token("patient", userId, "ROLE_PATIENT");
+        for (UUID hiddenId : List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())) {
+            when(service.findMineById(userId, hiddenId))
+                    .thenThrow(new ResourceNotFoundException("Treatment budget not found"));
+            mockMvc.perform(get("/api/v1/patients/me/treatment-budgets/{id}", hiddenId)
+                            .header("Authorization", "Bearer patient"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.message").value("Treatment budget not found"));
+        }
     }
 
     private PatientTreatmentBudgetResponse response(UUID id, PatientBudgetDecision decision) {

@@ -119,8 +119,15 @@ class TreatmentBudgetConsentRepositoryIntegrationTests {
         Fixture owner = fixture("9100000000003");
         Fixture foreign = fixture("9100000000004");
         TreatmentBudget budget = budget(owner, 1);
+        TreatmentPlan pendingPlan = new TreatmentPlan(UUID.randomUUID(), owner.patient(), owner.dentist(),
+                "Plan pendiente", null, TreatmentPlanStatus.DRAFT, NOW.minusSeconds(20), NOW.minusSeconds(20));
+        pendingPlan.addItem(new TreatmentPlanItem(UUID.randomUUID(), "Limpieza", null, 1,
+                new BigDecimal("250.00"), 0));
+        pendingPlan.approve(NOW.minusSeconds(10));
+        pendingPlan = plans.saveAndFlush(pendingPlan);
+        TreatmentBudget pendingAdministrativeReview = budget(owner, pendingPlan, 1);
         budget.approve(owner.dentist(), NOW.plusSeconds(10));
-        budgets.saveAndFlush(budget);
+        budgets.saveAllAndFlush(List.of(budget, pendingAdministrativeReview));
         budget.acceptByPatient(owner.patientUser(), NOW.plusSeconds(20));
         budgets.saveAndFlush(budget);
         entityManager.clear();
@@ -131,18 +138,25 @@ class TreatmentBudgetConsentRepositoryIntegrationTests {
         assertThat(loaded.getPatientDecidedBy().getId()).isEqualTo(owner.patientUser().getId());
         assertThat(loaded.getPatientDecidedAt()).isEqualTo(NOW.plusSeconds(20));
         assertThat(budgets.findPublishedOwnedById(budget.getId(), foreign.patient().getId())).isEmpty();
+        assertThat(budgets.findPublishedOwnedById(
+                pendingAdministrativeReview.getId(), owner.patient().getId())).isEmpty();
         assertThat(budgets.findPublishedIdsByPatientId(owner.patient().getId(),
                 org.springframework.data.domain.PageRequest.of(0, 20))).containsExactly(budget.getId());
     }
 
     private TreatmentBudget budget(Fixture fixture, int version) {
-        TreatmentPlanItem source = fixture.plan().getItems().getFirst();
-        TreatmentBudget budget = new TreatmentBudget(UUID.randomUUID(), fixture.plan(), fixture.patient(),
-                version, fixture.plan().getUpdatedAt(), new BigDecimal("700.00"),
-                new BigDecimal("700.00"), fixture.dentist(), NOW);
+        return budget(fixture, fixture.plan(), version);
+    }
+
+    private TreatmentBudget budget(Fixture fixture, TreatmentPlan plan, int version) {
+        TreatmentPlanItem source = plan.getItems().getFirst();
+        BigDecimal total = source.getUnitPrice().multiply(BigDecimal.valueOf(source.getQuantity()));
+        TreatmentBudget budget = new TreatmentBudget(UUID.randomUUID(), plan, fixture.patient(),
+                version, plan.getUpdatedAt(), total,
+                total, fixture.dentist(), NOW);
         budget.replaceItems(List.of(new TreatmentBudgetItem(UUID.randomUUID(), source.getId(),
                 source.getName(), source.getTooth(), source.getQuantity(), source.getUnitPrice(),
-                new BigDecimal("700.00"), source.getPosition())));
+                total, source.getPosition())));
         return budget;
     }
 

@@ -590,3 +590,25 @@ their business operations are implemented; this infrastructure does not establis
 ## Authenticated password change
 
 Authenticated patient password changes derive the account exclusively from the JWT principal. The API never accepts a target user id or CUI. The current password is verified against the stored BCrypt hash, the replacement uses the shared password policy, and all refresh sessions are revoked atomically after success. Existing access JWTs expire normally because the architecture is stateless. Clients must clear local tokens and require a new login after a successful change.
+
+## Patient self-service ownership and visibility
+
+Every route below `/api/v1/patients/me/**` is restricted to `ROLE_PATIENT` and derives the account exclusively from
+the authenticated JWT user id. Caller-supplied `patientId` or `userId` values never select the owner. Child-resource
+lookups combine the resource id with the resolved patient id and return the same not-found response for unknown,
+foreign, or non-visible records. Staff use separate administrative routes and permissions.
+
+| Self-service area | Ownership and visibility rule |
+| --- | --- |
+| Profile and health | Resolves the patient linked to the JWT user; masks DPI and excludes security internals. |
+| Appointments and requests | Reads and mutates only rows owned by the resolved patient. |
+| Treatment plans | Exposes only owned plans whose clinic status is `APPROVED`. |
+| Treatment budgets | Exposes only owned budgets whose clinic status is `APPROVED`. |
+| Prescriptions | Lists and loads only prescriptions owned by the resolved patient. |
+| Clinical documents | Requires ownership and `patientVisible=true`; storage keys are never returned. |
+| Account statement | Resolves the linked patient ledger and returns a dedicated patient DTO. |
+
+Treatment-budget clinic status and patient decision are independent concepts. `PENDING` and clinic-rejected budgets
+are not published to patients. Clinic `APPROVED` is the publication gate; only afterward may the patient's decision
+move independently from `PENDING` to `ACCEPTED` or `REJECTED`. A patient decision never publishes a budget or
+overrides its clinic status.

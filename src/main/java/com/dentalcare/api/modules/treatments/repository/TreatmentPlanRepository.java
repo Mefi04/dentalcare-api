@@ -34,6 +34,12 @@ public interface TreatmentPlanRepository extends JpaRepository<TreatmentPlan, UU
     @Query("SELECT tp FROM TreatmentPlan tp WHERE tp.id = :id")
     Optional<TreatmentPlan> findDetailedById(@Param("id") UUID id);
 
+    @EntityGraph(attributePaths = {"patient", "professional", "items"})
+    @Query("SELECT tp FROM TreatmentPlan tp WHERE tp.id = :id AND tp.patient.id = :patientId "
+            + "AND tp.status = com.dentalcare.api.modules.treatments.model.TreatmentPlanStatus.APPROVED")
+    Optional<TreatmentPlan> findApprovedOwnedById(@Param("id") UUID id,
+                                                   @Param("patientId") UUID patientId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {"patient", "professional", "items"})
     @Query("SELECT DISTINCT tp FROM TreatmentPlan tp WHERE tp.id = :id")
