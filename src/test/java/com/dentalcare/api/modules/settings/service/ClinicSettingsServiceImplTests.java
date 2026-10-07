@@ -5,6 +5,8 @@ import com.dentalcare.api.modules.settings.mapper.ClinicSettingsMapper;
 import com.dentalcare.api.modules.settings.model.ClinicSettings;
 import com.dentalcare.api.modules.settings.repository.ClinicSettingsRepository;
 import com.dentalcare.api.modules.users.repository.UserRepository;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
+import com.dentalcare.api.modules.notifications.model.NotificationEventType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.time.*;
@@ -17,14 +19,17 @@ class ClinicSettingsServiceImplTests {
     private ClinicSettingsRepository repository;
     private UserRepository users;
     private ClinicSettings settings;
+    private PatientNotificationPublisher notificationPublisher;
     private ClinicSettingsServiceImpl service;
     private final UUID actor=UUID.randomUUID();
 
     @BeforeEach void setUp(){
         repository=mock(ClinicSettingsRepository.class); users=mock(UserRepository.class); settings=mock(ClinicSettings.class);
+        notificationPublisher=mock(PatientNotificationPublisher.class);
         when(settings.getId()).thenReturn((short)1); when(repository.findById((short)1)).thenReturn(Optional.of(settings));
         when(repository.saveAndFlush(settings)).thenReturn(settings); when(users.existsById(actor)).thenReturn(true);
-        service=new ClinicSettingsServiceImpl(repository,users,new ClinicSettingsMapper(),Clock.fixed(Instant.parse("2026-10-04T12:00:00Z"),ZoneOffset.UTC));
+        service=new ClinicSettingsServiceImpl(repository,users,new ClinicSettingsMapper(),notificationPublisher,
+                Clock.fixed(Instant.parse("2026-10-04T12:00:00Z"),ZoneOffset.UTC));
     }
     @Test void getReadsTheSingleton(){assertThat(service.get().id()).isEqualTo((short)1); verify(repository).findById((short)1);}
     @Test void updateNormalizesValuesAndUsesAuthenticatedActor(){
@@ -34,5 +39,8 @@ class ClinicSettingsServiceImplTests {
         verify(settings).setTradeName("DentalCare"); verify(settings).setNit("548796-2");
         verify(settings).setEmail("info@example.com"); verify(settings).setReceiptPrefix("DC-");
         verify(settings).setUpdatedBy(actor); verify(settings).setUpdatedAt(Instant.parse("2026-10-04T12:00:00Z"));
+        verify(notificationPublisher).publishToAll(NotificationEventType.CLINIC_INFORMATION_UPDATED,
+                "Información de la clínica actualizada",
+                "La clínica actualizó su información. Consulta la aplicación para ver los datos vigentes.");
     }
 }

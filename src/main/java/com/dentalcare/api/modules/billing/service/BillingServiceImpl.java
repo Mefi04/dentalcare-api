@@ -29,6 +29,8 @@ import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.notifications.model.NotificationEventType;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +62,7 @@ public class BillingServiceImpl implements BillingService {
     private final BillingMapper billingMapper;
     private final ChargeLedger chargeLedger;
     private final CashShiftService cashShiftService;
+    private final PatientNotificationPublisher notificationPublisher;
     private final Clock clock;
 
     public BillingServiceImpl(ChargeRepository chargeRepository,
@@ -70,6 +73,7 @@ public class BillingServiceImpl implements BillingService {
                               BillingMapper billingMapper,
                               ChargeLedger chargeLedger,
                               CashShiftService cashShiftService,
+                              PatientNotificationPublisher notificationPublisher,
                               Clock clock) {
         this.chargeRepository = chargeRepository;
         this.paymentRepository = paymentRepository;
@@ -79,6 +83,7 @@ public class BillingServiceImpl implements BillingService {
         this.billingMapper = billingMapper;
         this.chargeLedger = chargeLedger;
         this.cashShiftService = cashShiftService;
+        this.notificationPublisher = notificationPublisher;
         this.clock = clock;
     }
 
@@ -169,6 +174,8 @@ public class BillingServiceImpl implements BillingService {
         Payment payment = paymentRepository.saveAndFlush(new Payment(
                 UUID.randomUUID(), patient, charge, kind, request.method(), amount, clock.instant(),
                 actorUserId, cashShift));
+        notificationPublisher.publish(patientId, NotificationEventType.PAYMENT_REGISTERED,
+                "Pago registrado", "Se registró un pago en tu cuenta. Consulta tu estado de cuenta para ver los detalles.");
         if (auditService != null) auditService.success(AuditActions.BILLING_PAYMENT_CREATED, "BILLING", "Payment", payment.getId(), actorUserId);
         return billingMapper.toPaymentResponse(payment);
     }

@@ -8,6 +8,8 @@ import com.dentalcare.api.modules.appointments.model.AppointmentStatus;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.notifications.model.NotificationEventType;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
 import com.dentalcare.api.modules.users.model.Role;
 import com.dentalcare.api.modules.users.model.User;
 import com.dentalcare.api.modules.users.model.UserStatus;
@@ -42,6 +44,7 @@ class AppointmentServiceImplTests {
     @Mock AppointmentRepository appointments;
     @Mock PatientRepository patients;
     @Mock UserRepository users;
+    @Mock PatientNotificationPublisher notificationPublisher;
 
     private AppointmentServiceImpl service;
     private Patient patient;
@@ -49,7 +52,7 @@ class AppointmentServiceImplTests {
 
     @BeforeEach
     void setUp() {
-        service = new AppointmentServiceImpl(appointments, patients, users,
+        service = new AppointmentServiceImpl(appointments, patients, users, notificationPublisher,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         patient = new Patient();
         patient.setId(UUID.randomUUID());
@@ -71,6 +74,8 @@ class AppointmentServiceImplTests {
         assertThat(result.getStatus()).isEqualTo(AppointmentStatus.SCHEDULED);
         assertThat(result.getCreatedAt()).isEqualTo(NOW);
         assertThat(result.getUpdatedAt()).isEqualTo(NOW);
+        verify(notificationPublisher).publish(patient.getId(), NotificationEventType.APPOINTMENT_SCHEDULED,
+                "Cita programada", "Tu cita fue programada. Consulta Mis citas para ver los detalles.");
     }
 
     @Test
@@ -149,6 +154,8 @@ class AppointmentServiceImplTests {
         assertThatThrownBy(() -> service.create(patient.getId(), dentist.getId(), SCHEDULED_AT))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("Appointment time is not available");
+        verify(notificationPublisher, never()).publish(any(), any(), any(), any());
+        verify(notificationPublisher, never()).publish(any(), any(), any(), any());
         verify(appointments, never()).saveAndFlush(any());
     }
 

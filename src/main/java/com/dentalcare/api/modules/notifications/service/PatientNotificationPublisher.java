@@ -7,4 +7,6 @@ import java.util.UUID;
 /** Internal application contract for modules that own real domain events. */
 public interface PatientNotificationPublisher {
     void publish(UUID patientId, NotificationEventType eventType, String title, String message);
+
+    void publishToAll(NotificationEventType eventType, String title, String message);
 }
