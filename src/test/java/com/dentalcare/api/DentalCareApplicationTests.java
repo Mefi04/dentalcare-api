@@ -28,6 +28,9 @@ class DentalCareApplicationTests {
     JwtService jwtService;
 
     @MockitoBean
+    com.dentalcare.api.security.ratelimit.DatabaseRateLimitRepository databaseRateLimitRepository;
+
+    @MockitoBean
     UserRepository userRepository;
 
     @MockitoBean

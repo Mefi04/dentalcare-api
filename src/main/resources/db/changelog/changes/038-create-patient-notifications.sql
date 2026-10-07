@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset dentalcare:037-create-patient-notifications
+--changeset dentalcare:038-create-patient-notifications
 CREATE TABLE patient_notifications (
     id UUID PRIMARY KEY,
     patient_id UUID NOT NULL,

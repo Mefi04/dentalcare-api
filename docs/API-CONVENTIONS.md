@@ -86,6 +86,8 @@ Common codes:
 - `403 Forbidden`: authentication succeeded, but the caller lacks permission for the operation.
 - `404 Not Found`: resource does not exist.
 - `409 Conflict`: unique constraint or state conflict.
+- `429 Too Many Requests`: a sensitive public endpoint exceeded its configured shared rate limit. The response uses
+  the normal error schema and includes `Retry-After` in seconds without disclosing account existence.
 - `422 Unprocessable Entity`: semantically invalid request when specifically appropriate.
 - `500 Internal Server Error`: unexpected server failure.
 

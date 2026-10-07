@@ -9,6 +9,8 @@ import com.dentalcare.api.modules.auth.dto.response.MobileRefreshResponse;
 import com.dentalcare.api.modules.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import com.dentalcare.api.security.service.AuthenticatedUser;
+import com.dentalcare.api.security.ratelimit.RateLimitPolicy;
+import com.dentalcare.api.security.ratelimit.RateLimitService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -26,14 +28,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class MobileAuthController {
 
     private final AuthService authService;
+    private final RateLimitService rateLimitService;
 
-    public MobileAuthController(AuthService authService) {
+    public MobileAuthController(AuthService authService, RateLimitService rateLimitService) {
         this.authService = authService;
+        this.rateLimitService = rateLimitService;
     }
 
     @Operation(summary = "Authenticate mobile client with CUI/DPI and password")
     @PostMapping("/login")
     public ResponseEntity<MobileLoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        rateLimitService.checkIdentity(RateLimitPolicy.LOGIN, request.cui());
         AuthService.LoginResult result = authService.login(request);
         MobileLoginResponse response = new MobileLoginResponse(
                 result.response().accessToken(),

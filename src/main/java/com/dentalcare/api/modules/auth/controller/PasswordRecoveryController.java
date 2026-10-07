@@ -4,6 +4,8 @@ import com.dentalcare.api.modules.auth.dto.request.ConfirmPasswordRecoveryReques
 import com.dentalcare.api.modules.auth.dto.request.PasswordRecoveryRequest;
 import com.dentalcare.api.modules.auth.dto.response.PasswordRecoveryResponse;
 import com.dentalcare.api.modules.auth.service.PasswordRecoveryService;
+import com.dentalcare.api.security.ratelimit.RateLimitPolicy;
+import com.dentalcare.api.security.ratelimit.RateLimitService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -20,15 +22,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class PasswordRecoveryController {
 
     private final PasswordRecoveryService passwordRecoveryService;
+    private final RateLimitService rateLimitService;
 
-    public PasswordRecoveryController(PasswordRecoveryService passwordRecoveryService) {
+    public PasswordRecoveryController(PasswordRecoveryService passwordRecoveryService, RateLimitService rateLimitService) {
         this.passwordRecoveryService = passwordRecoveryService;
+        this.rateLimitService = rateLimitService;
     }
 
     @Operation(summary = "Request a one-time patient password recovery code")
     @PostMapping("/request")
     public ResponseEntity<PasswordRecoveryResponse> request(
             @Valid @RequestBody PasswordRecoveryRequest request) {
+        rateLimitService.checkIdentity(RateLimitPolicy.PASSWORD_RECOVERY, request.cui());
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(passwordRecoveryService.requestRecovery(request));
     }

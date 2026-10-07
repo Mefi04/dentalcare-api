@@ -59,6 +59,9 @@ class CorsSecurityIntegrationTests {
     @MockitoBean
     private JwtProperties jwtProperties;
 
+    @MockitoBean
+    private com.dentalcare.api.security.ratelimit.RateLimitService rateLimitService;
+
     @BeforeEach
     void setUp() {
         when(jwtProperties.cookieSecure()).thenReturn(false);
