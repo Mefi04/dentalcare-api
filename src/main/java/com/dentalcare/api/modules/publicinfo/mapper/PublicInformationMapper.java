@@ -16,7 +16,7 @@ public class PublicInformationMapper {
     }
 
     public PublicServiceResponse toServiceResponse(ProcedureCatalogItemResponse item) {
-        return new PublicServiceResponse(item.code(), item.name(), item.category(), item.durationMinutes());
+        return new PublicServiceResponse(item.code(), item.name(), item.category(), item.description(), item.durationMinutes());
     }
 
     public PublicProfessionalResponse toProfessionalResponse(ProfessionalPublicProfileResponse profile) {

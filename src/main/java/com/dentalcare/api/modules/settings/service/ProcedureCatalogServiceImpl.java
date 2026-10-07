@@ -57,7 +57,8 @@ public class ProcedureCatalogServiceImpl implements ProcedureCatalogService {
     public ProcedureCatalogItemResponse create(CreateProcedureCatalogItemRequest request,UUID actorId){
         requireActor(actorId); String code=normalizeCode(request.code()); String name=required(request.name());
         ensureUnique(code,name,null); var now=clock.instant();
-        var item=new ProcedureCatalogItem(UUID.randomUUID(),code,name,required(request.category()),request.durationMinutes(),
+        String desc = request.description() == null || request.description().isBlank() ? null : request.description().trim();
+        var item=new ProcedureCatalogItem(UUID.randomUUID(),code,name,required(request.category()),desc,request.durationMinutes(),
                 request.basePrice(),ProcedureCatalogItemStatus.ACTIVE,actorId,actorId,now,now);
         var response=save(item); if(auditService!=null)auditService.success(AuditActions.SETTINGS_CATALOG_CHANGED,"SETTINGS","ProcedureCatalogItem",item.getId(),actorId); return response;
     }
@@ -65,6 +66,8 @@ public class ProcedureCatalogServiceImpl implements ProcedureCatalogService {
     public ProcedureCatalogItemResponse update(UUID id,UpdateProcedureCatalogItemRequest request,UUID actorId){
         requireActor(actorId); ProcedureCatalogItem item=find(id); String code=normalizeCode(request.code()); String name=required(request.name());
         ensureUnique(code,name,id); item.setCode(code); item.setName(name); item.setCategory(required(request.category()));
+        String desc = request.description() == null || request.description().isBlank() ? null : request.description().trim();
+        item.setDescription(desc);
         item.setDurationMinutes(request.durationMinutes()); item.setBasePrice(request.basePrice()); item.setUpdatedBy(actorId);
         item.setUpdatedAt(clock.instant()); var response=save(item); if(auditService!=null)auditService.success(AuditActions.SETTINGS_CATALOG_CHANGED,"SETTINGS","ProcedureCatalogItem",id,actorId); return response;
     }

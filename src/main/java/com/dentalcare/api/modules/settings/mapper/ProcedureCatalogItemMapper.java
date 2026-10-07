@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 public class ProcedureCatalogItemMapper {
     public ProcedureCatalogItemResponse toResponse(ProcedureCatalogItem item) {
         return new ProcedureCatalogItemResponse(item.getId(), item.getCode(), item.getName(), item.getCategory(),
-                item.getDurationMinutes(), item.getBasePrice(), item.getStatus(), item.getCreatedBy(),
-                item.getUpdatedBy(), item.getCreatedAt(), item.getUpdatedAt());
+                item.getDescription(), item.getDurationMinutes(), item.getBasePrice(), item.getStatus(),
+                item.getCreatedBy(), item.getUpdatedBy(), item.getCreatedAt(), item.getUpdatedAt());
     }
 }
