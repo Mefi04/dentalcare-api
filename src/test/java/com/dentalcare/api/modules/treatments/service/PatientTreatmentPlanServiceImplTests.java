@@ -98,21 +98,19 @@ class PatientTreatmentPlanServiceImplTests {
     void returnsOwnedApprovedDetailAndMasksForeignOrDraftPlansAsNotFound() {
         TreatmentPlan own = approvedPlan(1);
         when(patients.findByUser_Id(userId)).thenReturn(Optional.of(patient));
-        when(plans.findDetailedById(own.getId())).thenReturn(Optional.of(own));
+        when(plans.findApprovedOwnedById(own.getId(), patient.getId())).thenReturn(Optional.of(own));
         when(procedures.findOwnedByPlanId(own.getId(), patient.getId())).thenReturn(List.of());
         assertThat(service.findMineById(userId, own.getId()).id()).isEqualTo(own.getId());
 
-        Patient other = new Patient();
-        other.setId(UUID.randomUUID());
-        TreatmentPlan foreign = plan(other, TreatmentPlanStatus.APPROVED, 1);
-        when(plans.findDetailedById(foreign.getId())).thenReturn(Optional.of(foreign));
-        assertThatThrownBy(() -> service.findMineById(userId, foreign.getId()))
+        UUID foreignId = UUID.randomUUID();
+        when(plans.findApprovedOwnedById(foreignId, patient.getId())).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.findMineById(userId, foreignId))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Treatment plan not found");
 
-        TreatmentPlan draft = plan(patient, TreatmentPlanStatus.DRAFT, 1);
-        when(plans.findDetailedById(draft.getId())).thenReturn(Optional.of(draft));
-        assertThatThrownBy(() -> service.findMineById(userId, draft.getId()))
+        UUID draftId = UUID.randomUUID();
+        when(plans.findApprovedOwnedById(draftId, patient.getId())).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.findMineById(userId, draftId))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 

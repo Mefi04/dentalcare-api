@@ -73,9 +73,7 @@ public class PatientTreatmentPlanServiceImpl implements PatientTreatmentPlanServ
     public PatientTreatmentPlanResponse findMineById(UUID authenticatedUserId, UUID planId) {
         Patient patient = patientForUser(authenticatedUserId);
         requireId(planId, "Treatment plan id is required");
-        TreatmentPlan plan = plans.findDetailedById(planId)
-                .filter(value -> value.getPatient().getId().equals(patient.getId()))
-                .filter(value -> value.getStatus() == TreatmentPlanStatus.APPROVED)
+        TreatmentPlan plan = plans.findApprovedOwnedById(planId, patient.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Treatment plan not found"));
         return mapper.toResponse(plan, procedures.findOwnedByPlanId(planId, patient.getId()));
     }

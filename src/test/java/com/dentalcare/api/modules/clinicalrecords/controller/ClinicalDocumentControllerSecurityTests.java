@@ -37,6 +37,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -367,8 +368,9 @@ class ClinicalDocumentControllerSecurityTests {
     @Test
     @DisplayName("Patient role can list detail and download only through self-service endpoints")
     void patientCanUseOwnedSharedDocumentEndpoints() throws Exception {
+        UUID userId = UUID.randomUUID();
         UUID documentId = UUID.randomUUID();
-        token("patient-token", "ROLE_PATIENT");
+        token("patient-token", userId, "ROLE_PATIENT");
         PatientClinicalDocumentResponse response = new PatientClinicalDocumentResponse(
                 documentId,
                 new ClinicalProfessionalResponse(UUID.randomUUID(), "Dra. Ana"),
@@ -383,16 +385,18 @@ class ClinicalDocumentControllerSecurityTests {
                 Instant.now(),
                 Instant.now(),
                 Instant.now());
-        when(clinicalDocumentService.findVisibleDocumentsForPatient(any(), any(), eq(0), eq(20)))
+        when(clinicalDocumentService.findVisibleDocumentsForPatient(eq(userId), any(), eq(0), eq(20)))
                 .thenReturn(new PageImpl<>(List.of(response)));
-        when(clinicalDocumentService.findVisibleDocumentForPatient(any(), eq(documentId)))
+        when(clinicalDocumentService.findVisibleDocumentForPatient(eq(userId), eq(documentId)))
                 .thenReturn(response);
-        when(clinicalDocumentService.downloadVisibleDocumentForPatient(any(), eq(documentId)))
+        when(clinicalDocumentService.downloadVisibleDocumentForPatient(eq(userId), eq(documentId)))
                 .thenReturn(new ClinicalDocumentDownload(
                         new ByteArrayInputStream("shared".getBytes(StandardCharsets.UTF_8)),
                         "radiografia.pdf", "application/pdf", 6L));
 
         mockMvc.perform(get("/api/v1/patients/me/documents")
+                .param("patientId", UUID.randomUUID().toString())
+                .param("userId", UUID.randomUUID().toString())
                 .header("Authorization", "Bearer patient-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(documentId.toString()))
@@ -409,6 +413,10 @@ class ClinicalDocumentControllerSecurityTests {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "application/pdf"))
                 .andExpect(content().string("shared"));
+
+        verify(clinicalDocumentService).findVisibleDocumentsForPatient(eq(userId), any(), eq(0), eq(20));
+        verify(clinicalDocumentService).findVisibleDocumentForPatient(userId, documentId);
+        verify(clinicalDocumentService).downloadVisibleDocumentForPatient(userId, documentId);
     }
 
     @Test
@@ -421,8 +429,12 @@ class ClinicalDocumentControllerSecurityTests {
     }
 
     private void token(String token, String... authorities) {
+        token(token, UUID.randomUUID(), authorities);
+    }
+
+    private void token(String token, UUID userId, String... authorities) {
         when(jwtService.parseAccessToken(token))
-                .thenReturn(new JwtService.AccessTokenClaims(UUID.randomUUID(), List.of(authorities)));
+                .thenReturn(new JwtService.AccessTokenClaims(userId, List.of(authorities)));
     }
 
     private String validDocumentBody() {

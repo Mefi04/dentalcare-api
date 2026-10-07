@@ -3,6 +3,7 @@ package com.dentalcare.api.modules.treatments.controller;
 import com.dentalcare.api.config.CorsConfig;
 import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.exception.GlobalExceptionHandler;
+import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.treatments.dto.response.PatientTreatmentPlanResponse;
 import com.dentalcare.api.modules.treatments.model.TreatmentPlanStatus;
 import com.dentalcare.api.modules.treatments.service.PatientTreatmentPlanService;
@@ -63,6 +64,8 @@ class PatientTreatmentPlanControllerSecurityTests {
         when(service.findMineById(userId, planId)).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/patients/me/treatment-plans")
+                        .param("patientId", UUID.randomUUID().toString())
+                        .param("userId", UUID.randomUUID().toString())
                         .header("Authorization", "Bearer patient"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(planId.toString()))
@@ -77,6 +80,20 @@ class PatientTreatmentPlanControllerSecurityTests {
 
         verify(service).findMine(userId, 0, 20);
         verify(service).findMineById(userId, planId);
+    }
+
+    @Test
+    void foreignUnpublishedAndUnknownPlanIdsShareSafeNotFoundResponse() throws Exception {
+        UUID userId = UUID.randomUUID();
+        token("patient", userId, "ROLE_PATIENT");
+        for (UUID hiddenId : List.of(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID())) {
+            when(service.findMineById(userId, hiddenId))
+                    .thenThrow(new ResourceNotFoundException("Treatment plan not found"));
+            mockMvc.perform(get("/api/v1/patients/me/treatment-plans/{id}", hiddenId)
+                            .header("Authorization", "Bearer patient"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.message").value("Treatment plan not found"));
+        }
     }
 
     private void token(String token, UUID userId, String... authorities) {

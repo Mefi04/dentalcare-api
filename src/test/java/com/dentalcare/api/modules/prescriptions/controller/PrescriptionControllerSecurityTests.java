@@ -90,6 +90,8 @@ class PrescriptionControllerSecurityTests {
                 .thenReturn(response(UUID.randomUUID(), UUID.randomUUID()));
 
         mockMvc.perform(get("/api/v1/patients/me/prescriptions")
+                        .param("patientId", UUID.randomUUID().toString())
+                        .param("userId", UUID.randomUUID().toString())
                         .header("Authorization", "Bearer patient"))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/patients/me/prescriptions/{id}", prescriptionId)

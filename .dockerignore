@@ -6,4 +6,9 @@ target
 .env
 *.log
 docs
+!docs/
+docs/*
+!docs/openapi/
+docs/openapi/*
+!docs/openapi/dentalcare-api.json
 README.md
