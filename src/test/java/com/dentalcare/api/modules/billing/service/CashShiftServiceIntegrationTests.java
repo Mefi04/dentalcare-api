@@ -19,6 +19,7 @@ import com.dentalcare.api.modules.billing.model.PaymentMethod;
 import com.dentalcare.api.modules.billing.repository.CashMovementRepository;
 import com.dentalcare.api.modules.billing.repository.CashShiftRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
@@ -35,6 +36,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,6 +110,9 @@ class CashShiftServiceIntegrationTests {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @MockitoBean
+    private PatientNotificationPublisher notificationPublisher;
 
     private static final AtomicInteger sequence = new AtomicInteger();
 

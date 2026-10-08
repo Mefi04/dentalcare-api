@@ -27,6 +27,7 @@ import com.dentalcare.api.modules.billing.model.Refund;
 import com.dentalcare.api.modules.billing.repository.ChargeAdjustmentRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.billing.repository.RefundRepository;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
@@ -44,6 +45,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -114,6 +116,9 @@ class BillingAdjustmentServiceIntegrationTests {
     private UserRepository userRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private PatientNotificationPublisher notificationPublisher;
 
     @Test
     void concurrentRefundsNeverExceedThePayment() throws Exception {
