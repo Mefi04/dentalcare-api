@@ -6208,15 +6208,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -6734,15 +6737,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -6937,15 +6943,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -7686,15 +7695,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -8607,15 +8619,18 @@
         "description" : "Without BILLING_CASH_READ_ALL only the authenticated user's shifts are returned.",
         "operationId" : "list_1",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -8977,15 +8992,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -9503,15 +9521,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -9821,15 +9842,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -10442,15 +10466,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -10691,15 +10718,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -10814,15 +10844,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -11201,15 +11234,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -11688,15 +11724,18 @@
       "get" : {
         "operationId" : "search_1",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -12018,15 +12057,18 @@
       "get" : {
         "operationId" : "findAll_3",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -12581,15 +12623,18 @@
       "get" : {
         "operationId" : "findCurrentPatientAppointments",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -13142,15 +13187,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -13485,15 +13533,18 @@
       "get" : {
         "operationId" : "findAll_8",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -13916,15 +13967,18 @@
       "get" : {
         "operationId" : "list_7",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -14258,15 +14312,18 @@
       "get" : {
         "operationId" : "list_6",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -14638,15 +14695,18 @@
       "get" : {
         "operationId" : "list_5",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -15869,15 +15929,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -16633,15 +16696,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -16929,15 +16995,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -17143,15 +17212,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -17783,15 +17855,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -18314,17 +18389,18 @@
             "type" : "string"
           }
         }, {
-          "description" : "Page number (0-based)",
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
-          "description" : "Page size",
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -19185,15 +19261,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -19589,15 +19668,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -19898,15 +19980,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -20114,15 +20199,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -20790,15 +20878,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -21465,15 +21556,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -21854,15 +21948,18 @@
             "type" : "boolean"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -23688,15 +23785,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -24095,15 +24195,18 @@
       "get" : {
         "operationId" : "search",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,

@@ -20,6 +20,7 @@ import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
@@ -71,6 +72,7 @@ public class OpenApiConfig {
             openApi.getPaths().forEach((path, pathItem) ->
                     pathItem.readOperationsMap().forEach((method, operation) -> {
                         classifyAndSecure(path, operation);
+                        documentPaginationParameters(operation);
                         documentCommonResponses(path, method.name(), operation);
                     }));
         };
@@ -103,6 +105,20 @@ public class OpenApiConfig {
             operation.addTagsItem("Audience: Staff");
             operation.setSecurity(List.of(new SecurityRequirement().addList(BEARER_AUTH)));
         }
+    }
+
+    private void documentPaginationParameters(Operation operation) {
+        if (operation.getParameters() == null) {
+            return;
+        }
+        operation.getParameters().forEach(parameter -> {
+            if ("page".equals(parameter.getName())) {
+                parameter.setDescription("Zero-based page index; values above 1000 are rejected with HTTP 400.");
+                parameter.getSchema().maximum(BigDecimal.valueOf(1000));
+            } else if ("size".equals(parameter.getName())) {
+                parameter.setDescription("Requested page size; values above 100 are capped to 100.");
+            }
+        });
     }
 
     private void documentCommonResponses(String path, String method, Operation operation) {
