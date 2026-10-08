@@ -66,7 +66,8 @@ class OpenApiContractIntegrationTests extends DentalCareApplicationTests {
         assertNoJpaEntitiesArePublished(root);
 
         String canonical = objectMapper.writerWithDefaultPrettyPrinter()
-                .writeValueAsString(canonicalize(root)) + System.lineSeparator();
+                .writeValueAsString(canonicalize(root))
+                .replace("\r\n", "\n") + "\n";
         Files.createDirectories(GENERATED_SPEC.getParent());
         Files.writeString(GENERATED_SPEC, canonical, StandardCharsets.UTF_8);
 
