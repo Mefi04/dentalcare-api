@@ -9,6 +9,7 @@ import com.dentalcare.api.modules.appointments.repository.AdministrativeAppointm
 import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.medicalhistory.repository.MedicalHistoryRepository;
+import com.dentalcare.api.modules.medicalhistory.service.MedicalHistoryWorkflowService;
 import com.dentalcare.api.modules.treatments.repository.TreatmentPlanRepository;
 import com.dentalcare.api.modules.reports.repository.JpaDashboardMetricsRepository;
 import com.dentalcare.api.modules.users.repository.UserRepository;
@@ -23,6 +24,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         "dentalcare.cors.allowed-origin=http://localhost:3000"
 })
 class DentalCareApplicationTests {
+
+    @MockitoBean
+    MedicalHistoryWorkflowService medicalHistoryWorkflowService;
 
     @MockitoBean
     JwtService jwtService;

@@ -57,6 +57,10 @@ public class MedicalHistory {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "current_version_id")
+    private MedicalHistoryVersion currentVersion;
+
     protected MedicalHistory() {
     }
 
@@ -99,6 +103,10 @@ public class MedicalHistory {
         return updatedAt;
     }
 
+    public MedicalHistoryVersion getCurrentVersion() {
+        return currentVersion;
+    }
+
     public void replaceAllergies(Collection<String> values) {
         allergies.clear();
         allergies.addAll(values);
@@ -120,6 +128,10 @@ public class MedicalHistory {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public void setCurrentVersion(MedicalHistoryVersion currentVersion) {
+        this.currentVersion = currentVersion;
     }
 
     @Override

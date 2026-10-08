@@ -75,3 +75,5 @@ databaseChangeLog:
       file: db/changelog/changes/037-create-security-rate-limits.sql
   - include:
       file: db/changelog/changes/038-create-patient-notifications.sql
+  - include:
+      file: db/changelog/changes/039-create-medical-history-questionnaire-workflow.sql
