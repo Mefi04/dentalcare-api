@@ -8,6 +8,7 @@ import com.dentalcare.api.shared.response.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
@@ -69,6 +70,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ServiceUnavailableException.class)
     ResponseEntity<ApiErrorResponse> handleServiceUnavailable(ServiceUnavailableException exception, HttpServletRequest request) {
         return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(QueryTimeoutException.class)
+    ResponseEntity<ApiErrorResponse> handleQueryTimeout(QueryTimeoutException exception, HttpServletRequest request) {
+        LOGGER.warn("Database query timed out while processing {} {}", request.getMethod(), request.getRequestURI());
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE,
+                "The service could not complete the request within the configured time limit", request, Map.of());
     }
 
     @ExceptionHandler(com.dentalcare.api.security.ratelimit.RateLimitExceededException.class)
