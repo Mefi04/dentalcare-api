@@ -30,6 +30,7 @@ public class DashboardReportServiceImpl implements DashboardReportService {
 
     private final DashboardMetricsRepository dashboardMetricsRepository;
     private final Clock clock;
+    private final java.util.concurrent.Semaphore reportSemaphore = new java.util.concurrent.Semaphore(5);
 
     public DashboardReportServiceImpl(DashboardMetricsRepository dashboardMetricsRepository, Clock clock) {
         this.dashboardMetricsRepository = dashboardMetricsRepository;
@@ -39,12 +40,19 @@ public class DashboardReportServiceImpl implements DashboardReportService {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public DashboardReportResponse getDashboard(LocalDate requestedFrom, LocalDate requestedTo) {
+        if (!reportSemaphore.tryAcquire()) {
+            throw new com.dentalcare.api.exception.ServiceUnavailableException("El servidor está procesando la cantidad máxima de reportes simultáneos permitida. Por favor, intente en unos segundos.");
+        }
+        try {
         Instant generatedAt = clock.instant();
         LocalDate today = LocalDate.ofInstant(generatedAt, CLINIC_ZONE);
         LocalDate from = requestedFrom != null ? requestedFrom : today.withDayOfMonth(1);
         LocalDate to = requestedTo != null ? requestedTo : today;
         if (from.isAfter(to)) {
             throw new BadRequestException("Report start date must not be after end date");
+        }
+        if (from.plusYears(1).isBefore(to)) {
+            throw new BadRequestException("Report date range cannot exceed 1 year");
         }
 
         Instant fromInclusive = from.atStartOfDay(CLINIC_ZONE).toInstant();
@@ -68,6 +76,9 @@ public class DashboardReportServiceImpl implements DashboardReportService {
                         money(billing.paymentsReceivedInPeriod()),
                         money(accountBalance.max(BigDecimal.ZERO)),
                         money(accountBalance.negate().max(BigDecimal.ZERO))));
+        } finally {
+            reportSemaphore.release();
+        }
     }
 
     private BigDecimal money(BigDecimal value) {

@@ -66,6 +66,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(ServiceUnavailableException.class)
+    ResponseEntity<ApiErrorResponse> handleServiceUnavailable(ServiceUnavailableException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(com.dentalcare.api.security.ratelimit.RateLimitExceededException.class)
     ResponseEntity<ApiErrorResponse> handleRateLimit(
             com.dentalcare.api.security.ratelimit.RateLimitExceededException exception,
