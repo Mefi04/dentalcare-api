@@ -5,6 +5,7 @@ import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.exception.GlobalExceptionHandler;
 import com.dentalcare.api.modules.medicalhistory.dto.response.MedicalHistoryResponse;
 import com.dentalcare.api.modules.medicalhistory.service.MedicalHistoryService;
+import com.dentalcare.api.modules.medicalhistory.service.MedicalHistoryWorkflowService;
 import com.dentalcare.api.modules.patients.dto.response.PatientHealthStatus;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
 import com.dentalcare.api.security.handler.RestAccessDeniedHandler;
@@ -42,6 +43,9 @@ class MedicalHistoryControllerSecurityTests {
     private MedicalHistoryService medicalHistoryService;
 
     @MockitoBean
+    private MedicalHistoryWorkflowService workflowService;
+
+    @MockitoBean
     private JwtService jwtService;
 
     @Test
@@ -68,7 +72,7 @@ class MedicalHistoryControllerSecurityTests {
     }
 
     @Test
-    void updateRequiresClinicalUpdatePermission() throws Exception {
+    void legacyImportRequiresDentistOnlyCompatibilityPermission() throws Exception {
         UUID patientId = UUID.randomUUID();
         String body = validRequest();
 
@@ -79,8 +83,8 @@ class MedicalHistoryControllerSecurityTests {
                         .content(body))
                 .andExpect(status().isForbidden());
 
-        token("update-token", "MEDICAL_HISTORY_UPDATE");
-        when(medicalHistoryService.update(eq(patientId), any())).thenReturn(response(patientId));
+        token("update-token", "MEDICAL_HISTORY_LEGACY_IMPORT");
+        when(workflowService.importLegacy(eq(patientId), any(), any())).thenReturn(response(patientId));
         mockMvc.perform(put("/api/v1/patients/{patientId}/medical-history", patientId)
                         .header("Authorization", "Bearer update-token")
                         .contentType("application/json")
@@ -92,7 +96,7 @@ class MedicalHistoryControllerSecurityTests {
     @Test
     void updateRejectsInvalidListsAndOversizedValues() throws Exception {
         UUID patientId = UUID.randomUUID();
-        token("update-token", "MEDICAL_HISTORY_UPDATE");
+        token("update-token", "MEDICAL_HISTORY_LEGACY_IMPORT");
 
         mockMvc.perform(put("/api/v1/patients/{patientId}/medical-history", patientId)
                         .header("Authorization", "Bearer update-token")
