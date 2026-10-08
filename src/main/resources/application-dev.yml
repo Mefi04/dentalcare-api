@@ -18,3 +18,8 @@ springdoc:
     enabled: true
   api-docs:
     enabled: true
+
+management:
+  health:
+    mail:
+      enabled: ${MAIL_HEALTH_ENABLED:false}

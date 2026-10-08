@@ -76,7 +76,9 @@ class OpenApiContractIntegrationTests extends DentalCareApplicationTests {
             Files.writeString(COMMITTED_SPEC, canonical, StandardCharsets.UTF_8);
         }
         assertThat(COMMITTED_SPEC).as("committed OpenAPI snapshot").exists();
-        assertThat(Files.readString(COMMITTED_SPEC, StandardCharsets.UTF_8)).isEqualTo(canonical);
+        String committed = Files.readString(COMMITTED_SPEC, StandardCharsets.UTF_8)
+                .replace("\r\n", "\n");
+        assertThat(committed).isEqualTo(canonical);
     }
 
     private void assertSecuritySchemes(JsonNode root) {
