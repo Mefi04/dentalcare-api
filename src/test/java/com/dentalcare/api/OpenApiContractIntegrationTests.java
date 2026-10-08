@@ -44,6 +44,8 @@ class OpenApiContractIntegrationTests extends DentalCareApplicationTests {
     private static final Set<String> FORBIDDEN_ENTITY_SCHEMAS = Set.of(
             "User", "Role", "Permission", "Patient", "Appointment", "TreatmentPlan",
             "TreatmentBudget", "ClinicalDocument", "Prescription", "Charge", "Payment");
+    private static final Set<String> HTTP_METHODS = Set.of(
+            "get", "put", "post", "delete", "patch", "options", "head", "trace");
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
@@ -61,6 +63,7 @@ class OpenApiContractIntegrationTests extends DentalCareApplicationTests {
                 .as("priority path %s", path).isTrue());
         assertSecuritySchemes(root);
         assertPrincipalResponsesAreDocumented(root);
+        assertEveryOperationDocumentsRateLimiting(root);
         assertReferencesResolve(root, root);
         assertPatientSelfServiceHasNoOwnerSelector(root);
         assertNoJpaEntitiesArePublished(root);
@@ -135,6 +138,22 @@ class OpenApiContractIntegrationTests extends DentalCareApplicationTests {
         assertThat(root.at("/paths/~1api~1v1~1patients~1me~1appointments~1{appointmentId}~1cancel/patch/responses/409")
                 .isObject()).isTrue();
         assertThat(root.at("/components/schemas/ApiErrorResponse/properties/fieldErrors").isObject()).isTrue();
+    }
+
+    private void assertEveryOperationDocumentsRateLimiting(JsonNode root) {
+        root.path("paths").properties().forEach(pathEntry ->
+                pathEntry.getValue().properties()
+                        .stream()
+                        .filter(operationEntry -> HTTP_METHODS.contains(operationEntry.getKey()))
+                        .forEach(operationEntry -> {
+                            JsonNode responses = operationEntry.getValue().path("responses");
+                            assertThat(responses.has("429"))
+                                    .as("429 response for %s %s", operationEntry.getKey(), pathEntry.getKey())
+                                    .isTrue();
+                            assertThat(responses.at("/429/headers/Retry-After").isObject())
+                                    .as("Retry-After header for %s %s", operationEntry.getKey(), pathEntry.getKey())
+                                    .isTrue();
+                        }));
     }
 
     private JsonNode parameter(JsonNode parameters, String name) {
