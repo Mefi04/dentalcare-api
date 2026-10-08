@@ -1,6 +1,7 @@
 package com.dentalcare.api.config;
 
 import com.dentalcare.api.security.ratelimit.ApiRateLimitInterceptor;
+import com.dentalcare.api.security.ratelimit.RateLimitService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -9,15 +10,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    private final ObjectProvider<ApiRateLimitInterceptor> apiRateLimitInterceptor;
+    private final ObjectProvider<RateLimitService> rateLimitServiceProvider;
 
-    public WebMvcConfig(ObjectProvider<ApiRateLimitInterceptor> apiRateLimitInterceptor) {
-        this.apiRateLimitInterceptor = apiRateLimitInterceptor;
+    public WebMvcConfig(ObjectProvider<RateLimitService> rateLimitServiceProvider) {
+        this.rateLimitServiceProvider = rateLimitServiceProvider;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        apiRateLimitInterceptor.ifAvailable(interceptor ->
-            registry.addInterceptor(interceptor).addPathPatterns("/api/**"));
+        rateLimitServiceProvider.ifAvailable(rateLimitService ->
+            registry.addInterceptor(new ApiRateLimitInterceptor(rateLimitService)).addPathPatterns("/api/**"));
     }
 }
