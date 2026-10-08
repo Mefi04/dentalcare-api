@@ -7,6 +7,8 @@ import com.dentalcare.api.modules.audit.service.AuditActions;
 import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.notifications.model.NotificationEventType;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
 import com.dentalcare.api.modules.prescriptions.dto.request.CreatePrescriptionRequest;
 import com.dentalcare.api.modules.prescriptions.dto.response.PrescriptionResponse;
 import com.dentalcare.api.modules.prescriptions.mapper.PrescriptionMapper;
@@ -34,14 +36,17 @@ public class PrescriptionServiceImpl implements PrescriptionService {
     private final PatientRepository patients;
     private final UserRepository users;
     private final PrescriptionMapper mapper;
+    private final PatientNotificationPublisher notificationPublisher;
     private final Clock clock;
 
     public PrescriptionServiceImpl(PrescriptionRepository prescriptions, PatientRepository patients,
-            UserRepository users, PrescriptionMapper mapper, Clock clock) {
+            UserRepository users, PrescriptionMapper mapper, PatientNotificationPublisher notificationPublisher,
+            Clock clock) {
         this.prescriptions = prescriptions;
         this.patients = patients;
         this.users = users;
         this.mapper = mapper;
+        this.notificationPublisher = notificationPublisher;
         this.clock = clock;
     }
 
@@ -61,6 +66,8 @@ public class PrescriptionServiceImpl implements PrescriptionService {
                 required(request.frequency()), required(request.duration()), optional(request.instructions()),
                 clock.instant(), PrescriptionStatus.ISSUED);
         var saved=prescriptions.saveAndFlush(value);
+        notificationPublisher.publish(patientId, NotificationEventType.PRESCRIPTION_ISSUED,
+                "Nueva receta disponible", "Se emitió una receta para ti. Consulta Recetas para ver los detalles.");
         if(auditService!=null)auditService.success(AuditActions.PRESCRIPTION_ISSUED,"PRESCRIPTIONS","Prescription",saved.getId(),professionalId);
         return mapper.toResponse(saved);
     }

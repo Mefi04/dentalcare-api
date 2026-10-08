@@ -8,6 +8,8 @@ import com.dentalcare.api.modules.appointments.model.AppointmentStatus;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.notifications.model.NotificationEventType;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
 import com.dentalcare.api.modules.users.model.User;
 import com.dentalcare.api.modules.users.model.UserStatus;
 import com.dentalcare.api.modules.users.repository.UserRepository;
@@ -26,15 +28,18 @@ public class AppointmentServiceImpl implements AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final PatientRepository patientRepository;
     private final UserRepository userRepository;
+    private final PatientNotificationPublisher notificationPublisher;
     private final Clock clock;
 
     public AppointmentServiceImpl(AppointmentRepository appointmentRepository,
                                   PatientRepository patientRepository,
                                   UserRepository userRepository,
+                                  PatientNotificationPublisher notificationPublisher,
                                   Clock clock) {
         this.appointmentRepository = appointmentRepository;
         this.patientRepository = patientRepository;
         this.userRepository = userRepository;
+        this.notificationPublisher = notificationPublisher;
         this.clock = clock;
     }
 
@@ -62,7 +67,10 @@ public class AppointmentServiceImpl implements AppointmentService {
         Appointment appointment = new Appointment(UUID.randomUUID(), patient, professional, scheduledAt,
                 AppointmentStatus.SCHEDULED, now, now);
         try {
-            return appointmentRepository.saveAndFlush(appointment);
+            Appointment saved = appointmentRepository.saveAndFlush(appointment);
+            notificationPublisher.publish(patientId, NotificationEventType.APPOINTMENT_SCHEDULED,
+                    "Cita programada", "Tu cita fue programada. Consulta Mis citas para ver los detalles.");
+            return saved;
         } catch (DataIntegrityViolationException exception) {
             throw new ConflictException("Appointment time is not available");
         }
@@ -85,7 +93,10 @@ public class AppointmentServiceImpl implements AppointmentService {
         }
         appointment.setStatus(AppointmentStatus.CANCELLED);
         appointment.setUpdatedAt(clock.instant());
-        return appointmentRepository.saveAndFlush(appointment);
+        Appointment saved = appointmentRepository.saveAndFlush(appointment);
+        notificationPublisher.publish(appointment.getPatient().getId(), NotificationEventType.APPOINTMENT_CANCELLED,
+                "Cita cancelada", "Tu cita fue cancelada. Consulta Mis citas para ver los detalles.");
+        return saved;
     }
 
     @Override
@@ -113,7 +124,10 @@ public class AppointmentServiceImpl implements AppointmentService {
         appointment.setScheduledAt(scheduledAt);
         appointment.setUpdatedAt(clock.instant());
         try {
-            return appointmentRepository.saveAndFlush(appointment);
+            Appointment saved = appointmentRepository.saveAndFlush(appointment);
+            notificationPublisher.publish(appointment.getPatient().getId(), NotificationEventType.APPOINTMENT_RESCHEDULED,
+                    "Cita reprogramada", "Tu cita cambió de fecha u hora. Consulta Mis citas para ver los detalles.");
+            return saved;
         } catch (DataIntegrityViolationException exception) {
             throw new ConflictException("Appointment time is not available");
         }

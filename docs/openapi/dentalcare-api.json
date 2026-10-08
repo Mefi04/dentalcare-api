@@ -1998,6 +1998,15 @@
         },
         "type" : "object"
       },
+      "MarkAllNotificationsReadResponse" : {
+        "properties" : {
+          "updated" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "MedicalHistoryResponse" : {
         "properties" : {
           "allergies" : {
@@ -2150,6 +2159,27 @@
           "tokenType" : {
             "description" : "Token type",
             "example" : "Bearer",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "NotificationPreferencesResponse" : {
+        "properties" : {
+          "appointmentsEnabled" : {
+            "type" : "boolean"
+          },
+          "clinicUpdatesEnabled" : {
+            "type" : "boolean"
+          },
+          "medicationsEnabled" : {
+            "type" : "boolean"
+          },
+          "paymentsEnabled" : {
+            "type" : "boolean"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
             "type" : "string"
           }
         },
@@ -3047,6 +3077,52 @@
         },
         "type" : "object"
       },
+      "PagePatientNotificationResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PatientNotificationResponse"
+            },
+            "type" : "array"
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "first" : {
+            "type" : "boolean"
+          },
+          "last" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "numberOfElements" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageable" : {
+            "$ref" : "#/components/schemas/PageableObject"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "$ref" : "#/components/schemas/SortObject"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PagePatientResponse" : {
         "properties" : {
           "content" : {
@@ -3843,6 +3919,40 @@
           "total" : {
             "format" : "int64",
             "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PatientNotificationResponse" : {
+        "properties" : {
+          "category" : {
+            "enum" : [ "APPOINTMENT", "PAYMENT", "MEDICATION", "CLINIC_UPDATE" ],
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "eventType" : {
+            "enum" : [ "APPOINTMENT_SCHEDULED", "APPOINTMENT_RESCHEDULED", "APPOINTMENT_CANCELLED", "PAYMENT_REGISTERED", "PRESCRIPTION_ISSUED", "CLINIC_INFORMATION_UPDATED" ],
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "read" : {
+            "type" : "boolean"
+          },
+          "readAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -5525,6 +5635,24 @@
         "required" : [ "allergies", "currentMedications", "relevantConditions" ],
         "type" : "object"
       },
+      "UpdateNotificationPreferencesRequest" : {
+        "properties" : {
+          "appointmentsEnabled" : {
+            "type" : "boolean"
+          },
+          "clinicUpdatesEnabled" : {
+            "type" : "boolean"
+          },
+          "medicationsEnabled" : {
+            "type" : "boolean"
+          },
+          "paymentsEnabled" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "appointmentsEnabled", "clinicUpdatesEnabled", "medicationsEnabled", "paymentsEnabled" ],
+        "type" : "object"
+      },
       "UpdatePatientProfileRequest" : {
         "description" : "Request to update the authenticated patient's personal contact profile",
         "properties" : {
@@ -6038,7 +6166,7 @@
   "paths" : {
     "/api/v1/appointment-requests" : {
       "get" : {
-        "operationId" : "findAll_12",
+        "operationId" : "findAll_13",
         "parameters" : [ {
           "in" : "query",
           "name" : "from",
@@ -6650,7 +6778,7 @@
     },
     "/api/v1/appointments/waiting-room" : {
       "get" : {
-        "operationId" : "findAll_11",
+        "operationId" : "findAll_12",
         "parameters" : [ {
           "in" : "query",
           "name" : "date",
@@ -8757,7 +8885,7 @@
     },
     "/api/v1/contact-inquiries" : {
       "get" : {
-        "operationId" : "findAll_10",
+        "operationId" : "findAll_11",
         "parameters" : [ {
           "in" : "query",
           "name" : "status",
@@ -9704,7 +9832,7 @@
     },
     "/api/v1/inventory/movements" : {
       "get" : {
-        "operationId" : "findAll_9",
+        "operationId" : "findAll_10",
         "parameters" : [ {
           "in" : "query",
           "name" : "itemId",
@@ -11693,7 +11821,7 @@
     },
     "/api/v1/patients/me/documents" : {
       "get" : {
-        "operationId" : "findAll_8",
+        "operationId" : "findAll_9",
         "parameters" : [ {
           "in" : "query",
           "name" : "type",
@@ -11964,6 +12092,342 @@
         } ],
         "summary" : "Get the authenticated patient's health summary",
         "tags" : [ "Patients", "Audience: Patient self-service" ]
+      }
+    },
+    "/api/v1/patients/me/notifications" : {
+      "get" : {
+        "operationId" : "findAll_8",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PagePatientNotificationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "List the authenticated patient's in-app notifications",
+        "tags" : [ "Patient notifications", "Audience: Patient self-service" ]
+      }
+    },
+    "/api/v1/patients/me/notifications/preferences" : {
+      "get" : {
+        "operationId" : "findPreferences",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationPreferencesResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Get the authenticated patient's notification preferences",
+        "tags" : [ "Patient notifications", "Audience: Patient self-service" ]
+      },
+      "put" : {
+        "operationId" : "updatePreferences",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateNotificationPreferencesRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationPreferencesResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Replace the authenticated patient's notification preferences",
+        "tags" : [ "Patient notifications", "Audience: Patient self-service" ]
+      }
+    },
+    "/api/v1/patients/me/notifications/read-all" : {
+      "patch" : {
+        "operationId" : "markAllAsRead",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MarkAllNotificationsReadResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Mark every unread owned notification as read",
+        "tags" : [ "Patient notifications", "Audience: Patient self-service" ]
+      }
+    },
+    "/api/v1/patients/me/notifications/{notificationId}/read" : {
+      "patch" : {
+        "operationId" : "markAsRead",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "notificationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PatientNotificationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Mark one owned notification as read",
+        "tags" : [ "Patient notifications", "Audience: Patient self-service" ]
       }
     },
     "/api/v1/patients/me/prescriptions" : {
@@ -20832,6 +21296,9 @@
   "tags" : [ {
     "description" : "Patient clinical record consolidated summary, current attention, and history",
     "name" : "Clinical records"
+  }, {
+    "description" : "In-app notifications owned by the authenticated patient",
+    "name" : "Patient notifications"
   }, {
     "description" : "Persistent treatment plan management",
     "name" : "Treatment plans"

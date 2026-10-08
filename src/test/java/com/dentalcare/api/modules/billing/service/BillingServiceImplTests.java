@@ -28,6 +28,8 @@ import com.dentalcare.api.modules.billing.repository.RefundRepository;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
+import com.dentalcare.api.modules.notifications.model.NotificationEventType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,6 +78,9 @@ class BillingServiceImplTests {
     @Mock
     private CashShiftService cashShiftService;
 
+    @Mock
+    private PatientNotificationPublisher notificationPublisher;
+
     private final UUID actorId = UUID.randomUUID();
 
     private BillingServiceImpl service;
@@ -84,7 +89,7 @@ class BillingServiceImplTests {
     void setUp() {
         service = new BillingServiceImpl(chargeRepository, paymentRepository, chargeAdjustmentRepository,
                 refundRepository, patientRepository, new BillingMapper(), new ChargeLedger(), cashShiftService,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                notificationPublisher, Clock.fixed(NOW, ZoneOffset.UTC));
         lenient().when(chargeAdjustmentRepository.sumDiscountByChargeId(any())).thenReturn(BigDecimal.ZERO);
         lenient().when(refundRepository.sumAmountByChargeId(any())).thenReturn(BigDecimal.ZERO);
         lenient().when(chargeAdjustmentRepository.existsByChargeIdAndType(any(), any())).thenReturn(false);
@@ -278,6 +283,8 @@ class BillingServiceImplTests {
         assertThat(saved.getValue().getCashShift()).isNull();
         verify(cashShiftService, never()).requireOpenShiftForUpdate(any());
         verifyNoInteractions(chargeRepository);
+        verify(notificationPublisher).publish(patient.getId(), NotificationEventType.PAYMENT_REGISTERED,
+                "Pago registrado", "Se registró un pago en tu cuenta. Consulta tu estado de cuenta para ver los detalles.");
     }
 
     @Test

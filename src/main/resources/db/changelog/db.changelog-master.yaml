@@ -73,3 +73,5 @@ databaseChangeLog:
       file: db/changelog/changes/036-add-procedure-catalog-description.sql
   - include:
       file: db/changelog/changes/037-create-security-rate-limits.sql
+  - include:
+      file: db/changelog/changes/038-create-patient-notifications.sql

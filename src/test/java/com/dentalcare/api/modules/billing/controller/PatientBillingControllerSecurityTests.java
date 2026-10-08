@@ -12,6 +12,7 @@ import com.dentalcare.api.modules.billing.repository.ChargeRepository;
 import com.dentalcare.api.modules.billing.repository.PaymentRepository;
 import com.dentalcare.api.modules.billing.service.BillingServiceImpl;
 import com.dentalcare.api.modules.billing.service.CashShiftService;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
@@ -71,6 +72,9 @@ class PatientBillingControllerSecurityTests {
 
     @MockitoBean
     private CashShiftService cashShiftService;
+
+    @MockitoBean
+    private PatientNotificationPublisher notificationPublisher;
 
     @MockitoBean
     private com.dentalcare.api.modules.billing.repository.ChargeAdjustmentRepository chargeAdjustmentRepository;

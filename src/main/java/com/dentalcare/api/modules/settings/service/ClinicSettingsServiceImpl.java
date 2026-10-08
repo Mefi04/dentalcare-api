@@ -9,6 +9,8 @@ import com.dentalcare.api.modules.settings.dto.response.ClinicSettingsResponse;
 import com.dentalcare.api.modules.settings.mapper.ClinicSettingsMapper;
 import com.dentalcare.api.modules.settings.model.ClinicSettings;
 import com.dentalcare.api.modules.settings.repository.ClinicSettingsRepository;
+import com.dentalcare.api.modules.notifications.model.NotificationEventType;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
 import com.dentalcare.api.modules.users.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,11 +24,14 @@ public class ClinicSettingsServiceImpl implements ClinicSettingsService {
     private final ClinicSettingsRepository repository;
     private final UserRepository userRepository;
     private final ClinicSettingsMapper mapper;
+    private final PatientNotificationPublisher notificationPublisher;
     private final Clock clock;
 
     public ClinicSettingsServiceImpl(ClinicSettingsRepository repository, UserRepository userRepository,
-                                     ClinicSettingsMapper mapper, Clock clock) {
-        this.repository=repository; this.userRepository=userRepository; this.mapper=mapper; this.clock=clock;
+                                     ClinicSettingsMapper mapper, PatientNotificationPublisher notificationPublisher,
+                                     Clock clock) {
+        this.repository=repository; this.userRepository=userRepository; this.mapper=mapper;
+        this.notificationPublisher=notificationPublisher; this.clock=clock;
     }
 
     @Override @Transactional(readOnly=true)
@@ -47,6 +52,9 @@ public class ClinicSettingsServiceImpl implements ClinicSettingsService {
         settings.setUpdatedBy(actorId);
         settings.setUpdatedAt(clock.instant());
         var response=mapper.toResponse(repository.saveAndFlush(settings));
+        notificationPublisher.publishToAll(NotificationEventType.CLINIC_INFORMATION_UPDATED,
+                "Información de la clínica actualizada",
+                "La clínica actualizó su información. Consulta la aplicación para ver los datos vigentes.");
         if(auditService!=null)auditService.success(AuditActions.SETTINGS_CLINIC_UPDATED,"SETTINGS","ClinicSettings",null,actorId);
         return response;
     }

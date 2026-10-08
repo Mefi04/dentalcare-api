@@ -4,6 +4,8 @@ import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.exception.ResourceNotFoundException;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.notifications.service.PatientNotificationPublisher;
+import com.dentalcare.api.modules.notifications.model.NotificationEventType;
 import com.dentalcare.api.modules.prescriptions.dto.request.CreatePrescriptionRequest;
 import com.dentalcare.api.modules.prescriptions.mapper.PrescriptionMapper;
 import com.dentalcare.api.modules.prescriptions.model.Prescription;
@@ -44,6 +46,7 @@ class PrescriptionServiceImplTests {
     @Mock private PrescriptionRepository prescriptions;
     @Mock private PatientRepository patients;
     @Mock private UserRepository users;
+    @Mock private PatientNotificationPublisher notificationPublisher;
 
     private PrescriptionServiceImpl service;
     private Patient patient;
@@ -52,7 +55,7 @@ class PrescriptionServiceImplTests {
     @BeforeEach
     void setUp() {
         service = new PrescriptionServiceImpl(prescriptions, patients, users, new PrescriptionMapper(),
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                notificationPublisher, Clock.fixed(NOW, ZoneOffset.UTC));
         patient = patient();
         dentist = professional(UserStatus.ACTIVE, "DENTIST", true);
         org.mockito.Mockito.lenient().when(prescriptions.saveAndFlush(any()))
@@ -76,6 +79,8 @@ class PrescriptionServiceImplTests {
         assertThat(saved.getIssuedAt()).isEqualTo(NOW);
         assertThat(saved.getStatus()).isEqualTo(PrescriptionStatus.ISSUED);
         assertThat(response.professional().id()).isEqualTo(dentist.getId());
+        verify(notificationPublisher).publish(patient.getId(), NotificationEventType.PRESCRIPTION_ISSUED,
+                "Nueva receta disponible", "Se emitió una receta para ti. Consulta Recetas para ver los detalles.");
     }
 
     @Test
