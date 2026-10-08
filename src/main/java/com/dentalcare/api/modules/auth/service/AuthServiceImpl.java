@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -134,13 +135,13 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED, noRollbackFor = UnauthorizedException.class)
     public RefreshResult refresh(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
             throw new UnauthorizedException(AUTH_REQUIRED);
         }
 
-        RefreshSession session = refreshTokenService.findByRawToken(rawRefreshToken)
+        RefreshSession session = refreshTokenService.findByRawTokenForUpdate(rawRefreshToken)
                 .orElseThrow(() -> new UnauthorizedException(AUTH_REQUIRED));
 
         // Reuse detection: a previously rotated token was presented

@@ -214,7 +214,7 @@ class AuthServiceImplTests {
 
     @Test
     void refreshRejectsNonExistentToken() {
-        when(refreshTokenService.findByRawToken("unknown")).thenReturn(Optional.empty());
+        when(refreshTokenService.findByRawTokenForUpdate("unknown")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.refresh("unknown"))
                 .isInstanceOf(UnauthorizedException.class)
@@ -229,7 +229,7 @@ class AuthServiceImplTests {
                 now.plus(Duration.ofDays(6)), now.minus(Duration.ofHours(1)));
         session.setReplacedBySession(new RefreshSession()); // already rotated!
 
-        when(refreshTokenService.findByRawToken("stolen-token")).thenReturn(Optional.of(session));
+        when(refreshTokenService.findByRawTokenForUpdate("stolen-token")).thenReturn(Optional.of(session));
 
         assertThatThrownBy(() -> service.refresh("stolen-token"))
                 .isInstanceOf(UnauthorizedException.class)
@@ -247,7 +247,7 @@ class AuthServiceImplTests {
                 now.plus(Duration.ofDays(6)), now.minus(Duration.ofHours(1)));
         session.setRevokedAt(now.minus(Duration.ofHours(2)));
 
-        when(refreshTokenService.findByRawToken("revoked-token")).thenReturn(Optional.of(session));
+        when(refreshTokenService.findByRawTokenForUpdate("revoked-token")).thenReturn(Optional.of(session));
 
         assertThatThrownBy(() -> service.refresh("revoked-token"))
                 .isInstanceOf(UnauthorizedException.class)
@@ -263,7 +263,7 @@ class AuthServiceImplTests {
                 UUID.randomUUID(), user, familyId, "hash", now.minus(Duration.ofDays(8)),
                 now.minus(Duration.ofSeconds(1)), now.minus(Duration.ofHours(1)));
 
-        when(refreshTokenService.findByRawToken("expired-token")).thenReturn(Optional.of(session));
+        when(refreshTokenService.findByRawTokenForUpdate("expired-token")).thenReturn(Optional.of(session));
 
         assertThatThrownBy(() -> service.refresh("expired-token"))
                 .isInstanceOf(UnauthorizedException.class)
@@ -279,7 +279,7 @@ class AuthServiceImplTests {
                 UUID.randomUUID(), user, familyId, "hash", now.minus(Duration.ofDays(2)),
                 now.plus(Duration.ofDays(5)), now.minus(Duration.ofHours(24).plusSeconds(1)));
 
-        when(refreshTokenService.findByRawToken("inactive-token")).thenReturn(Optional.of(session));
+        when(refreshTokenService.findByRawTokenForUpdate("inactive-token")).thenReturn(Optional.of(session));
 
         assertThatThrownBy(() -> service.refresh("inactive-token"))
                 .isInstanceOf(UnauthorizedException.class)
@@ -295,7 +295,7 @@ class AuthServiceImplTests {
                 UUID.randomUUID(), user, familyId, "hash", now.minus(Duration.ofDays(1)),
                 now.plus(Duration.ofDays(6)), now.minus(Duration.ofHours(2)));
 
-        when(refreshTokenService.findByRawToken("valid-token")).thenReturn(Optional.of(session));
+        when(refreshTokenService.findByRawTokenForUpdate("valid-token")).thenReturn(Optional.of(session));
         user.setStatus(UserStatus.LOCKED);
         when(userRepository.findWithRolesAndPermissionsById(user.getId())).thenReturn(Optional.of(user));
 
@@ -314,7 +314,7 @@ class AuthServiceImplTests {
                 UUID.randomUUID(), user, familyId, "old-hash", now.minus(Duration.ofDays(3)),
                 originalExpiresAt, now.minus(Duration.ofHours(2)));
 
-        when(refreshTokenService.findByRawToken("valid-token")).thenReturn(Optional.of(session));
+        when(refreshTokenService.findByRawTokenForUpdate("valid-token")).thenReturn(Optional.of(session));
         when(userRepository.findWithRolesAndPermissionsById(user.getId())).thenReturn(Optional.of(user));
         when(refreshTokenService.generateRawToken()).thenReturn("new-raw-token");
         Role administrator = new Role(UUID.randomUUID(), "ADMINISTRATOR", "Administrator", null, true);

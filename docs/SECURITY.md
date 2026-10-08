@@ -183,7 +183,7 @@ Every successful refresh rotates the token:
 9. Mark the presented session as revoked, link `replacedBySessionId`, and commit both changes atomically.
 10. Issue a new access token and replace the refresh-token cookie only after the rotation succeeds.
 
-Presenting a previously rotated token is token reuse. On detected reuse, the backend revokes every active refresh session in that `familyId` and returns a generic `401 Unauthorized` response. Rotation and family revocation require transactional consistency.
+Presenting a previously rotated token is token reuse. On detected reuse, the backend revokes every active refresh session in that `familyId` and returns a generic `401 Unauthorized` response. Rotation and family revocation require transactional consistency. Refresh processing locks the matching session row and uses `READ COMMITTED` isolation so concurrent requests for the same token are serialized before validation and rotation. Reuse-driven family revocation participates in that transaction and is committed with the `401` response.
 
 ## Browser transport and CORS
 

@@ -181,4 +181,17 @@ class RefreshTokenServiceImplTests {
         assertThat(service.findByRawToken("   ")).isEmpty();
         verifyNoInteractions(repository);
     }
+
+    @Test
+    void findsSessionForUpdateByRawTokenUsingDeterministicHash() {
+        String raw = "token-to-lock";
+        String expectedHash = service.hashToken(raw);
+        RefreshSession session = new RefreshSession(
+                UUID.randomUUID(), user, UUID.randomUUID(), expectedHash, now, now.plus(Duration.ofDays(7)), now);
+
+        when(repository.findByTokenHashForUpdate(expectedHash)).thenReturn(Optional.of(session));
+
+        assertThat(service.findByRawTokenForUpdate(raw)).contains(session);
+        verify(repository).findByTokenHashForUpdate(expectedHash);
+    }
 }

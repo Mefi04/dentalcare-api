@@ -24,4 +24,6 @@ public interface RefreshTokenService {
     void revokeAllForUser(UUID userId);
 
     Optional<RefreshSession> findByRawToken(String rawToken);
+
+    Optional<RefreshSession> findByRawTokenForUpdate(String rawToken);
 }

@@ -4,7 +4,6 @@ import com.dentalcare.api.modules.auth.model.RefreshSession;
 import com.dentalcare.api.modules.auth.repository.RefreshSessionRepository;
 import com.dentalcare.api.modules.users.model.User;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -105,7 +104,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void revokeFamily(UUID familyId) {
         List<RefreshSession> sessions = refreshSessionRepository.findAllByFamilyId(familyId);
         Instant now = clock.instant();
@@ -152,5 +151,15 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         }
         String tokenHash = hashToken(rawToken);
         return refreshSessionRepository.findByTokenHash(tokenHash);
+    }
+
+    @Override
+    @Transactional
+    public Optional<RefreshSession> findByRawTokenForUpdate(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            return Optional.empty();
+        }
+        String tokenHash = hashToken(rawToken);
+        return refreshSessionRepository.findByTokenHashForUpdate(tokenHash);
     }
 }

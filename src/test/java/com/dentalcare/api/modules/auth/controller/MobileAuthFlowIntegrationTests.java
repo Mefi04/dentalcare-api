@@ -130,6 +130,11 @@ class MobileAuthFlowIntegrationTests {
                     return s;
                 });
 
+        when(refreshTokenService.findByRawTokenForUpdate(any(String.class)))
+                .thenAnswer(inv -> {
+                    String token = inv.getArgument(0);
+                    return Optional.ofNullable(sessionsByToken.get(token));
+                });
         when(refreshTokenService.findByRawToken(any(String.class)))
                 .thenAnswer(inv -> {
                     String token = inv.getArgument(0);
