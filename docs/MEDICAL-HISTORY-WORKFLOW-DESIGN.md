@@ -102,11 +102,33 @@ The initial clinic-authored catalog should cover, after odontologist approval: a
 - Append-only questionnaire ID, from/to status, actor, timestamp, reason code, and safe metadata without answers or PHI.
 - Complements the global audit module; it is the domain history used by workflow clients.
 
+### Relationship diagram
+
+```mermaid
+erDiagram
+    PATIENT ||--o{ QUESTIONNAIRE : receives
+    TEMPLATE ||--o{ TEMPLATE_VERSION : versions
+    TEMPLATE_VERSION ||--o{ TEMPLATE_SECTION : contains
+    TEMPLATE_SECTION ||--o{ TEMPLATE_QUESTION : contains
+    TEMPLATE_VERSION ||--o{ QUESTIONNAIRE : instantiates
+    QUESTIONNAIRE ||--o{ QUESTIONNAIRE_ANSWER : holds
+    TEMPLATE_QUESTION ||--o{ QUESTIONNAIRE_ANSWER : answers
+    QUESTIONNAIRE ||--o{ ANSWER_REVISION : snapshots
+    QUESTIONNAIRE ||--o{ REVIEW_NOTE : documents
+    QUESTIONNAIRE ||--o{ ATTESTATION : attests
+    QUESTIONNAIRE ||--o{ TRANSITION_EVENT : traces
+    QUESTIONNAIRE ||--o| CLINICAL_DOCUMENT : references_scan
+    PATIENT ||--o{ MEDICAL_HISTORY_VERSION : owns
+    QUESTIONNAIRE ||--o| MEDICAL_HISTORY_VERSION : validates_into
+    MEDICAL_HISTORY_VERSION ||--o| MEDICAL_HISTORY_VERSION : supersedes
+    MEDICAL_HISTORY_VERSION ||--o| MEDICAL_HISTORY : projects_current
+```
+
 ## 4. State machine
 
 | From | Action | To | Actor/permission | Notes |
 |---|---|---|---|---|
-| none | assign/create | `DRAFT` | `ASSIGN` or authenticated patient | Patient route always resolves patient from JWT. |
+| none | assign/create | `DRAFT` | `ASSIGN`; authenticated patient only for a change proposal | Initial questionnaires are staff-assigned. Patient routes always resolve the patient from JWT. |
 | `DRAFT` | save answers | `DRAFT` | owning patient or `TRANSCRIBE` | Paper transcription requires `PAPER`/`TRANSCRIPTION` provenance. |
 | `DRAFT` | submit | `SUBMITTED` | owning patient or `SUBMIT` | Idempotent for the same revision; validates required answers and attestation. |
 | `SUBMITTED` | start review | `UNDER_REVIEW` | `REVIEW` | Records reviewer and timestamp. |
@@ -118,13 +140,30 @@ The initial clinic-authored catalog should cover, after odontologist approval: a
 
 All other transitions return `409 Conflict`. Stale `lockVersion` returns `409`. Validation uses a patient row lock plus uniqueness constraints to prevent two current versions.
 
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT: staff assigns questionnaire
+    DRAFT --> DRAFT: owner saves answers
+    DRAFT --> SUBMITTED: owner submits revision
+    DRAFT --> CANCELLED: owner/staff cancels
+    SUBMITTED --> UNDER_REVIEW: assistant/dentist starts review
+    UNDER_REVIEW --> CLARIFICATION_REQUIRED: reviewer requests clarification
+    CLARIFICATION_REQUIRED --> SUBMITTED: owner resubmits new revision
+    CLARIFICATION_REQUIRED --> CANCELLED: owner/staff cancels
+    UNDER_REVIEW --> VALIDATED: dentist validates
+    UNDER_REVIEW --> REJECTED: dentist rejects with reason
+    VALIDATED --> [*]
+    REJECTED --> [*]
+    CANCELLED --> [*]
+```
+
 ## 5. Permission matrix
 
 | Permission | Administrator | Secretary | Assistant | Dentist | Patient |
 |---|:---:|:---:|:---:|:---:|:---:|
 | `MEDICAL_HISTORY_TEMPLATE_READ` | yes | no | yes | yes | via assigned snapshot only |
 | `MEDICAL_HISTORY_TEMPLATE_MANAGE` | no | no | no | yes | no |
-| `MEDICAL_HISTORY_ASSIGN` | yes | yes | yes | yes | own initial/change draft only |
+| `MEDICAL_HISTORY_ASSIGN` | yes | yes | yes | yes | own change proposal only |
 | `MEDICAL_HISTORY_RECEIVE` | yes | yes | yes | yes | no |
 | `MEDICAL_HISTORY_TRANSCRIBE` | no | no | yes | yes | no |
 | `MEDICAL_HISTORY_REVIEW` | no | no | yes | yes | no |
@@ -171,7 +210,7 @@ Every `/patients/me/**` operation resolves the patient from `AuthenticatedUser.u
 
 ### Patient self-service
 
-- `POST /api/v1/patients/me/medical-history/questionnaires` (initial draft or change proposal)
+- `POST /api/v1/patients/me/medical-history/change-proposals` (requires a current validated version)
 - `GET /api/v1/patients/me/medical-history/questionnaires`
 - `GET /api/v1/patients/me/medical-history/questionnaires/{questionnaireId}`
 - `PUT /api/v1/patients/me/medical-history/questionnaires/{questionnaireId}/answers`
