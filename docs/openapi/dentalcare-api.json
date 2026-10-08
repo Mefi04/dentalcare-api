@@ -6208,15 +6208,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -6245,7 +6248,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -6266,6 +6269,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -6337,6 +6359,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -6417,6 +6458,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -6507,6 +6567,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -6587,6 +6666,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -6639,15 +6737,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -6676,7 +6777,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -6697,6 +6798,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -6767,6 +6887,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -6804,15 +6943,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -6841,7 +6983,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -6862,6 +7004,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -6932,6 +7093,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7023,6 +7203,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7114,6 +7313,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7185,6 +7403,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7265,6 +7502,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7355,6 +7611,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7420,15 +7695,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -7457,7 +7735,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -7478,6 +7756,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7529,6 +7826,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ ],
@@ -7669,6 +7985,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7721,6 +8056,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7844,6 +8198,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ ],
@@ -7907,6 +8280,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -7969,6 +8361,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ ],
@@ -8019,6 +8430,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ ],
@@ -8156,6 +8586,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8170,15 +8619,18 @@
         "description" : "Without BILLING_CASH_READ_ALL only the authenticated user's shifts are returned.",
         "operationId" : "list_1",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -8207,7 +8659,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -8228,6 +8680,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8298,6 +8769,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8351,6 +8841,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8443,6 +8952,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8464,15 +8992,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -8501,7 +9032,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -8532,6 +9063,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8621,6 +9171,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8692,6 +9261,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8783,6 +9371,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8874,6 +9481,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -8895,15 +9521,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -8932,7 +9561,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -8953,6 +9582,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9023,6 +9671,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9113,6 +9780,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9156,15 +9842,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -9193,7 +9882,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -9214,6 +9903,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9285,6 +9993,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9360,6 +10087,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9429,6 +10175,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9518,6 +10283,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9610,6 +10394,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9663,15 +10466,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -9700,7 +10506,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -9731,6 +10537,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9821,6 +10646,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9874,15 +10718,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -9911,7 +10758,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -9932,6 +10779,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -9978,15 +10844,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -10015,7 +10884,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -10036,6 +10905,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10107,6 +10995,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10178,6 +11085,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10260,6 +11186,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10289,15 +11234,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -10326,7 +11274,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -10347,6 +11295,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10417,6 +11384,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10488,6 +11474,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10577,6 +11582,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10668,6 +11692,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10681,15 +11724,18 @@
       "get" : {
         "operationId" : "search_1",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -10725,7 +11771,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -10746,6 +11792,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10816,6 +11881,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10869,6 +11953,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10922,6 +12025,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -10935,15 +12057,18 @@
       "get" : {
         "operationId" : "findAll_3",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -10972,7 +12097,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -10993,6 +12118,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11062,6 +12206,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11132,6 +12295,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11212,6 +12394,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11292,6 +12493,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11372,6 +12592,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11384,15 +12623,18 @@
       "get" : {
         "operationId" : "findCurrentPatientAppointments",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -11421,7 +12663,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -11442,6 +12684,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11512,6 +12773,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11567,6 +12847,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11638,6 +12937,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11719,6 +13037,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11810,6 +13147,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11831,15 +13187,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -11868,7 +13227,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -11889,6 +13248,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -11960,6 +13338,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12032,6 +13429,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12085,6 +13501,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12098,15 +13533,18 @@
       "get" : {
         "operationId" : "findAll_8",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -12135,7 +13573,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -12156,6 +13594,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12208,6 +13665,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12278,6 +13754,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12340,6 +13835,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12421,6 +13935,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12434,15 +13967,18 @@
       "get" : {
         "operationId" : "list_7",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -12471,7 +14007,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -12492,6 +14028,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12563,6 +14118,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12616,6 +14190,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12687,6 +14280,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12700,15 +14312,18 @@
       "get" : {
         "operationId" : "list_6",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -12737,7 +14352,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -12758,6 +14373,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12829,6 +14463,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12910,6 +14563,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -12991,6 +14663,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13004,15 +14695,18 @@
       "get" : {
         "operationId" : "list_5",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -13041,7 +14735,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -13062,6 +14756,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13133,6 +14846,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13204,6 +14936,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13293,6 +15044,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13374,6 +15144,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13446,6 +15235,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13520,6 +15328,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13611,6 +15438,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13710,6 +15556,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13789,6 +15654,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13887,6 +15771,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -13986,6 +15889,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14007,15 +15929,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -14044,7 +15969,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -14075,6 +16000,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14164,6 +16108,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14243,6 +16206,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14342,6 +16324,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14441,6 +16442,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14520,6 +16540,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14617,6 +16656,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14638,15 +16696,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -14675,7 +16736,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -14706,6 +16767,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14777,6 +16857,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14848,6 +16947,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -14877,15 +16995,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -14914,7 +17035,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -14945,6 +17066,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15024,6 +17164,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15053,15 +17212,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -15090,7 +17252,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -15121,6 +17283,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15210,6 +17391,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15300,6 +17500,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15379,6 +17598,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15459,6 +17697,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15558,6 +17815,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15579,15 +17855,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -15616,7 +17895,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -15647,6 +17926,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15726,6 +18024,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15797,6 +18114,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15886,6 +18222,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -15967,6 +18322,25 @@
               }
             },
             "description" : "Patient not found"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16015,17 +18389,18 @@
             "type" : "string"
           }
         }, {
-          "description" : "Page number (0-based)",
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
-          "description" : "Page size",
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -16054,7 +18429,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -16085,6 +18460,25 @@
               }
             },
             "description" : "Patient not found"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16175,6 +18569,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16249,6 +18662,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16348,6 +18780,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16440,6 +18891,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16519,6 +18989,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16607,6 +19096,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16713,6 +19221,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16734,15 +19261,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -16771,7 +19301,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -16802,6 +19332,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16891,6 +19440,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -16962,6 +19530,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -17041,6 +19628,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -17062,15 +19668,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -17099,7 +19708,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -17130,6 +19739,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -17219,6 +19847,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -17293,6 +19940,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -17314,15 +19980,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -17351,7 +20020,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -17382,6 +20051,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -17471,6 +20159,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -17492,15 +20199,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -17529,7 +20239,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -17560,6 +20270,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -17631,6 +20360,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -17663,6 +20411,25 @@
               }
             },
             "description" : "Invalid request or failed validation"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ ],
@@ -17766,6 +20533,25 @@
               }
             },
             "description" : "Invalid request or failed validation"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ ],
@@ -17815,6 +20601,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ ],
@@ -17848,6 +20653,25 @@
               }
             },
             "description" : "Invalid request or failed validation"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ ],
@@ -17916,6 +20740,35 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Service is saturated, please try again later"
           }
         },
         "security" : [ {
@@ -17971,6 +20824,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18006,15 +20878,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -18043,7 +20918,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -18064,6 +20939,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18134,6 +21028,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18204,6 +21117,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18292,6 +21224,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18382,6 +21333,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18433,6 +21403,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18503,6 +21492,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18548,15 +21556,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -18585,7 +21596,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -18606,6 +21617,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18675,6 +21705,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18745,6 +21794,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18835,6 +21903,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18861,15 +21948,18 @@
             "type" : "boolean"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -18898,7 +21988,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -18919,6 +22009,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -18988,6 +22097,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19058,6 +22186,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19146,6 +22293,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19236,6 +22402,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19306,6 +22491,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19387,6 +22591,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19468,6 +22691,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19539,6 +22781,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19620,6 +22881,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19701,6 +22981,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19756,6 +23055,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19827,6 +23145,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19916,6 +23253,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -19997,6 +23353,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20071,6 +23446,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20150,6 +23544,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20224,6 +23637,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20313,6 +23745,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20334,15 +23785,18 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -20371,7 +23825,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -20402,6 +23856,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20491,6 +23964,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20562,6 +24054,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20652,6 +24163,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20665,15 +24195,18 @@
       "get" : {
         "operationId" : "search",
         "parameters" : [ {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
           "name" : "page",
           "required" : false,
           "schema" : {
             "default" : 0,
             "format" : "int32",
+            "maximum" : 1000,
             "type" : "integer"
           }
         }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
           "in" : "query",
           "name" : "size",
           "required" : false,
@@ -20724,7 +24257,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -20745,6 +24278,25 @@
               }
             },
             "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20815,6 +24367,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20886,6 +24457,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -20975,6 +24565,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -21066,6 +24675,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -21137,6 +24765,25 @@
               }
             },
             "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -21226,6 +24873,25 @@
               }
             },
             "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "security" : [ {
@@ -21258,6 +24924,25 @@
               }
             },
             "description" : "Invalid request or failed validation"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "tags" : [ "test-security-controller" ]
@@ -21286,6 +24971,25 @@
               }
             },
             "description" : "Invalid request or failed validation"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
           }
         },
         "tags" : [ "test-security-controller" ]

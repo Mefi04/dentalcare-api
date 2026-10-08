@@ -9,6 +9,12 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:5000}
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      max-lifetime: ${DB_MAX_LIFETIME:600000}
+  transaction:
+    default-timeout: ${DB_TX_TIMEOUT:15}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -26,6 +32,9 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  tomcat:
+    connection-timeout: 10000
+    max-threads: ${SERVER_MAX_THREADS:200}
 
 management:
   endpoints:

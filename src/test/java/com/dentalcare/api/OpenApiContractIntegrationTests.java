@@ -122,9 +122,26 @@ class OpenApiContractIntegrationTests extends DentalCareApplicationTests {
         assertThat(login.has("401")).isTrue();
         assertThat(login.has("429")).isTrue();
         assertThat(login.at("/429/headers/Retry-After").isObject()).isTrue();
+        JsonNode reports = root.at("/paths/~1api~1v1~1reports~1dashboard/get/responses");
+        assertThat(reports.has("429")).isTrue();
+        assertThat(reports.at("/429/headers/Retry-After").isObject()).isTrue();
+        assertThat(reports.has("503")).isTrue();
+        assertThat(reports.at("/503/headers/Retry-After").isMissingNode()).isTrue();
+        assertThat(root.at("/paths/~1api~1v1~1patients/get/responses/400/description").asText())
+                .contains("page must not exceed 1000");
+        JsonNode patientParameters = root.at("/paths/~1api~1v1~1patients/get/parameters");
+        assertThat(parameter(patientParameters, "page").path("schema").path("maximum").asInt()).isEqualTo(1000);
+        assertThat(parameter(patientParameters, "size").path("description").asText()).contains("capped to 100");
         assertThat(root.at("/paths/~1api~1v1~1patients~1me~1appointments~1{appointmentId}~1cancel/patch/responses/409")
                 .isObject()).isTrue();
         assertThat(root.at("/components/schemas/ApiErrorResponse/properties/fieldErrors").isObject()).isTrue();
+    }
+
+    private JsonNode parameter(JsonNode parameters, String name) {
+        return java.util.stream.StreamSupport.stream(parameters.spliterator(), false)
+                .filter(parameter -> name.equals(parameter.path("name").asText()))
+                .findFirst()
+                .orElseThrow();
     }
 
     private void assertReferencesResolve(JsonNode root, JsonNode node) {

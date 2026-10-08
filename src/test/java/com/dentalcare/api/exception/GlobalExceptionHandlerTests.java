@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -91,6 +93,20 @@ class GlobalExceptionHandlerTests {
     }
 
     @Test
+    void returnsServiceUnavailableForDatabaseQueryTimeout() throws Exception {
+        mockMvc.perform(get("/test/errors/query-timeout"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().doesNotExist("Retry-After"))
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.error").value("Service Unavailable"))
+                .andExpect(jsonPath("$.message")
+                        .value("The service could not complete the request within the configured time limit"))
+                .andExpect(jsonPath("$.message").value(not("synthetic database timeout")))
+                .andExpect(jsonPath("$.path").value("/test/errors/query-timeout"))
+                .andExpect(jsonPath("$.fieldErrors").isEmpty());
+    }
+
+    @Test
     void internalServerErrorDoesNotExposeOriginalExceptionMessage() throws Exception {
         mockMvc.perform(get("/test/errors/unexpected"))
                 .andExpect(status().isInternalServerError())
@@ -126,6 +142,11 @@ class GlobalExceptionHandlerTests {
         @GetMapping("/unexpected")
         void unexpected() {
             throw new IllegalStateException(INTERNAL_EXCEPTION_MESSAGE);
+        }
+
+        @GetMapping("/query-timeout")
+        void queryTimeout() {
+            throw new QueryTimeoutException("synthetic database timeout");
         }
     }
 
