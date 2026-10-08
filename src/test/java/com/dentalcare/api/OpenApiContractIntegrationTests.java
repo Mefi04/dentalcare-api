@@ -122,6 +122,13 @@ class OpenApiContractIntegrationTests extends DentalCareApplicationTests {
         assertThat(login.has("401")).isTrue();
         assertThat(login.has("429")).isTrue();
         assertThat(login.at("/429/headers/Retry-After").isObject()).isTrue();
+        JsonNode reports = root.at("/paths/~1api~1v1~1reports~1dashboard/get/responses");
+        assertThat(reports.has("429")).isTrue();
+        assertThat(reports.at("/429/headers/Retry-After").isObject()).isTrue();
+        assertThat(reports.has("503")).isTrue();
+        assertThat(reports.at("/503/headers/Retry-After").isMissingNode()).isTrue();
+        assertThat(root.at("/paths/~1api~1v1~1patients/get/responses/400/description").asText())
+                .contains("page must not exceed 1000");
         assertThat(root.at("/paths/~1api~1v1~1patients~1me~1appointments~1{appointmentId}~1cancel/patch/responses/409")
                 .isObject()).isTrue();
         assertThat(root.at("/components/schemas/ApiErrorResponse/properties/fieldErrors").isObject()).isTrue();

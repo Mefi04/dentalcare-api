@@ -107,7 +107,9 @@ public class OpenApiConfig {
 
     private void documentCommonResponses(String path, String method, Operation operation) {
         ApiResponses responses = operation.getResponses();
-        addError(responses, "400", "Invalid request, failed validation, or page offset > 1000");
+        addError(responses, "400", hasPageParameter(operation)
+                ? "Invalid request or failed validation; page must not exceed 1000"
+                : "Invalid request or failed validation");
         if (operation.getSecurity() != null && !operation.getSecurity().isEmpty()) {
             addError(responses, "401", "Authentication is required or invalid");
             addError(responses, "403", "Authenticated caller lacks the required permission");
@@ -121,7 +123,7 @@ public class OpenApiConfig {
         if (!"GET".equals(method)) {
             addError(responses, "409", "Operation conflicts with the current resource state");
         }
-        
+
         // Rate limiting is globally applied
         ApiResponse tooManyRequests = errorResponse("Request rate limit exceeded");
         tooManyRequests.addHeaderObject("Retry-After", new io.swagger.v3.oas.models.headers.Header()
@@ -130,12 +132,13 @@ public class OpenApiConfig {
         responses.addApiResponse("429", tooManyRequests);
 
         if (path.startsWith("/api/v1/reports")) {
-            ApiResponse serviceUnavailable = errorResponse("Service is saturated, please try again later");
-            serviceUnavailable.addHeaderObject("Retry-After", new io.swagger.v3.oas.models.headers.Header()
-                .description("Seconds until the request may be retried")
-                .schema(new IntegerSchema().format("int64")));
-            responses.addApiResponse("503", serviceUnavailable);
+            responses.addApiResponse("503", errorResponse("Service is saturated, please try again later"));
         }
+    }
+
+    private boolean hasPageParameter(Operation operation) {
+        return operation.getParameters() != null && operation.getParameters().stream()
+                .anyMatch(parameter -> "page".equals(parameter.getName()));
     }
 
     private void addError(ApiResponses responses, String status, String description) {
