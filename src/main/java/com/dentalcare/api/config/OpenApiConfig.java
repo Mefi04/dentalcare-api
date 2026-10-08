@@ -35,9 +35,6 @@ public class OpenApiConfig {
             "/api/v1/auth/activate", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout",
             "/api/v1/auth/mobile/login", "/api/v1/auth/mobile/refresh", "/api/v1/auth/mobile/logout",
             "/api/v1/auth/password-recovery/request", "/api/v1/auth/password-recovery/confirm");
-    private static final Set<String> RATE_LIMITED_PATHS = Set.of(
-            "/api/v1/auth/login", "/api/v1/auth/mobile/login",
-            "/api/v1/auth/password-recovery/request", "/api/v1/public/contact-inquiries");
     private static final Set<String> AUTHENTICATION_FAILURE_PATHS = Set.of(
             "/api/v1/auth/login", "/api/v1/auth/mobile/login", "/api/v1/auth/mobile/refresh");
     private static final Set<String> PATIENT_AUTH_PATHS = Set.of("/api/v1/auth/mobile/password");
@@ -110,7 +107,7 @@ public class OpenApiConfig {
 
     private void documentCommonResponses(String path, String method, Operation operation) {
         ApiResponses responses = operation.getResponses();
-        addError(responses, "400", "Invalid request or failed validation");
+        addError(responses, "400", "Invalid request, failed validation, or page offset > 1000");
         if (operation.getSecurity() != null && !operation.getSecurity().isEmpty()) {
             addError(responses, "401", "Authentication is required or invalid");
             addError(responses, "403", "Authenticated caller lacks the required permission");
@@ -124,12 +121,20 @@ public class OpenApiConfig {
         if (!"GET".equals(method)) {
             addError(responses, "409", "Operation conflicts with the current resource state");
         }
-        if (RATE_LIMITED_PATHS.contains(path)) {
-            ApiResponse response = errorResponse("Request rate limit exceeded");
-            response.addHeaderObject("Retry-After", new io.swagger.v3.oas.models.headers.Header()
-                    .description("Seconds until the request may be retried")
-                    .schema(new IntegerSchema().format("int64")));
-            responses.addApiResponse("429", response);
+        
+        // Rate limiting is globally applied
+        ApiResponse tooManyRequests = errorResponse("Request rate limit exceeded");
+        tooManyRequests.addHeaderObject("Retry-After", new io.swagger.v3.oas.models.headers.Header()
+                .description("Seconds until the request may be retried")
+                .schema(new IntegerSchema().format("int64")));
+        responses.addApiResponse("429", tooManyRequests);
+
+        if (path.startsWith("/api/v1/reports")) {
+            ApiResponse serviceUnavailable = errorResponse("Service is saturated, please try again later");
+            serviceUnavailable.addHeaderObject("Retry-After", new io.swagger.v3.oas.models.headers.Header()
+                .description("Seconds until the request may be retried")
+                .schema(new IntegerSchema().format("int64")));
+            responses.addApiResponse("503", serviceUnavailable);
         }
     }
 
