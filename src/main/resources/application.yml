@@ -29,6 +29,9 @@ spring:
     properties:
       mail.smtp.auth: ${MAIL_SMTP_AUTH:false}
       mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:false}
+      mail.smtp.connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT:5000}
+      mail.smtp.timeout: ${MAIL_SMTP_TIMEOUT:5000}
+      mail.smtp.writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT:5000}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -69,7 +72,7 @@ dentalcare:
       public-appointment-request:
         window: ${RATE_LIMIT_PUBLIC_APPOINTMENT_WINDOW:15m}
         ip-limit: ${RATE_LIMIT_PUBLIC_APPOINTMENT_IP:5}
-        identity-limit: 0
+        identity-limit: ${RATE_LIMIT_PUBLIC_APPOINTMENT_IDENTITY:10}
   initial-admin:
     enabled: ${INITIAL_ADMIN_ENABLED:false}
     full-name: ${INITIAL_ADMIN_FULL_NAME:}
@@ -95,6 +98,14 @@ dentalcare:
     twilio-account-sid: ${TWILIO_ACCOUNT_SID:}
     twilio-auth-token: ${TWILIO_AUTH_TOKEN:}
     twilio-from-number: ${TWILIO_FROM_NUMBER:}
+    email-enabled: ${PUBLIC_APPOINTMENT_EMAIL_ENABLED:false}
+  appointment-outbox:
+    encryption-key: ${APPOINTMENT_OUTBOX_ENCRYPTION_KEY:}
+    max-attempts: ${APPOINTMENT_OUTBOX_MAX_ATTEMPTS:8}
+    base-retry-delay: ${APPOINTMENT_OUTBOX_BASE_RETRY_DELAY:30s}
+    processing-lease: ${APPOINTMENT_OUTBOX_PROCESSING_LEASE:2m}
+    batch-size: ${APPOINTMENT_OUTBOX_BATCH_SIZE:10}
+    poll-delay: ${APPOINTMENT_OUTBOX_POLL_DELAY:5s}
   r2:
     enabled: ${R2_ENABLED:false}
     account-id: ${R2_ACCOUNT_ID:}

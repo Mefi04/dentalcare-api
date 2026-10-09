@@ -41,6 +41,10 @@ import com.dentalcare.api.modules.appointments.dto.response.PublicVerificationAc
 import com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestMessageResponse;
 import com.dentalcare.api.modules.appointments.dto.response.AppointmentProfessionalResponse;
 import com.dentalcare.api.modules.appointments.dto.request.ClinicSchedulingMessageRequest;
+import com.dentalcare.api.modules.appointments.dto.request.CreateAppointmentConversationMessageRequest;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentConversationMessagesPageResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentNotificationOutboxResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentWhatsAppDraftResponse;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Service
@@ -65,6 +69,8 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     private final AppointmentPublicConversationRepository conversations;
     private final AppointmentPublicDecisionRepository decisions;
     private final AppointmentRequestMessageRepository messages;
+    private final AppointmentNotificationOutboxService notificationOutbox;
+    private final AppointmentConversationMessageService conversationMessages;
     private final PublicAppointmentCodeDelivery codeDelivery;
     private final PasswordEncoder passwordEncoder;
     private final com.dentalcare.api.modules.appointments.repository.AppointmentRepository appointmentRepository;
@@ -81,6 +87,8 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
                                          AppointmentPublicConversationRepository conversations,
                                          AppointmentPublicDecisionRepository decisions,
                                          AppointmentRequestMessageRepository messages,
+                                         AppointmentNotificationOutboxService notificationOutbox,
+                                         AppointmentConversationMessageService conversationMessages,
                                          PublicAppointmentCodeDelivery codeDelivery,
                                          PasswordEncoder passwordEncoder,
                                          com.dentalcare.api.modules.appointments.repository.AppointmentRepository appointmentRepository) {
@@ -95,6 +103,8 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         this.conversations = conversations;
         this.decisions = decisions;
         this.messages = messages;
+        this.notificationOutbox = notificationOutbox;
+        this.conversationMessages = conversationMessages;
         this.codeDelivery = codeDelivery;
         this.passwordEncoder = passwordEncoder;
         this.appointmentRepository = appointmentRepository;
@@ -421,14 +431,8 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         Page<AppointmentRequest> result = requests.findAll(spec, page(page, size));
         List<AppointmentRequest> content = result.getContent();
         if (content.isEmpty()) return result.map(mapper::toAdministrativeResponse);
-        List<UUID> publicIds = content.stream().filter(value -> value.getRequesterFullName() != null)
-                .map(AppointmentRequest::getId).toList();
-        if (publicIds.isEmpty()) return result.map(mapper::toAdministrativeResponse);
-        var byRequest = messages.findByAppointmentRequestIdInOrderByCreatedAtAscIdAsc(
-                publicIds).stream()
-                .collect(java.util.stream.Collectors.groupingBy(AppointmentRequestMessage::getAppointmentRequestId));
-        List<AppointmentRequestResponse> responses = content.stream().map(value -> administrativeResponse(value,
-                byRequest.getOrDefault(value.getId(), List.of()))).toList();
+        List<AppointmentRequestResponse> responses = content.stream()
+                .map(value -> administrativeResponse(value, List.of())).toList();
         return new PageImpl<AppointmentRequestResponse>(responses, result.getPageable(), result.getTotalElements());
     }
 
@@ -508,6 +512,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         request.propose(professional, proposedAt, expiresAt, actor, now);
         messages.save(new AppointmentRequestMessage(UUID.randomUUID(), request.getId(), "RECEPTION", "PROPOSAL",
                 "Recepción propone " + proposedAt + " con " + professional.getFullName() + ". Puedes aceptar o rechazar esta propuesta.", now));
+        enqueueNotice(request, "Recepción propuso un horario. Ingresa al portal para revisar y responder la propuesta.");
         if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED,"APPOINTMENTS","AppointmentRequest",request.getId(),actorId);
         AppointmentRequest saved = requests.saveAndFlush(request);
         return administrativeResponse(saved, historyFor(saved.getId()));
@@ -518,6 +523,9 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     public PublicVerificationAcknowledgement requestConversationCode(UUID requestId,
             PublicVerificationChannelRequest request) {
         String generic = "If the request and selected channel are valid, a verification code will be sent.";
+        if (!codeDelivery.isConfigured(request.channel())) {
+            throw new ServiceUnavailableException("Public appointment verification is temporarily unavailable");
+        }
         AppointmentRequest appointmentRequest = requests.findById(requestId).orElse(null);
         if (appointmentRequest == null || appointmentRequest.getRequesterFullName() == null) {
             return new PublicVerificationAcknowledgement(generic);
@@ -535,7 +543,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             conversation.replaceCode(request.channel().name(), passwordEncoder.encode(code), now.plus(OTP_TTL), now);
         }
         conversations.saveAndFlush(conversation);
-        codeDelivery.deliver(request.channel(), destination, code, OTP_TTL);
+        notificationOutbox.enqueueOtp(requestId, request.channel(), destination, code, OTP_TTL);
         return new PublicVerificationAcknowledgement(generic);
     }
 
@@ -672,6 +680,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         Instant now = clock.instant();
         messages.save(new AppointmentRequestMessage(UUID.randomUUID(), requestId, "RECEPTION",
                 "SCHEDULING_UPDATE", text, now));
+        enqueueNotice(request, text);
         return administrativeResponse(requests.saveAndFlush(request), historyFor(requestId));
     }
 
@@ -721,8 +730,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     }
 
     private PublicAppointmentConversationResponse conversationResponse(AppointmentRequest request) {
-        List<AppointmentRequestMessageResponse> history = messages
-                .findByAppointmentRequestIdOrderByCreatedAtAscIdAsc(request.getId()).stream()
+        List<AppointmentRequestMessageResponse> history = historyFor(request.getId()).stream()
                 .map(value -> new AppointmentRequestMessageResponse(value.getId(), value.getSender(),
                         value.getMessageType(), value.getText(), value.getCreatedAt())).toList();
         User professional = request.getStatus() == AppointmentRequestStatus.PENDING_PATIENT
@@ -747,7 +755,142 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     }
 
     private List<AppointmentRequestMessage> historyFor(UUID requestId) {
-        return messages.findByAppointmentRequestIdOrderByCreatedAtAscIdAsc(requestId);
+        return conversationMessages.latest(requestId, 20);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AppointmentConversationMessagesPageResponse getPublicMessages(UUID requestId, String token,
+            String cursor, int size) {
+        return conversationMessages.getPublic(requestId, token, cursor, size);
+    }
+
+    @Override
+    @Transactional
+    public AppointmentRequestMessageResponse addPublicMessage(UUID requestId, String token, UUID key,
+            CreateAppointmentConversationMessageRequest input) {
+        return conversationMessages.addPublic(requestId, token, key, input);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AppointmentConversationMessagesPageResponse getAdministrativeMessages(UUID requestId,
+            String cursor, int size) {
+        return conversationMessages.getAdministrative(requestId, cursor, size);
+    }
+
+    @Override
+    @Transactional
+    public AppointmentRequestMessageResponse addAdministrativeMessage(UUID actorId, UUID requestId, UUID key,
+            CreateAppointmentConversationMessageRequest input) {
+        return conversationMessages.addAdministrative(actorId, requestId, key, input);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AppointmentNotificationOutboxResponse> getNotificationStatus(UUID requestId, int page, int size) {
+        AppointmentRequest request = requests.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment request not found"));
+        if (request.getRequesterFullName() == null) {
+            throw new ConflictException(REQUEST_NOT_PUBLIC, "Notification history is available only for public requests");
+        }
+        return notificationOutbox.findForRequest(requestId, page, size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AppointmentWhatsAppDraftResponse createWhatsAppDraft(UUID requestId) {
+        AppointmentRequest request = requests.findById(requestId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment request not found"));
+        if (request.getRequesterFullName() == null || request.getRequesterPhone() == null
+                || request.getRequesterPhone().isBlank()) {
+            throw new ConflictException(REQUEST_NOT_PUBLIC, "A public request with a phone number is required");
+        }
+        String rawPhone = request.getRequesterPhone().trim();
+        String digits = rawPhone.replaceAll("\\D", "");
+        String international = rawPhone.startsWith("+") || digits.startsWith("502") ? digits : "502" + digits;
+        String text = "Hola " + request.getRequesterFullName()
+                + ", te contactamos de DentalCare para coordinar tu solicitud de cita. Responde por este medio.";
+        String url = "https://wa.me/" + international + "?text="
+                + java.net.URLEncoder.encode(text, StandardCharsets.UTF_8);
+        return new AppointmentWhatsAppDraftResponse(requestId, international, text, url, false);
+    }
+
+    private AppointmentRequestMessageResponse saveTextMessage(UUID requestId, String sender, UUID key, String rawText) {
+        if (key == null) throw new BadRequestException("Idempotency-Key UUID is required");
+        if (rawText == null || rawText.isBlank() || rawText.length() > 500
+                || rawText.indexOf('<') >= 0 || rawText.indexOf('>') >= 0
+                || rawText.chars().anyMatch(Character::isISOControl)) {
+            throw new BadRequestException("Message must be plain text between 1 and 500 characters");
+        }
+        String text = rawText.trim();
+        NonClinicalSchedulingText.validate(text);
+        AppointmentRequest request = locked(requestId);
+        if (request.getRequesterFullName() == null || !isOpen(request)) {
+            throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE, "Messages require an open public request");
+        }
+        String hash = sha256(text);
+        var previous = messages.findByAppointmentRequestIdAndSenderAndIdempotencyKey(requestId, sender, key);
+        if (previous.isPresent()) {
+            if (!hash.equals(previous.get().getIdempotencyPayloadHash())) {
+                throw new ConflictException("IDEMPOTENCY_KEY_REUSED", "Idempotency-Key was used with different message content");
+            }
+            return messageResponse(previous.get());
+        }
+        AppointmentRequestMessage saved = messages.saveAndFlush(new AppointmentRequestMessage(UUID.randomUUID(),
+                requestId, sender, "FREE_TEXT", text, clock.instant(), key, hash));
+        if ("RECEPTION".equals(sender)) enqueueNotice(request, "Recepción te envió un mensaje. Ingresa al portal para consultarlo.");
+        return messageResponse(saved);
+    }
+
+    private AppointmentConversationMessagesPageResponse messagePage(UUID requestId, String cursor, int size) {
+        if (size < 1 || size > 100) throw new BadRequestException("size must be between 1 and 100");
+        List<AppointmentRequestMessage> found;
+        if (cursor == null || cursor.isBlank()) {
+            found = messages.findLatest(requestId, PageRequest.of(0, size + 1));
+        } else {
+            String decoded;
+            try {
+                decoded = new String(java.util.Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException exception) {
+                throw new BadRequestException("Invalid message cursor");
+            }
+            String[] parts = decoded.split("\\|", 2);
+            if (parts.length != 2) throw new BadRequestException("Invalid message cursor");
+            try {
+                found = messages.findOlderThan(requestId, Instant.parse(parts[0]), UUID.fromString(parts[1]),
+                        PageRequest.of(0, size + 1));
+            } catch (RuntimeException exception) {
+                throw new BadRequestException("Invalid message cursor");
+            }
+        }
+        boolean more = found.size() > size;
+        if (more) found = new java.util.ArrayList<>(found.subList(0, size));
+        String next = null;
+        if (more && !found.isEmpty()) {
+            AppointmentRequestMessage last = found.get(found.size() - 1);
+            next = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    (last.getCreatedAt() + "|" + last.getId()).getBytes(StandardCharsets.UTF_8));
+        }
+        java.util.Collections.reverse(found);
+        return new AppointmentConversationMessagesPageResponse(found.stream().map(this::messageResponse).toList(), next, more, size);
+    }
+
+    private AppointmentRequestMessageResponse messageResponse(AppointmentRequestMessage message) {
+        return new AppointmentRequestMessageResponse(message.getId(), message.getSender(), message.getMessageType(),
+                message.getText(), message.getCreatedAt());
+    }
+
+    private void enqueueNotice(AppointmentRequest request, String text) {
+        if (request.getRequesterEmail() != null && !request.getRequesterEmail().isBlank()
+                && codeDelivery.isConfigured(PublicVerificationChannelRequest.Channel.EMAIL)) {
+            notificationOutbox.enqueueNotice(request.getId(), PublicVerificationChannelRequest.Channel.EMAIL,
+                    request.getRequesterEmail(), text);
+        } else if (request.getRequesterPhone() != null && !request.getRequesterPhone().isBlank()
+                && codeDelivery.isConfigured(PublicVerificationChannelRequest.Channel.SMS)) {
+            notificationOutbox.enqueueNotice(request.getId(), PublicVerificationChannelRequest.Channel.SMS,
+                    request.getRequesterPhone(), text);
+        }
     }
 
     private String randomToken() {

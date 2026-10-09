@@ -571,11 +571,17 @@ produce an appointment-slot conflict.
 | `POST` | `/api/v1/appointment-requests/{requestId}/assign-professional` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Assigns/reassigns an active dentist to an open public request; does not confirm a slot. Body: `professionalId`. |
 | `GET` | `/api/v1/appointment-requests/{requestId}/availability?professionalId={uuid}&date=YYYY-MM-DD` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Returns only booked instants for that dentist on the Guatemala clinic date. Proposal submission validates availability again. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/messages` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Body is a predefined non-clinical template type; free-text/clinical messages are not accepted. |
+| `GET` | `/api/v1/appointment-requests/{requestId}/conversation/messages?size=20&cursor=...` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Cursor-paginated public conversation; size 1-100; list endpoints no longer embed full history. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/conversation/messages` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | `{ "text": "Please call after 3 pm" }`; UUID `Idempotency-Key`; sender comes from auth. |
+| `GET` | `/api/v1/appointment-requests/{requestId}/notifications?page=0&size=20` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Safe notification state only; no destination or ciphertext is returned. |
+| `GET` | `/api/v1/appointment-requests/{requestId}/whatsapp-draft` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Manual `wa.me` draft; `sentAutomatically` is always false. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/confirm-public-proposal` | `ADMINISTRATOR`, `SECRETARY` | `409 Conflict` | Legacy compatibility route; public proposal acceptance is restricted to the verified conversation. |
 | `POST` | `/api/v1/public/appointment-requests` | Public | `202 Accepted` | First appointment intake; request time is not reserved. Requires UUID `Idempotency-Key`; see contract above. |
 | `POST` | `/api/v1/public/appointment-requests/{requestId}/verification-codes` | Public | `202 Accepted` | Body `channel: SMS|EMAIL`; always returns a generic acknowledgment. OTP expires in 10 minutes, max five attempts. |
 | `POST` | `/api/v1/public/appointment-requests/{requestId}/verification` | Public | `200 OK` | Body `code`; success returns a scoped 24-hour `conversationToken`. Invalid code is 401, expired/consumed code is 410. |
 | `GET` | `/api/v1/public/appointment-requests/{requestId}/conversation` | Conversation bearer token | `200 OK` | Returns only that request's state, proposal and messages. |
+| `GET` | `/api/v1/public/appointment-requests/{requestId}/conversation/messages?size=20&cursor=...` | Conversation bearer token | `200 OK` | Stable chronological cursor page; size 1-100, latest page first. |
+| `POST` | `/api/v1/public/appointment-requests/{requestId}/conversation/messages` | Conversation bearer token | `200 OK` | `{ "text": "Please call after 3 pm" }`, UUID `Idempotency-Key`; non-clinical plain text only, max 500 chars. |
 | `POST` | `/api/v1/public/appointment-requests/{requestId}/decision` | Conversation bearer token | `200 OK` | Body `decision: ACCEPT|REJECT`; UUID `Idempotency-Key` required. Accept creates a cita only if an existing patient record is linked and slot still free. |
 | `POST` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `201 Created` | Body: `professionalId`, future `requestedAt`; patient comes from JWT. |
 | `GET` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `200 OK` | Lists only owned requests. |
@@ -613,7 +619,24 @@ on active dentist/time reservations closes concurrent booking races; an occupied
 `409 PATIENT_RECORD_LINK_REQUIRED`; reception verifies identity, then either links an existing record or creates
 one through the patient module before another acceptance attempt. The CUI is never used as chat authentication or
 an automatic record match. No account is created automatically, and no arbitrary patient messages are accepted.
-Reception messages use predefined scheduling templates to avoid collecting clinical information.
+Reception may use predefined templates or free-text logistical messages. Both directions reject clinical terms, markup,
+control characters and messages above 500 characters. Message senders are server-derived (`PATIENT` from the scoped
+conversation token, `RECEPTION` from the authenticated staff principal); `BOT` and `SYSTEM` are server-only. Reusing
+the same sender/request/idempotency key and payload returns the original message; changing its payload returns 409.
+
+Conversation history is fetched through the cursor endpoint. A page response is shaped as
+`{"items":[{"id":"uuid","sender":"RECEPTION","type":"FREE_TEXT","text":"...","createdAt":"..."}],"nextCursor":"...","hasMore":true,"pageSize":20}`.
+Traversal uses `(createdAt DESC, id DESC)` and each page is presented chronologically; clients pass `nextCursor`
+unchanged. Legacy conversation/detail projections include at most the latest 20 messages.
+
+OTP and proposal notices use a PostgreSQL transactional outbox. Recipient and message payload are stored only as
+AES-256-GCM ciphertext while pending/retrying and erased after provider acceptance or terminal failure. `SENT` means
+accepted by SMTP/Twilio, not delivered. Admin status omits recipient data. Retries use capped exponential backoff,
+eight attempts by default, and expired OTP events are discarded. Configure `APPOINTMENT_OUTBOX_ENCRYPTION_KEY` as
+base64 for exactly 32 random bytes. Email requires explicit `PUBLIC_APPOINTMENT_EMAIL_ENABLED=true` and working SMTP;
+SMS requires Twilio credentials and has connection/request timeouts; SMTP connect/read/write timeouts default to five
+seconds and are configurable. If no OTP channel is configured, requests return 503 without disclosing whether the
+request exists. The WhatsApp draft endpoint does not send or claim delivery.
 
 ## Waiting room endpoints
 

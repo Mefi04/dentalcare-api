@@ -34,7 +34,7 @@ public class SensitiveEndpointRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        boolean conversationVerification = path.matches("/api/v1/public/appointment-requests/[^/]+/(verification-codes|verification|decision)");
+        boolean conversationVerification = path.matches("/api/v1/public/appointment-requests/[^/]+/(verification-codes|verification|decision|conversation/messages)");
         return !"POST".equals(request.getMethod()) || (!POLICIES.containsKey(path) && !conversationVerification);
     }
 
@@ -44,6 +44,10 @@ public class SensitiveEndpointRateLimitFilter extends OncePerRequestFilter {
         try {
             RateLimitPolicy policy = POLICIES.getOrDefault(request.getServletPath(), RateLimitPolicy.PUBLIC_APPOINTMENT_REQUEST);
             service.checkIp(policy, request);
+            java.util.regex.Matcher publicRequest = java.util.regex.Pattern
+                    .compile("^/api/v1/public/appointment-requests/([0-9a-fA-F-]{36})/.*$")
+                    .matcher(request.getServletPath());
+            if (publicRequest.matches()) service.checkIdentity(policy, publicRequest.group(1));
             chain.doFilter(request, response);
         } catch (RateLimitExceededException exception) {
             exceptionResolver.resolveException(request, response, null, exception);

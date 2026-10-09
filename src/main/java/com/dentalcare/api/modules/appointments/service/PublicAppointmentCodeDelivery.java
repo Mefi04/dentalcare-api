@@ -5,4 +5,6 @@ import java.time.Duration;
 
 public interface PublicAppointmentCodeDelivery {
     void deliver(Channel channel, String destination, String code, Duration validity);
+    void deliverNotice(Channel channel, String destination, String text);
+    boolean isConfigured(Channel channel);
 }

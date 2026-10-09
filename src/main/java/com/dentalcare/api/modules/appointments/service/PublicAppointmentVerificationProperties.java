@@ -3,7 +3,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "dentalcare.public-appointment-verification")
 public record PublicAppointmentVerificationProperties(String twilioAccountSid, String twilioAuthToken,
-                                                       String twilioFromNumber) {
+                                                       String twilioFromNumber, boolean emailEnabled) {
     public PublicAppointmentVerificationProperties {
         twilioAccountSid = value(twilioAccountSid); twilioAuthToken = value(twilioAuthToken);
         twilioFromNumber = value(twilioFromNumber);

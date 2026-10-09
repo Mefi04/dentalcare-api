@@ -6,6 +6,7 @@ import com.dentalcare.api.modules.auth.config.PasswordRecoveryProperties;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
+
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -20,45 +21,63 @@ public class PublicAppointmentCodeDeliveryImpl implements PublicAppointmentCodeD
     private final JavaMailSender mailSender;
     private final PasswordRecoveryProperties mailProperties;
     private final PublicAppointmentVerificationProperties properties;
-    private final HttpClient http = HttpClient.newHttpClient();
+    private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
 
     public PublicAppointmentCodeDeliveryImpl(JavaMailSender mailSender, PasswordRecoveryProperties mailProperties,
                                              PublicAppointmentVerificationProperties properties) {
-        this.mailSender = mailSender; this.mailProperties = mailProperties; this.properties = properties;
+        this.mailSender = mailSender;
+        this.mailProperties = mailProperties;
+        this.properties = properties;
     }
 
     @Override
     public void deliver(Channel channel, String destination, String code, Duration validity) {
+        send(channel, destination, "Código para tu solicitud de cita DentalCare",
+                "Tu código de verificación es " + code + ". Expira en " + validity.toMinutes()
+                        + " minutos. Si no lo solicitaste, ignora este mensaje.");
+    }
+
+    @Override
+    public void deliverNotice(Channel channel, String destination, String text) {
+        send(channel, destination, "Actualización de tu solicitud de cita DentalCare", text);
+    }
+
+    @Override
+    public boolean isConfigured(Channel channel) {
+        if (channel == Channel.EMAIL) return properties.emailEnabled() && !mailProperties.mailFrom().isBlank();
+        return !properties.twilioAccountSid().isBlank() && !properties.twilioAuthToken().isBlank()
+                && !properties.twilioFromNumber().isBlank();
+    }
+
+    private void send(Channel channel, String destination, String subject, String text) {
         try {
+            if (!isConfigured(channel)) throw new ServiceUnavailableException("Appointment notification channel unavailable");
             if (channel == Channel.EMAIL) {
                 SimpleMailMessage message = new SimpleMailMessage();
-                message.setFrom(mailProperties.mailFrom()); message.setTo(destination);
-                message.setSubject("Código para tu solicitud de cita DentalCare");
-                message.setText("Tu código de verificación es " + code + ". Expira en "
-                        + validity.toMinutes() + " minutos. Si no lo solicitaste, ignora este mensaje.");
+                message.setFrom(mailProperties.mailFrom());
+                message.setTo(destination);
+                message.setSubject(subject);
+                message.setText(text);
                 mailSender.send(message);
                 return;
             }
-            if (properties.twilioAccountSid().isBlank() || properties.twilioAuthToken().isBlank()
-                    || properties.twilioFromNumber().isBlank()) {
-                throw new ServiceUnavailableException("SMS verification is not configured");
-            }
             String form = "To=" + enc(phoneForSms(destination)) + "&From=" + enc(properties.twilioFromNumber())
-                    + "&Body=" + enc("DentalCare: código " + code + ", válido por " + validity.toMinutes() + " minutos.");
+                    + "&Body=" + enc("DentalCare: " + text);
             String auth = Base64.getEncoder().encodeToString((properties.twilioAccountSid() + ":"
                     + properties.twilioAuthToken()).getBytes(StandardCharsets.UTF_8));
             HttpRequest request = HttpRequest.newBuilder(URI.create("https://api.twilio.com/2010-04-01/Accounts/"
-                    + properties.twilioAccountSid() + "/Messages.json"))
+                            + properties.twilioAccountSid() + "/Messages.json"))
+                    .timeout(Duration.ofSeconds(8))
                     .header("Authorization", "Basic " + auth)
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .POST(HttpRequest.BodyPublishers.ofString(form)).build();
             HttpResponse<Void> response = http.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() < 200 || response.statusCode() >= 300)
-                throw new ServiceUnavailableException("SMS verification delivery failed");
+                throw new ServiceUnavailableException("Appointment notification provider rejected delivery");
         } catch (ServiceUnavailableException exception) {
             throw exception;
         } catch (Exception exception) {
-            throw new ServiceUnavailableException("Verification code delivery is temporarily unavailable");
+            throw new ServiceUnavailableException("Appointment notification delivery is temporarily unavailable");
         }
     }
 

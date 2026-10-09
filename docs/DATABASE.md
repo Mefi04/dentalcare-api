@@ -381,6 +381,12 @@ Changeset `044-public-appointment-decision-idempotency` stores each successful p
 request, rather than relying only on the conversation's last key. Previously recorded keys are migrated, so a
 replayed decision cannot be applied to a later proposal cycle.
 
+Changeset `045-appointment-chat-messages-and-notification-outbox` adds per-request/sender message idempotency keys,
+permits the `FREE_TEXT` logistics message type, and creates the transactional notification outbox. Recipient and
+payload columns hold authenticated ciphertext only while an event is pending, processing, or retrying; a database
+check enforces that successful and terminal events have had both fields erased. The due-event index supports bounded
+`FOR UPDATE SKIP LOCKED` worker claims, and a lease timestamp recovers abandoned `PROCESSING` events.
+
 `appointment_waiting_room_entries` has a unique one-to-one foreign key to `appointments` and stores
 `ARRIVED -> WAITING -> READY -> CLOSED`, transition timestamps, check-in staff and latest responsible staff.
 Check-in is limited to a `SCHEDULED` appointment on the current `America/Guatemala` clinic day. Cancelling or

@@ -20,6 +20,11 @@ import com.dentalcare.api.modules.appointments.dto.request.ClinicSchedulingMessa
 import com.dentalcare.api.modules.appointments.dto.request.VerifyPublicRequesterIdentityRequest;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import java.time.LocalDate;
+import com.dentalcare.api.modules.appointments.dto.request.CreateAppointmentConversationMessageRequest;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentConversationMessagesPageResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentNotificationOutboxResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestMessageResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentWhatsAppDraftResponse;
 
 public interface AppointmentRequestService {
     PublicAppointmentRequestReceipt createPublic(CreatePublicAppointmentRequest request, UUID idempotencyKey);
@@ -51,4 +56,12 @@ public interface AppointmentRequestService {
                                                                PublicAppointmentDecisionRequest request, UUID idempotencyKey);
     AppointmentAvailabilityResponse getAvailability(UUID professionalId, LocalDate date);
     AppointmentRequestResponse addSchedulingMessage(UUID actorId, UUID requestId, ClinicSchedulingMessageRequest request);
+    AppointmentConversationMessagesPageResponse getPublicMessages(UUID requestId, String token, String cursor, int size);
+    AppointmentRequestMessageResponse addPublicMessage(UUID requestId, String token, UUID key,
+            CreateAppointmentConversationMessageRequest request);
+    AppointmentConversationMessagesPageResponse getAdministrativeMessages(UUID requestId, String cursor, int size);
+    AppointmentRequestMessageResponse addAdministrativeMessage(UUID actorId, UUID requestId, UUID key,
+            CreateAppointmentConversationMessageRequest request);
+    java.util.List<AppointmentNotificationOutboxResponse> getNotificationStatus(UUID requestId, int page, int size);
+    AppointmentWhatsAppDraftResponse createWhatsAppDraft(UUID requestId);
 }

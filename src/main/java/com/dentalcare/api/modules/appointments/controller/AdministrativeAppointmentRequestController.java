@@ -24,6 +24,11 @@ import com.dentalcare.api.modules.appointments.dto.response.AppointmentAvailabil
 import com.dentalcare.api.modules.appointments.dto.request.ClinicSchedulingMessageRequest;
 import com.dentalcare.api.modules.appointments.dto.request.VerifyPublicRequesterIdentityRequest;
 import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
+import com.dentalcare.api.modules.appointments.dto.request.CreateAppointmentConversationMessageRequest;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentConversationMessagesPageResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestMessageResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentNotificationOutboxResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentWhatsAppDraftResponse;
 
 @RestController
 @RequestMapping("/api/v1/appointment-requests")
@@ -83,6 +88,37 @@ public class AdministrativeAppointmentRequestController {
             @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
             @Valid @RequestBody ClinicSchedulingMessageRequest request) {
         return ResponseEntity.ok(service.addSchedulingMessage(principal.userId(), requestId, request));
+    }
+
+    @GetMapping("/{requestId}/conversation/messages")
+    @Operation(summary = "Read a paginated public conversation as authorized reception")
+    public ResponseEntity<AppointmentConversationMessagesPageResponse> conversationMessages(
+            @PathVariable UUID requestId, @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(service.getAdministrativeMessages(requestId, cursor, size));
+    }
+
+    @PostMapping("/{requestId}/conversation/messages")
+    @Operation(summary = "Send a non-clinical free-text message from reception", description = "Sender is derived from the authenticated administrator/secretary. Requires Idempotency-Key UUID.")
+    public ResponseEntity<AppointmentRequestMessageResponse> addConversationMessage(
+            @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
+            @RequestHeader(value = "Idempotency-Key", required = false) UUID key,
+            @Valid @RequestBody CreateAppointmentConversationMessageRequest request) {
+        return ResponseEntity.ok(service.addAdministrativeMessage(principal.userId(), requestId, key, request));
+    }
+
+    @GetMapping("/{requestId}/notifications")
+    @Operation(summary = "Read safe delivery status and retries for a public appointment request")
+    public ResponseEntity<java.util.List<AppointmentNotificationOutboxResponse>> notifications(
+            @PathVariable UUID requestId, @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(service.getNotificationStatus(requestId, page, size));
+    }
+
+    @GetMapping("/{requestId}/whatsapp-draft")
+    @Operation(summary = "Prepare but do not send a WhatsApp message for reception to review manually")
+    public ResponseEntity<AppointmentWhatsAppDraftResponse> whatsappDraft(@PathVariable UUID requestId) {
+        return ResponseEntity.ok(service.createWhatsAppDraft(requestId));
     }
 
     @PostMapping("/{requestId}/reject")

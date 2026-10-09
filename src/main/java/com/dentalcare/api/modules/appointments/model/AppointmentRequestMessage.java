@@ -26,10 +26,22 @@ public class AppointmentRequestMessage {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "idempotency_key")
+    private UUID idempotencyKey;
+
+    @Column(name = "idempotency_payload_hash", length = 64)
+    private String idempotencyPayloadHash;
+
     protected AppointmentRequestMessage() {}
     public AppointmentRequestMessage(UUID id, UUID requestId, String sender, String type, String text, Instant createdAt) {
         this.id = id; this.appointmentRequestId = requestId; this.sender = sender;
         this.messageType = type; this.text = text; this.createdAt = createdAt;
+    }
+    public AppointmentRequestMessage(UUID id, UUID requestId, String sender, String type, String text,
+            Instant createdAt, UUID idempotencyKey, String payloadHash) {
+        this(id, requestId, sender, type, text, createdAt);
+        this.idempotencyKey = idempotencyKey;
+        this.idempotencyPayloadHash = payloadHash;
     }
     public UUID getId() { return id; }
     public UUID getAppointmentRequestId() { return appointmentRequestId; }
@@ -37,4 +49,6 @@ public class AppointmentRequestMessage {
     public String getMessageType() { return messageType; }
     public String getText() { return text; }
     public Instant getCreatedAt() { return createdAt; }
+    public UUID getIdempotencyKey() { return idempotencyKey; }
+    public String getIdempotencyPayloadHash() { return idempotencyPayloadHash; }
 }

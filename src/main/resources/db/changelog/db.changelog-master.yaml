@@ -87,3 +87,5 @@ databaseChangeLog:
       file: db/changelog/changes/043-public-request-identity-and-safe-deduplication.sql
   - include:
       file: db/changelog/changes/044-public-appointment-decision-idempotency.sql
+  - include:
+      file: db/changelog/changes/045-appointment-chat-messages-and-notification-outbox.sql

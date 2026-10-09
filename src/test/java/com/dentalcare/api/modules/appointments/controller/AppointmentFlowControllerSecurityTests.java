@@ -109,6 +109,46 @@ class AppointmentFlowControllerSecurityTests {
     }
 
     @Test
+    void publicMessagesRequireAndForwardTheScopedConversationBearerToken() throws Exception {
+        UUID requestId = UUID.randomUUID();
+        UUID messageId = UUID.randomUUID();
+        when(requestService.getPublicMessages(eq(requestId), eq("chat-token"), isNull(), eq(20)))
+                .thenReturn(new com.dentalcare.api.modules.appointments.dto.response.AppointmentConversationMessagesPageResponse(
+                        List.of(), null, false, 20));
+        mockMvc.perform(get("/api/v1/public/appointment-requests/{id}/conversation/messages", requestId)
+                        .header("Authorization", "Bearer chat-token"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isArray());
+
+        UUID key = UUID.randomUUID();
+        when(requestService.addPublicMessage(eq(requestId), eq("chat-token"), eq(key), any()))
+                .thenReturn(new com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestMessageResponse(
+                        messageId, "PATIENT", "FREE_TEXT", "Please call after 3 pm", Instant.now()));
+        mockMvc.perform(post("/api/v1/public/appointment-requests/{id}/conversation/messages", requestId)
+                        .header("Authorization", "Bearer chat-token").header("Idempotency-Key", key)
+                        .contentType("application/json").content("{\"text\":\"Please call after 3 pm\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.sender").value("PATIENT"));
+    }
+
+    @Test
+    void freeTextAdministrativeConversationRoutesKeepExistingStaffRoleBoundary() throws Exception {
+        UUID requestId = UUID.randomUUID();
+        mockMvc.perform(get("/api/v1/appointment-requests/{id}/conversation/messages", requestId))
+                .andExpect(status().isUnauthorized());
+        token("cashier-chat", "ROLE_CASHIER");
+        mockMvc.perform(get("/api/v1/appointment-requests/{id}/conversation/messages", requestId)
+                        .header("Authorization", "Bearer cashier-chat"))
+                .andExpect(status().isForbidden());
+
+        token("secretary-chat", "ROLE_SECRETARY");
+        when(requestService.getAdministrativeMessages(eq(requestId), isNull(), eq(20)))
+                .thenReturn(new com.dentalcare.api.modules.appointments.dto.response.AppointmentConversationMessagesPageResponse(
+                        List.of(), null, false, 20));
+        mockMvc.perform(get("/api/v1/appointment-requests/{id}/conversation/messages", requestId)
+                        .header("Authorization", "Bearer secretary-chat"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void administrativeRequestsRequireSecretaryOrAdministrator() throws Exception {
         mockMvc.perform(get("/api/v1/appointment-requests")).andExpect(status().isUnauthorized());
 

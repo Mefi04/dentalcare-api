@@ -13,6 +13,9 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
+import com.dentalcare.api.modules.appointments.dto.request.CreateAppointmentConversationMessageRequest;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentConversationMessagesPageResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestMessageResponse;
 
 @RestController
 @RequestMapping("/api/v1/public/appointment-requests/{requestId}")
@@ -43,6 +46,23 @@ public class PublicAppointmentConversationController {
     public ResponseEntity<PublicAppointmentConversationResponse> get(@PathVariable UUID requestId,
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         return ResponseEntity.ok(service.getPublicConversation(requestId, bearer(authorization)));
+    }
+
+    @GetMapping("/conversation/messages")
+    @Operation(summary = "Read a stable cursor-paginated public conversation history", description = "Requires the scoped conversation bearer token. Results are chronological within each page, newest first page, size 1-100.")
+    public ResponseEntity<AppointmentConversationMessagesPageResponse> messages(@PathVariable UUID requestId,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(service.getPublicMessages(requestId, bearer(authorization), cursor, size));
+    }
+
+    @PostMapping("/conversation/messages")
+    @Operation(summary = "Send a non-clinical scheduling message from the verified requester", description = "Requires the scoped bearer token and Idempotency-Key UUID. HTML, clinical content, and messages over 500 characters are rejected.")
+    public ResponseEntity<AppointmentRequestMessageResponse> addMessage(@PathVariable UUID requestId,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = "Idempotency-Key", required = false) UUID key,
+            @Valid @RequestBody CreateAppointmentConversationMessageRequest request) {
+        return ResponseEntity.ok(service.addPublicMessage(requestId, bearer(authorization), key, request));
     }
 
     @PostMapping("/decision")
