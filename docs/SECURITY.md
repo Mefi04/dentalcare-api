@@ -1,5 +1,8 @@
 # Security
 
+Operational monitoring, strict structured log fields, private management endpoints and incident response
+are documented in [MONITORING.md](MONITORING.md). Never publish management port 9091.
+
 ## Scope and source of truth
 
 This document defines the phase-one authentication and authorization model for the DentalCare backend. It is a design contract for Issues #5 through #8; it does not implement persistence, endpoints, tokens, or authorization rules.

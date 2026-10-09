@@ -1,0 +1,173 @@
+{
+  "timestamp": "2026-10-09T17:34:29.0114169Z",
+  "project": "dentalcare-issue149",
+  "correlationIdsUnique": true,
+  "burstBeforeFirstScrape": true,
+  "scrape": [
+    {
+      "metric": {
+        "__name__": "up",
+        "instance": "backend:9091",
+        "job": "dentalcare"
+      },
+      "value": [
+        1791567323.429,
+        "1"
+      ]
+    }
+  ],
+  "hikari": [
+    {
+      "metric": {
+        "__name__": "hikaricp_connections_max",
+        "instance": "backend:9091",
+        "job": "dentalcare",
+        "pool": "HikariPool-1"
+      },
+      "value": [
+        1791567323.844,
+        "2"
+      ]
+    }
+  ],
+  "auditBaseline": [
+    {
+      "metric": {
+        "__name__": "dentalcare_audit_failures_total",
+        "instance": "backend:9091",
+        "job": "dentalcare",
+        "kind": "persistence"
+      },
+      "value": [
+        1791567324.29,
+        "0"
+      ]
+    }
+  ],
+  "storageBaseline": [
+    {
+      "metric": {
+        "__name__": "dentalcare_storage_operations_seconds_count",
+        "instance": "backend:9091",
+        "job": "dentalcare",
+        "operation": "delete",
+        "result": "failure"
+      },
+      "value": [
+        1791567324.744,
+        "0"
+      ]
+    },
+    {
+      "metric": {
+        "__name__": "dentalcare_storage_operations_seconds_count",
+        "instance": "backend:9091",
+        "job": "dentalcare",
+        "operation": "exists",
+        "result": "failure"
+      },
+      "value": [
+        1791567324.744,
+        "0"
+      ]
+    },
+    {
+      "metric": {
+        "__name__": "dentalcare_storage_operations_seconds_count",
+        "instance": "backend:9091",
+        "job": "dentalcare",
+        "operation": "getMetadata",
+        "result": "failure"
+      },
+      "value": [
+        1791567324.744,
+        "0"
+      ]
+    },
+    {
+      "metric": {
+        "__name__": "dentalcare_storage_operations_seconds_count",
+        "instance": "backend:9091",
+        "job": "dentalcare",
+        "operation": "load",
+        "result": "failure"
+      },
+      "value": [
+        1791567324.744,
+        "0"
+      ]
+    },
+    {
+      "metric": {
+        "__name__": "dentalcare_storage_operations_seconds_count",
+        "instance": "backend:9091",
+        "job": "dentalcare",
+        "operation": "store",
+        "result": "failure"
+      },
+      "value": [
+        1791567324.744,
+        "0"
+      ]
+    }
+  ],
+  "coldHttpWindow": [
+    {
+      "metric": {
+        "__name__": "dentalcare_http_window_requests",
+        "instance": "backend:9091",
+        "job": "dentalcare",
+        "route": "application",
+        "status": "401"
+      },
+      "value": [
+        1791567325.203,
+        "40"
+      ]
+    }
+  ],
+  "publicManagementDenied": true,
+  "alertFiring": [
+    {
+      "metric": {
+        "__name__": "ALERTS",
+        "alertname": "AuthenticationFailures",
+        "alertstate": "firing",
+        "severity": "warning"
+      },
+      "value": [
+        1791567347.089,
+        "1"
+      ]
+    }
+  ],
+  "httpP95": [
+    {
+      "metric": {},
+      "value": [
+        1791567347.546,
+        "0.0034602984999999994"
+      ]
+    }
+  ],
+  "grafanaHttp401": [
+    {
+      "metric": {
+        "__name__": "http_server_requests_seconds_count",
+        "instance": "backend:9091",
+        "job": "dentalcare",
+        "method": "GET",
+        "status": "401",
+        "uri": "api"
+      },
+      "value": [
+        1791567347.872,
+        "40"
+      ]
+    }
+  ],
+  "grafanaAnonymousDenied": true,
+  "alertRecovered": true,
+  "logAllowlistPassed": true,
+  "structuredLogRecordsChecked": 233
+}

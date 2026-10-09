@@ -1,0 +1,6 @@
+<configuration>
+    <appender name="SAFE_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="com.dentalcare.api.shared.observability.SafeJsonEncoder"/>
+    </appender>
+    <root level="INFO"><appender-ref ref="SAFE_CONSOLE"/></root>
+</configuration>

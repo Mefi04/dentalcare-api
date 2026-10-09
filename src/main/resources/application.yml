@@ -43,10 +43,23 @@ server:
     max-swallow-size: ${DOCUMENT_MAX_SWALLOW_SIZE:12MB}
 
 management:
+  server:
+    port: 9091
+    address: ${MANAGEMENT_SERVER_ADDRESS:127.0.0.1}
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      minimum-expected-value:
+        http.server.requests: 1ms
+      maximum-expected-value:
+        http.server.requests: 30s
+      slo:
+        http.server.requests: 100ms,500ms,1s,2s,5s,15s,30s
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,prometheus
   endpoint:
     health:
       show-details: never

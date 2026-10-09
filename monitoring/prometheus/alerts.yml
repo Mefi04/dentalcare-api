@@ -1,0 +1,40 @@
+groups:
+  - name: dentalcare-security
+    rules:
+      - alert: BackendUnavailable
+        expr: up{job="dentalcare"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: 'Backend scrape unavailable; see incident runbook'}
+      - alert: AuthenticationFailures
+        expr: sum(dentalcare_http_window_requests{status="401"}) >= 20
+        labels: {severity: warning}
+      - alert: AuthorizationFailures
+        expr: sum(dentalcare_http_window_requests{status="403"}) >= 10
+        labels: {severity: warning}
+      - alert: RateLimitSurge
+        expr: sum(dentalcare_http_window_requests{status="429"}) >= 10
+        labels: {severity: warning}
+      - alert: ServerErrors
+        expr: sum(dentalcare_http_window_requests{status="5xx",route="application"}) >= 5 and sum(dentalcare_http_window_requests{status="5xx",route="application"}) / sum(dentalcare_http_window_requests{route="application"}) > 0.05
+        labels: {severity: critical}
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{uri!="documents",uri!="management"}[5m]))) > 1 and sum(increase(http_server_requests_seconds_count{uri!="documents",uri!="management"}[5m])) >= 50
+        for: 5m
+        labels: {severity: warning}
+      - alert: DatabasePoolPressure
+        expr: max(hikaricp_connections_active / hikaricp_connections_max) > 0.8 and max(hikaricp_connections_pending) > 0
+        for: 2m
+        labels: {severity: warning}
+      - alert: DatabaseConnectionTimeout
+        expr: sum(increase(hikaricp_connections_timeout_total[5m])) > 0
+        labels: {severity: critical}
+      - alert: DatabaseErrors
+        expr: (sum(increase(dentalcare_database_errors_total{kind!="constraint"}[5m])) or vector(0)) + (sum(increase(dentalcare_transaction_commit_failures_total[5m])) or vector(0)) >= 3
+        labels: {severity: warning}
+      - alert: StorageFailures
+        expr: (sum(increase(dentalcare_storage_operations_seconds_count{result="failure"}[5m])) or vector(0)) + (sum(increase(dentalcare_storage_transfers_total{result="failure"}[5m])) or vector(0)) >= 3
+        labels: {severity: warning}
+      - alert: AuditPersistenceFailure
+        expr: sum(increase(dentalcare_audit_failures_total[5m])) > 0
+        labels: {severity: critical}

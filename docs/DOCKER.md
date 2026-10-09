@@ -1,5 +1,9 @@
 # Docker
 
+The optional `monitoring` profile adds local Prometheus/Grafana. Management port 9091 is never published;
+Grafana requires a password and binds to loopback. See [MONITORING.md](MONITORING.md) for configuration,
+disposable verification, alert simulation and retention.
+
 ## Requirement
 
 DentalCare must be executable using Docker.
