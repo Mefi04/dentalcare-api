@@ -49,7 +49,7 @@ public class OpenApiConfig {
                 .addSecuritySchemes(REFRESH_COOKIE, new SecurityScheme()
                         .type(SecurityScheme.Type.APIKEY).in(SecurityScheme.In.COOKIE)
                         .name(AuthCookieManager.REFRESH_TOKEN_COOKIE_NAME)
-                        .description("HttpOnly refresh-session cookie used only by web refresh and logout."));
+                        .description("HttpOnly refresh-session cookie used only by web refresh and logout. Browser clients may use the X-Client-Session-Id header to select a tab-specific cookie."));
         return new OpenAPI()
                 .info(new Info().title("DentalCare API").version("1.0")
                         .description("Versioned REST contract consumed by DentalCare Web and Mobile clients."))

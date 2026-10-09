@@ -18,10 +18,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -49,13 +49,16 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest request,
+            @RequestHeader(name = AuthCookieManager.TAB_SESSION_HEADER_NAME, required = false) String tabSessionId,
             HttpServletRequest httpRequest) {
+        authCookieManager.cookieNameForTab(tabSessionId);
         rateLimitService.checkIdentity(RateLimitPolicy.LOGIN, request.cui());
         AuthService.LoginResult result = authService.login(request);
         ResponseCookie cookie = authCookieManager.createRefreshCookie(
                 result.refreshToken(),
                 result.cookieMaxAge(),
-                httpRequest.isSecure()
+                httpRequest.isSecure(),
+                tabSessionId
         );
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
@@ -65,8 +68,9 @@ public class AuthController {
     @Operation(summary = "Refresh access token")
     @PostMapping("/refresh")
     public ResponseEntity<RefreshResponse> refresh(
-            @CookieValue(name = AuthCookieManager.REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken,
+            @RequestHeader(name = AuthCookieManager.TAB_SESSION_HEADER_NAME, required = false) String tabSessionId,
             HttpServletRequest httpRequest) {
+        String refreshToken = authCookieManager.findRefreshToken(httpRequest, tabSessionId);
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new com.dentalcare.api.exception.UnauthorizedException("Authentication is required");
         }
@@ -74,7 +78,8 @@ public class AuthController {
         ResponseCookie cookie = authCookieManager.createRefreshCookie(
                 result.refreshToken(),
                 result.cookieMaxAge(),
-                httpRequest.isSecure()
+                httpRequest.isSecure(),
+                tabSessionId
         );
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
@@ -84,10 +89,11 @@ public class AuthController {
     @Operation(summary = "Logout and invalidate refresh session")
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
-            @CookieValue(name = AuthCookieManager.REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken,
+            @RequestHeader(name = AuthCookieManager.TAB_SESSION_HEADER_NAME, required = false) String tabSessionId,
             HttpServletRequest httpRequest) {
+        String refreshToken = authCookieManager.findRefreshToken(httpRequest, tabSessionId);
         authService.logout(refreshToken);
-        ResponseCookie clearCookie = authCookieManager.createClearCookie(httpRequest.isSecure());
+        ResponseCookie clearCookie = authCookieManager.createClearCookie(httpRequest.isSecure(), tabSessionId);
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
                 .build();
