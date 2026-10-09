@@ -1,0 +1,51 @@
+# Standalone: never combine with the application's compose or its .env.
+services:
+  pgsource:
+    image: postgres:17-bookworm
+    environment: &database
+      POSTGRES_DB: dentalcare_synthetic
+      POSTGRES_USER: synthetic
+      POSTGRES_PASSWORD: ${LAB_PASSWORD:?Use run-lab.ps1}
+    networks: [isolated]
+    healthcheck: &health
+      test: [CMD-SHELL, 'pg_isready -U synthetic -d dentalcare_synthetic']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  pgtarget:
+    image: postgres:17-bookworm
+    environment: *database
+    networks: [isolated]
+    healthcheck: *health
+  migrate:
+    image: liquibase/liquibase:4.31
+    networks: [isolated]
+    volumes: ['../../src/main/resources/db:/liquibase/changelog/db:ro']
+    environment:
+      LIQUIBASE_COMMAND_URL: jdbc:postgresql://pgsource:5432/dentalcare_synthetic
+      LIQUIBASE_COMMAND_USERNAME: synthetic
+      LIQUIBASE_COMMAND_PASSWORD: ${LAB_PASSWORD:?Use run-lab.ps1}
+    command: ['--search-path=/liquibase/changelog', '--changelog-file=db/changelog/db.changelog-master.yaml', update]
+    depends_on:
+      pgsource: {condition: service_healthy}
+  runner:
+    build: {context: ../.., dockerfile: operations/backup/Dockerfile}
+    networks: [isolated]
+    environment:
+      DENTALCARE_SYNTHETIC_LAB: '1'
+      PGPASSWORD: ${LAB_PASSWORD:?Use run-lab.ps1}
+      PGUSER: synthetic
+      PGDATABASE: dentalcare_synthetic
+      PGCONNECT_TIMEOUT: '3'
+    volumes:
+      - '../../src/main/resources/db:/schema:ro'
+      - 'state:/lab'
+    tmpfs: ['/work:mode=0700,size=256m']
+    command: [verify]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      pgtarget: {condition: service_healthy}
+networks:
+  isolated: {internal: true}
+volumes:
+  state:

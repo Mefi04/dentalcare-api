@@ -45,6 +45,79 @@ jobs:
       - name: Verify Docker availability
         run: docker info
 
+      - name: Prepare isolated Docker configuration
+        run: |
+          config_dir="$RUNNER_TEMP/backend-ci-docker"
+          install -d -m 700 "$config_dir"
+          echo "DOCKER_CONFIG=$config_dir" >> "$GITHUB_ENV"
+
+      # Forks and external authors never receive registry credentials.
+      - name: Check Docker Hub authentication availability
+        id: docker-auth
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.pull_request.author_association)
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_TOKEN" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate Docker Hub for image preload
+        if: steps.docker-auth.outputs.enabled == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: false
+
+      - name: Preload CI Docker images
+        timeout-minutes: 6
+        shell: bash
+        run: |
+          set -euo pipefail
+          pull_log=$(mktemp)
+          trap 'rm -f "$pull_log"' EXIT
+          deadline=$((SECONDS + 300))
+          images=(
+            postgres:17-alpine
+            testcontainers/ryuk:0.12.0
+            maven:3.9.11-eclipse-temurin-21
+            eclipse-temurin:21-jre-alpine
+          )
+          for image in "${images[@]}"; do
+            for attempt in 1 2 3; do
+              remaining=$((deadline - SECONDS))
+              if (( remaining <= 0 )); then
+                echo "::error::Docker image preload exceeded its five-minute budget. Maven will not run."
+                exit 1
+              fi
+              (( remaining > 60 )) && remaining=60
+              if timeout --kill-after=5s "${remaining}s" docker pull "$image" > "$pull_log" 2>&1; then
+                cat "$pull_log"
+                docker image inspect "$image" > /dev/null
+                break
+              fi
+              cat "$pull_log"
+              if (( attempt == 3 )); then
+                if grep -Eqi 'toomanyrequests|429|pull rate limit' "$pull_log"; then
+                  echo "::error::Docker Hub rate limit persists for $image. Check DOCKERHUB_USERNAME/DOCKERHUB_TOKEN secrets and account quota. Maven will not run."
+                else
+                  echo "::error::Cannot preload $image after three attempts. Check authentication and registry availability. Maven will not run."
+                fi
+                exit 1
+              fi
+              sleep "$((attempt * 5))"
+            done
+          done
+
+      - name: Remove registry credentials before Maven
+        if: steps.docker-auth.outputs.enabled == 'true'
+        run: docker logout
+
       - name: Run Maven verification
         run: mvn -B clean verify
 
@@ -53,5 +126,19 @@ jobs:
           test -s target/openapi/dentalcare-api.json
           cmp docs/openapi/dentalcare-api.json target/openapi/dentalcare-api.json
 
+      - name: Authenticate Docker Hub for backend build
+        if: steps.docker-auth.outputs.enabled == 'true'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          logout: false
+
       - name: Build backend Docker image
         run: docker build --tag dentalcare-api:ci .
+
+      - name: Clean up Docker Hub authentication
+        if: always() && env.DOCKER_CONFIG != ''
+        run: |
+          trap 'rm -rf -- "$DOCKER_CONFIG"' EXIT
+          docker logout

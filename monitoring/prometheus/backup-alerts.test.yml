@@ -1,0 +1,142 @@
+rule_files: [backup-alerts.yml]
+evaluation_interval: 1m
+tests:
+  # A failure and success both happen before the first scrape. Durable timestamp
+  # preserves the failure signal, including an exporter restart; no counter delta needed.
+  - interval: 1m
+    input_series:
+      - series: dentalcare_backup_last_complete_timestamp_seconds
+        values: '1+60x10'
+      - series: dentalcare_backup_last_restore_timestamp_seconds
+        values: '1+60x10'
+      - series: dentalcare_backup_last_attempt_timestamp_seconds
+        values: '1+60x10'
+      - series: dentalcare_backup_last_result
+        values: '1x10'
+      - series: dentalcare_backup_last_failure_timestamp_seconds
+        values: '1x10'
+      - series: 'dentalcare_backup_failures_total{stage="objects"}'
+        values: '1x10'
+      - series: 'up{job="dentalcare-backup"}'
+        values: '1 0 1x8'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: BackupExecutionFailed
+        exp_alerts: [{exp_labels: {severity: critical}}]
+      - eval_time: 3m
+        alertname: BackupExecutionFailed
+        exp_alerts: [{exp_labels: {severity: critical}}]
+      - eval_time: 6m
+        alertname: BackupExecutionFailed
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: dentalcare_backup_last_complete_timestamp_seconds
+        values: '0x6 420+60x10'
+      - series: dentalcare_backup_last_restore_timestamp_seconds
+        values: '0x6 420+60x10'
+      - series: dentalcare_backup_last_attempt_timestamp_seconds
+        values: '1x16'
+      - series: dentalcare_backup_last_result
+        values: '0x6 1x10'
+      - series: 'up{job="dentalcare-backup"}'
+        values: '0x6 1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: BackupMissing
+        exp_alerts: [{exp_labels: {severity: critical}}]
+      - eval_time: 6m
+        alertname: BackupExecutionFailed
+        exp_alerts: [{exp_labels: {severity: critical}}]
+      - eval_time: 6m
+        alertname: BackupRestoreOverdue
+        exp_alerts: [{exp_labels: {severity: warning}}]
+      - eval_time: 6m
+        alertname: BackupMonitoringUnavailable
+        exp_alerts: [{exp_labels: {severity: critical}}]
+      - eval_time: 10m
+        alertname: BackupMissing
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: BackupExecutionFailed
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: BackupRestoreOverdue
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: BackupMonitoringUnavailable
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: dentalcare_backup_last_complete_timestamp_seconds
+        values: '1x3000 180060+60x5'
+    alert_rule_test:
+      - eval_time: 26h
+        alertname: BackupStale
+        exp_alerts: []
+      - eval_time: 27h
+        alertname: BackupStale
+        exp_alerts: [{exp_labels: {severity: warning}}]
+      - eval_time: 49h
+        alertname: BackupStale
+        exp_alerts: []
+      - eval_time: 49h
+        alertname: BackupVeryStale
+        exp_alerts: [{exp_labels: {severity: critical}}]
+      - eval_time: 50h4m
+        alertname: BackupVeryStale
+        exp_alerts: []
+  - interval: 1h
+    input_series:
+      - series: dentalcare_backup_last_restore_timestamp_seconds
+        values: '1x750 2703600+3600x5'
+    alert_rule_test:
+      - eval_time: 31d
+        alertname: BackupRestoreOverdue
+        exp_alerts: [{exp_labels: {severity: warning}}]
+      - eval_time: 31d8h
+        alertname: BackupRestoreOverdue
+        exp_alerts: []
+  - interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: BackupMissing
+        exp_alerts: [{exp_labels: {severity: critical}}]
+      - eval_time: 6m
+        alertname: BackupMonitoringUnavailable
+        exp_alerts: [{exp_labels: {severity: critical}}]
+
+  # Completed yesterday/today does not imply the ciphertext still exists.
+  - interval: 1m
+    input_series:
+      - series: dentalcare_backup_last_complete_timestamp_seconds
+        values: '1x10'
+      - series: dentalcare_backup_payload_available
+        values: '1 0 0 1x7'
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: BackupPayloadUnavailable
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BackupPayloadUnavailable
+        exp_alerts: [{exp_labels: {severity: critical}}]
+      - eval_time: 2m
+        alertname: BackupMissing
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: BackupPayloadUnavailable
+        exp_alerts: []
+    promql_expr_test:
+      - expr: dentalcare_backup_payload_available
+        eval_time: 2m
+        exp_samples: [{labels: 'dentalcare_backup_payload_available', value: 0}]
+      - expr: dentalcare_backup_payload_available
+        eval_time: 3m
+        exp_samples: [{labels: 'dentalcare_backup_payload_available', value: 1}]
+  - interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BackupPayloadUnavailable
+        exp_alerts: [{exp_labels: {severity: critical}}]
