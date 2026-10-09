@@ -15,22 +15,22 @@ public interface AppointmentRequestRepository extends JpaRepository<AppointmentR
         JpaSpecificationExecutor<AppointmentRequest> {
 
     @Override
-    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "proposedProfessional", "appointment"})
+    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment"})
     Page<AppointmentRequest> findAll(org.springframework.data.jpa.domain.Specification<AppointmentRequest> spec,
                                      Pageable pageable);
 
-    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "proposedProfessional", "appointment"})
+    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment"})
     Page<AppointmentRequest> findByPatient_Id(UUID patientId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "proposedProfessional", "appointment"})
+    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment"})
     Optional<AppointmentRequest> findByIdAndPatient_Id(UUID id, UUID patientId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "proposedProfessional", "appointment"})
+    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment"})
     @Query("select r from AppointmentRequest r where r.id = :id")
     Optional<AppointmentRequest> findDetailedByIdForUpdate(@Param("id") UUID id);
 
-    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "proposedProfessional", "appointment"})
+    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment"})
     @Query("select r from AppointmentRequest r where r.id = :id")
     Optional<AppointmentRequest> findDetailedById(@Param("id") UUID id);
 

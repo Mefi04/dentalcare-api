@@ -6,6 +6,9 @@ import com.dentalcare.api.modules.appointments.service.*;
 import com.dentalcare.api.modules.appointments.dto.request.CreatePublicAppointmentRequest;
 import com.dentalcare.api.modules.appointments.dto.request.AssignAppointmentRequestProfessionalRequest;
 import com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestResponse;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentProfessionalResponse;
+import com.dentalcare.api.modules.appointments.dto.response.PublicAppointmentRequesterResponse;
+import com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus;
 import com.dentalcare.api.modules.appointments.dto.response.PublicAppointmentRequestReceipt;
 import com.dentalcare.api.security.ratelimit.RateLimitService;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
@@ -20,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.*;
+import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
@@ -105,13 +109,46 @@ class AppointmentFlowControllerSecurityTests {
                 .andExpect(status().isForbidden());
 
         token("secretary", "ROLE_SECRETARY");
+        Instant now = Instant.parse("2026-10-01T10:00:00Z");
         when(requestService.assignPublicRequestProfessional(any(), eq(requestId), eq(professionalId)))
-                .thenReturn(org.mockito.Mockito.mock(AppointmentRequestResponse.class));
+                .thenReturn(new AppointmentRequestResponse(requestId, null, null, now.plusSeconds(86400),
+                        null, null, AppointmentRequestStatus.PENDING, "CLINIC", null, now, now,
+                        new PublicAppointmentRequesterResponse("Maria Lopez", null, "5555-0101",
+                                "maria@example.test", null), "PUBLIC",
+                        new PublicAppointmentRequesterResponse("Maria Lopez", null, "5555-0101",
+                                "maria@example.test", null),
+                        new AppointmentProfessionalResponse(professionalId, "Dra. Example")));
         mockMvc.perform(post("/api/v1/appointment-requests/{id}/assign-professional", requestId)
                         .header("Authorization", "Bearer secretary")
                         .contentType("application/json")
                         .content("{\"professionalId\":\"%s\"}".formatted(professionalId)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.source").value("PUBLIC"))
+                .andExpect(jsonPath("$.contact.fullName").value("Maria Lopez"))
+                .andExpect(jsonPath("$.contact.phone").value("5555-0101"))
+                .andExpect(jsonPath("$.assignedProfessional.id").value(professionalId.toString()))
+                .andExpect(jsonPath("$.requestedProfessional").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.appointmentId").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void assignmentConflictReturnsStableCodeAndActionableReason() throws Exception {
+        UUID requestId = UUID.randomUUID();
+        UUID professionalId = UUID.randomUUID();
+        token("secretary", "ROLE_SECRETARY");
+        when(requestService.assignPublicRequestProfessional(any(), eq(requestId), eq(professionalId)))
+                .thenThrow(new com.dentalcare.api.exception.ConflictException(
+                        "APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE",
+                        "Cannot assign a dentist while request status is CONFIRMED; eligible statuses are PENDING and PROPOSED"));
+
+        mockMvc.perform(post("/api/v1/appointment-requests/{id}/assign-professional", requestId)
+                        .header("Authorization", "Bearer secretary")
+                        .contentType("application/json")
+                        .content("{\"professionalId\":\"%s\"}".formatted(professionalId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("CONFIRMED")));
     }
 
     @Test

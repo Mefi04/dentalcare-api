@@ -89,6 +89,8 @@ public class OpenApiConfig {
                 .addProperty("error", new StringSchema())
                 .addProperty("message", new StringSchema())
                 .addProperty("path", new StringSchema())
+                .addProperty("code", new StringSchema()
+                        .description("Stable application error code when the client needs to distinguish conflict types."))
                 .addProperty("fieldErrors", new ObjectSchema()
                         .description("Validation errors keyed by request field; values are human-readable strings."))
                 .required(List.of("timestamp", "status", "error", "message", "path", "fieldErrors"));

@@ -512,21 +512,36 @@ is a preference, not a reservation; no calendar slot is held. Clinic staff must 
 a patient, then propose a real available time/professional or accept an existing requested slot through the
 existing availability validation. Receptionists and administrators can assign or reassign an active dentist using
 `POST /api/v1/appointment-requests/{requestId}/assign-professional` with
-`{ "professionalId": "<uuid>" }`. This assignment is recorded on the request while it remains `PENDING`; it does
-not reserve a slot or confirm an appointment. Repeating an identical payload with the same key returns the same receipt;
+`{ "professionalId": "<uuid>" }`. It is available to `ADMINISTRATOR` and `SECRETARY` for public requests in
+`PENDING` or `PROPOSED`. Assignment is stored separately from `requestedProfessional`, so receptionist assignment
+does not overwrite the visitor's dentist preference. It does not reserve a slot, change request status, or confirm
+an appointment. Its response includes the refreshed administrative projection and `assignedProfessional`.
+Changing assignment does not silently alter an already-sent `proposedProfessional`/`proposedAt`; clinic staff can
+review and explicitly submit a replacement proposal through the existing proposal endpoint.
+Repeating an identical payload with the same key returns the same receipt;
 reusing a key with another payload or submitting an equivalent active request for the same CUI/time/preferred
 dentist returns generic `409 Conflict`. Missing/invalid fields or a past time return `400 Bad Request`, an
 unavailable/inactive professional returns generic `409 Conflict`, and excessive requests return `429 Too Many
 Requests` with `Retry-After`. Rate limiting is 5 requests per IP per 15 minutes (configurable); clients should
 generate one UUID per submission and retain it across network retries.
 
-Administrative `GET /api/v1/appointment-requests` includes public requests, including rows with no patient link.
-The additive `publicRequester` field on administrative request responses contains intake contact data only for
-authorized staff. `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
+Administrative `GET /api/v1/appointment-requests` and `GET /api/v1/appointment-requests/{requestId}` include
+public requests, including those linked to an existing patient by CUI and those with no patient link. They expose
+`source: "PUBLIC"` independent of the patient link, `contact` (`fullName`, `phone`, and available `cui`, `email`,
+`reason`), `requestedAt`, actual `status`, `requestedProfessional`, and `assignedProfessional` (or `null`). The
+existing `publicRequester` field is retained for compatibility. `contact` is non-clinical and staff-only; public
+intake never returns clinical data. Patient-origin requests identify as `PATIENT_PORTAL` in the administrative
+projection and otherwise retain their existing patient data and workflow. `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
 `{ "patientId": "<uuid>" }`; when the intake included CUI, it must match the selected patient's DPI. A proposed
 public request is confirmed by staff through `POST /api/v1/appointment-requests/{requestId}/confirm-public-proposal`
 after linking the patient, because an anonymous requester cannot use the authenticated patient's proposal
 acceptance route. Existing patient endpoints and their contracts are unchanged.
+
+Assignment errors use `409 Conflict` with a stable `code`: `APPOINTMENT_REQUEST_NOT_PUBLIC`,
+`APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE` (includes the actual and allowed states), or
+`PROFESSIONAL_NOT_AVAILABLE`. Appointment creation conflicts use `APPOINTMENT_TIME_UNAVAILABLE` and a message
+that identifies the occupied date/time. Assignment itself performs no availability reservation, so it cannot
+produce an appointment-slot conflict.
 
 | Method | Path | Authorization | Success | Notes |
 |---|---|---|---|---|
