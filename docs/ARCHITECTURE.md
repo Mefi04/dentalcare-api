@@ -1,5 +1,8 @@
 # DentalCare Backend Architecture
 
+Security/operations monitoring remains technical infrastructure in `config` and `shared/observability`.
+See [MONITORING.md](MONITORING.md) for private Actuator, Prometheus/Grafana, safe logging and incident response.
+
 ## Architectural style
 
 DentalCare uses:

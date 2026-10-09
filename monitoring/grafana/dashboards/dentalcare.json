@@ -1,0 +1,238 @@
+{
+  "uid": "dentalcare-security",
+  "title": "DentalCare security and operations",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "HTTP requests by status",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count{uri!=\"management\"}[5m]))",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "HTTP p95 seconds",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le,uri) (rate(http_server_requests_seconds_bucket{uri!=\"management\"}[5m])))",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Hikari connections",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{__name__=~\"hikaricp_connections_(active|idle|pending|max)\"}",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Hikari timeouts",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(hikaricp_connections_timeout_total[5m]))",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Database errors",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (kind) (increase(dentalcare_database_errors_total[5m]))",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (completion) (increase(dentalcare_transaction_commit_failures_total[5m]))",
+          "legendFormat": "commit {{completion}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "R2 operation failures",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation) (increase(dentalcare_storage_operations_seconds_count{result=\"failure\"}[5m]))",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "R2 transfer results",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (result) (increase(dentalcare_storage_transfers_total[5m]))",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Audit persistence failures",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(dentalcare_audit_failures_total[5m]))",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Active alerts",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "ALERTS{alertstate=\"firing\"}",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Backend scrape",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"dentalcare\"}",
+          "legendFormat": "{{__name__}} {{status}} {{uri}} {{kind}} {{operation}} {{result}} {{alertname}}"
+        }
+      ]
+    }
+  ]
+}
