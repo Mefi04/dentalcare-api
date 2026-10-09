@@ -439,6 +439,23 @@
         },
         "type" : "object"
       },
+      "ChangeInitialPasswordRequest" : {
+        "properties" : {
+          "confirmation" : {
+            "description" : "Must exactly match newPassword",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "newPassword" : {
+            "description" : "Permanent password to set for the account",
+            "maxLength" : 128,
+            "minLength" : 8,
+            "type" : "string"
+          }
+        },
+        "required" : [ "confirmation", "newPassword" ],
+        "type" : "object"
+      },
       "ChangePasswordRequest" : {
         "properties" : {
           "currentPassword" : {
@@ -1921,6 +1938,18 @@
           },
           "period" : {
             "$ref" : "#/components/schemas/ReportPeriodResponse"
+          }
+        },
+        "type" : "object"
+      },
+      "InitialPasswordChangeUserResponse" : {
+        "properties" : {
+          "fullName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -4263,6 +4292,21 @@
           },
           "unpaged" : {
             "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "PasswordChangeRequiredResponse" : {
+        "properties" : {
+          "passwordChangeToken" : {
+            "type" : "string"
+          },
+          "requiresPasswordChange" : {
+            "example" : true,
+            "type" : "boolean"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/InitialPasswordChangeUserResponse"
           }
         },
         "type" : "object"
@@ -8455,6 +8499,7 @@
     },
     "/api/v1/auth/activate" : {
       "post" : {
+        "description" : "Compatible legacy flow. New clients should use login and change-initial.",
         "operationId" : "activate",
         "requestBody" : {
           "content" : {
@@ -8518,12 +8563,13 @@
           }
         },
         "security" : [ ],
-        "summary" : "Activate account with temporary password and set new permanent password",
+        "summary" : "Legacy account activation retained for existing clients",
         "tags" : [ "auth-controller", "Audience: Public" ]
       }
     },
     "/api/v1/auth/login" : {
       "post" : {
+        "description" : "Active accounts receive an authenticated session. A correct initial temporary password receives only a short-lived password-change token.",
         "operationId" : "login_1",
         "parameters" : [ {
           "in" : "header",
@@ -8548,7 +8594,11 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/LoginResponse"
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/LoginResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/PasswordChangeRequiredResponse"
+                  } ]
                 }
               }
             },
@@ -9201,6 +9251,113 @@
         "security" : [ ],
         "summary" : "Request a one-time patient password recovery code",
         "tags" : [ "Password Recovery", "Audience: Public" ]
+      }
+    },
+    "/api/v1/auth/password/change-initial" : {
+      "post" : {
+        "description" : "Requires Authorization: Bearer <passwordChangeToken> from login. Confirmation must exactly equal newPassword. Success returns the normal login response and sets the HttpOnly refresh cookie selected by X-Client-Session-Id.",
+        "operationId" : "changeInitialPassword",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "Authorization",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-Client-Session-Id",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangeInitialPasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Change the initial password and create a tab-scoped authenticated session",
+        "tags" : [ "auth-controller", "Audience: Initial password change" ]
       }
     },
     "/api/v1/auth/refresh" : {
@@ -28912,6 +29069,9 @@
   }, {
     "description" : "Requires staff permissions documented by each operation.",
     "name" : "Audience: Staff"
+  }, {
+    "description" : "Requires a restricted, short-lived initial password-change token.",
+    "name" : "Audience: Initial password change"
   }, {
     "description" : "Auditable inventory movements and Kardex",
     "name" : "Inventory movements"

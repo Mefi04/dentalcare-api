@@ -29,12 +29,12 @@ User identity is a shared security concern. It must not contain clinical data or
 
 ### Account statuses
 
-- `PENDING_ACTIVATION`: Account is created with a temporary password and must be activated via `/api/v1/auth/activate` before any login.
+- `PENDING_ACTIVATION`: Account is created with a temporary password. Web login with the correct temporary password returns a restricted initial-password-change challenge; `/api/v1/auth/activate` remains available as a compatible legacy flow.
 - `ACTIVE`: Account is active and eligible for normal authentication and session creation.
 - `INACTIVE`: Account is deactivated by administrative action.
 - `LOCKED`: Account is locked.
 
-Authentication and session use respect account status. Accounts in `PENDING_ACTIVATION` cannot log in directly and must complete the initial activation flow.
+Authentication and session use respect account status. Accounts in `PENDING_ACTIVATION` cannot create an authenticated session or access protected routes until the initial password is changed.
 
 ### Role and Permission
 
@@ -62,7 +62,7 @@ Users and roles have a many-to-many relationship through `UserRole`. Roles and p
 - Never store, log, return, or place a raw password in a token.
 - Compare passwords through the password encoder; do not compare hashes directly.
 - Password input must be validated before hashing. The baseline policy enforces a non-blank password between 8 and 128 characters.
-- Initial account activation establishes the user's permanent password via `/api/v1/auth/activate`.
+- Initial account password change establishes the user's permanent password through the restricted login challenge. The legacy `/api/v1/auth/activate` endpoint remains compatible for existing consumers and is not scheduled for removal.
 - Patient password recovery uses an expiring, one-time, out-of-band code whose raw value is never persisted.
 
 ## Access token
@@ -242,6 +242,25 @@ Key rules:
 - The account transitions atomically to `ACTIVE`.
 - No access token or refresh cookie is generated upon activation. The user must subsequently authenticate via `POST /api/v1/auth/login`.
 - To prevent user enumeration, unknown CUI numbers, non-pending account statuses (`ACTIVE`, `INACTIVE`, `LOCKED`), and invalid temporary passwords all return a generic `401 Unauthorized` with message `"Invalid activation credentials"`.
+- The endpoint remains available for existing consumers; no removal date has been set. New web clients should use the initial-password challenge flow below.
+
+### Initial password change during web login
+
+`POST /api/v1/auth/login` continues to accept `{ "cui", "password" }`. Active accounts receive the established login response and their refresh cookie. A correct temporary password for a `PENDING_ACTIVATION` account returns `200 OK` with:
+
+```json
+{
+  "requiresPasswordChange": true,
+  "passwordChangeToken": "<signed-token>",
+  "user": { "id": "<uuid>", "fullName": "<display-name>" }
+}
+```
+
+No access token, refresh token, or cookie is created in this response. Unknown users, wrong passwords, and `INACTIVE`/`LOCKED` accounts receive the same generic `401 Invalid credentials`; the CUI is not disclosed.
+
+The change token is an RS256 JWT with only user subject, token purpose, token ID, and timestamps. It has a fixed 10-minute lifetime, carries no authorities, and is rejected by the normal access-token filter. It is accepted only by `POST /api/v1/auth/password/change-initial` with `Authorization: Bearer <passwordChangeToken>` and body `{ "newPassword": "...", "confirmation": "..." }`. Confirmation must exactly match; the password policy remains 8–128 non-blank characters.
+
+The change endpoint locks the user row and requires `PENDING_ACTIVATION`; its successful atomic transition to `ACTIVE` makes the token unusable on every subsequent request, including concurrent replay. Expired, malformed, or wrong-purpose tokens return generic `401`; replay after completion returns `409`; password/confirmation validation returns `400`. Success immediately returns the normal login response and creates a refresh session. The optional `X-Client-Session-Id` UUID chooses the matching `refreshToken-<uuid>` HttpOnly cookie, falling back to the legacy `refreshToken` cookie when omitted. No database migration is needed: the existing account status is the persisted single-use marker.
 
 ### Patient password recovery
 
@@ -443,7 +462,7 @@ Key rules:
 
 A patient portal account is an ordinary `User`; no parallel authentication model exists. An administrator creates access with `POST /api/v1/patients/{id}/access`. The operation locks the patient row, creates a `PENDING_ACTIVATION` user with only the persisted `PATIENT` role, and returns a cryptographically generated temporary password exactly once. Only its BCrypt hash is persisted.
 
-The patient uses their existing DPI as `User.cui` to activate through `POST /api/v1/auth/activate`, then signs in through the normal login endpoint. The established authority is `ROLE_PATIENT`; it does not grant administrative patient permissions. `GET /api/v1/patients/me` requires that role and resolves the profile only from the JWT user ID, never from a browser-supplied patient ID.
+The patient uses their existing DPI as `User.cui`. Web clients can complete the initial change from the normal login challenge; existing web/mobile clients may continue to use `POST /api/v1/auth/activate` compatibly. The established authority is `ROLE_PATIENT`; it does not grant administrative patient permissions. `GET /api/v1/patients/me` requires that role and resolves the profile only from the JWT user ID, never from a browser-supplied patient ID.
 
 Patient contact email remains separate administrative data in `patients.email`. A portal user may have a null `users.email`; staff users and the initial administrator must still supply a valid email. To preserve the identity link, a patient DPI cannot be changed after portal access has been created.
 

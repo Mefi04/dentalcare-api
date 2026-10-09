@@ -6,6 +6,8 @@ import java.util.UUID;
 public interface JwtService {
     String createAccessToken(UUID userId, List<String> authorities);
     AccessTokenClaims parseAccessToken(String token);
+    String createInitialPasswordChangeToken(UUID userId);
+    UUID parseInitialPasswordChangeToken(String token);
     long getAccessTokenLifetimeSeconds();
 
     record AccessTokenClaims(UUID userId, List<String> authorities) {
