@@ -37,8 +37,10 @@ public class OpenApiConfig {
             "/api/v1/auth/mobile/login", "/api/v1/auth/mobile/refresh", "/api/v1/auth/mobile/logout",
             "/api/v1/auth/password-recovery/request", "/api/v1/auth/password-recovery/confirm");
     private static final Set<String> AUTHENTICATION_FAILURE_PATHS = Set.of(
-            "/api/v1/auth/login", "/api/v1/auth/mobile/login", "/api/v1/auth/mobile/refresh");
+            "/api/v1/auth/login", "/api/v1/auth/mobile/login", "/api/v1/auth/mobile/refresh",
+            "/api/v1/auth/password/change-initial");
     private static final Set<String> PATIENT_AUTH_PATHS = Set.of("/api/v1/auth/mobile/password");
+    private static final String INITIAL_PASSWORD_CHANGE_PATH = "/api/v1/auth/password/change-initial";
 
     @Bean
     OpenAPI dentalCareOpenApi() {
@@ -60,6 +62,8 @@ public class OpenApiConfig {
                                 .description("Requires staff permissions documented by each operation."),
                         new Tag().name("Audience: Patient self-service")
                                 .description("Requires ROLE_PATIENT and derives ownership exclusively from the JWT."),
+                        new Tag().name("Audience: Initial password change")
+                                .description("Requires a restricted, short-lived initial password-change token."),
                         new Tag().name("Audience: Authenticated")
                                 .description("Available to any authenticated account type.")));
     }
@@ -91,7 +95,10 @@ public class OpenApiConfig {
     }
 
     private void classifyAndSecure(String path, Operation operation) {
-        if (path.startsWith("/api/v1/patients/me") || PATIENT_AUTH_PATHS.contains(path)) {
+        if (INITIAL_PASSWORD_CHANGE_PATH.equals(path)) {
+            operation.addTagsItem("Audience: Initial password change");
+            operation.setSecurity(List.of(new SecurityRequirement().addList(BEARER_AUTH)));
+        } else if (path.startsWith("/api/v1/patients/me") || PATIENT_AUTH_PATHS.contains(path)) {
             operation.addTagsItem("Audience: Patient self-service");
             operation.setSecurity(List.of(new SecurityRequirement().addList(BEARER_AUTH)));
         } else if (path.startsWith("/api/v1/public/") || PUBLIC_AUTH_PATHS.contains(path)) {

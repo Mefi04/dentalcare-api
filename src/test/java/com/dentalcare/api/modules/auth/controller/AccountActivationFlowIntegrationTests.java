@@ -118,12 +118,15 @@ class AccountActivationFlowIntegrationTests {
         assertThat(passwordEncoder.matches(TEMPORARY_PASSWORD, user.getPasswordHash())).isTrue();
         assertThat(passwordEncoder.matches(NEW_PASSWORD, user.getPasswordHash())).isFalse();
 
-        // Step 2: Attempting login before activation fails with 401
+        // Step 2: Web login now requires the initial password change and creates no session.
+        when(jwtService.createInitialPasswordChangeToken(user.getId())).thenReturn("password-change-token");
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(String.format("{\"cui\":\"%s\",\"password\":\"%s\"}", CUI, TEMPORARY_PASSWORD)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("Invalid credentials"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requiresPasswordChange").value(true))
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -147,6 +150,10 @@ class AccountActivationFlowIntegrationTests {
                 .andExpect(jsonPath("$.accessToken").doesNotExist())
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/auth/me")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer password-change-token"))
+                .andExpect(status().isUnauthorized());
 
         // Step 4: Verify post-activation entity state
         assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
@@ -185,5 +192,54 @@ class AccountActivationFlowIntegrationTests {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.status").value(401))
                 .andExpect(jsonPath("$.message").value("Invalid activation credentials"));
+    }
+
+    @Test
+    void initialLoginChangesPasswordAndCreatesSessionForTheRequestingTab() throws Exception {
+        when(jwtService.createInitialPasswordChangeToken(user.getId())).thenReturn("password-change-token");
+        when(jwtService.parseInitialPasswordChangeToken("password-change-token")).thenReturn(user.getId());
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format("{\"cui\":\"%s\",\"password\":\"%s\"}", CUI, TEMPORARY_PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requiresPasswordChange").value(true))
+                .andExpect(jsonPath("$.passwordChangeToken").value("password-change-token"))
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+
+        String tabId = UUID.randomUUID().toString();
+        mockMvc.perform(post("/api/v1/auth/password/change-initial")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer password-change-token")
+                        .header("X-Client-Session-Id", tabId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"" + NEW_PASSWORD + "\",\"confirmation\":\"" + NEW_PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("mock-access-token"))
+                .andExpect(jsonPath("$.user.status").value("ACTIVE"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE,
+                        containsString("refreshToken-" + tabId + "=mock-refresh-token")));
+
+        assertThat(user.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        assertThat(passwordEncoder.matches(NEW_PASSWORD, user.getPasswordHash())).isTrue();
+        assertThat(passwordEncoder.matches(TEMPORARY_PASSWORD, user.getPasswordHash())).isFalse();
+
+        mockMvc.perform(post("/api/v1/auth/password/change-initial")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer password-change-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"AnotherPermanentPassword789!\",\"confirmation\":\"AnotherPermanentPassword789!\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void wrongTemporaryPasswordDoesNotDisclosePendingAccountOrCreateToken() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format("{\"cui\":\"%s\",\"password\":\"wrong-password\"}", CUI)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid credentials"))
+                .andExpect(jsonPath("$.passwordChangeToken").doesNotExist());
     }
 }
