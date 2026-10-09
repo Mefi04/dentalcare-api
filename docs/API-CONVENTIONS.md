@@ -517,7 +517,7 @@ Content-Type: application/json
 }
 ```
 
-Success is `202 Accepted` with only `{ "requestId": "<opaque UUID>", "message": "..." }`. The requested time
+Success is `202 Accepted` with `{ "requestId": "<opaque UUID>", "message": "...", "conversationToken": "<random bearer>", "tokenType": "Bearer", "conversationExpiresAt": "<ISO-8601 instant>" }`. The token is a random 256-bit secret scoped to this request, valid for seven days, stored only as SHA-256 and returned only in this response. Save it securely (prefer `sessionStorage`) and never place it in a URL. No email or SMS verification is required. The requested time
 is a preference, not a reservation; no calendar slot is held. Clinic staff must link an unassociated requester to
 a patient, then propose a real available time/professional or accept an existing requested slot through the
 existing availability validation. Receptionists and administrators can assign or reassign an active dentist using
@@ -586,9 +586,9 @@ produce an appointment-slot conflict.
 | `GET` | `/api/v1/appointment-requests/{requestId}/notifications?page=0&size=20` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Safe notification state only; no destination or ciphertext is returned. |
 | `GET` | `/api/v1/appointment-requests/{requestId}/whatsapp-draft` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Manual `wa.me` draft; `sentAutomatically` is always false. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/confirm-public-proposal` | `ADMINISTRATOR`, `SECRETARY` | `409 Conflict` | Legacy compatibility route; public proposal acceptance is restricted to the verified conversation. |
-| `POST` | `/api/v1/public/appointment-requests` | Public | `202 Accepted` | First appointment intake; request time is not reserved. Requires UUID `Idempotency-Key`; see contract above. |
-| `POST` | `/api/v1/public/appointment-requests/{requestId}/verification-codes` | Public | `202 Accepted` | Body `channel: SMS|EMAIL`; always returns a generic acknowledgment. OTP expires in 10 minutes, max five attempts. |
-| `POST` | `/api/v1/public/appointment-requests/{requestId}/verification` | Public | `200 OK` | Body `code`; success returns a scoped 24-hour `conversationToken`. Invalid code is 401, expired/consumed code is 410. |
+| `POST` | `/api/v1/public/appointment-requests` | Public | `202 Accepted` | First appointment intake; request time is not reserved. Requires UUID `Idempotency-Key`; returns a seven-day scoped conversation token in the receipt. |
+| `POST` | `/api/v1/public/appointment-requests/{requestId}/verification-codes` | Public (legacy-compatible) | `202 Accepted` | Optional legacy flow. Body `channel: SMS|EMAIL`; generic acknowledgment; OTP expires in 10 minutes, max five attempts. Not used by the new web flow. |
+| `POST` | `/api/v1/public/appointment-requests/{requestId}/verification` | Public (legacy-compatible) | `200 OK` | Optional legacy flow. Body `code`; success returns a scoped 24-hour `conversationToken`. Not used by the new web flow. |
 | `GET` | `/api/v1/public/appointment-requests/{requestId}/conversation` | Conversation bearer token | `200 OK` | Returns only that request's state, proposal and messages. |
 | `GET` | `/api/v1/public/appointment-requests/{requestId}/conversation/messages?size=20&cursor=...` | Conversation bearer token | `200 OK` | Stable chronological cursor page; size 1-100, latest page first. |
 | `POST` | `/api/v1/public/appointment-requests/{requestId}/conversation/messages` | Conversation bearer token | `200 OK` | `{ "text": "Please call after 3 pm" }`, UUID `Idempotency-Key`; non-clinical plain text only, max 500 chars. |
@@ -603,7 +603,7 @@ produce an appointment-slot conflict.
 `actionRequiredBy` is derived as `CLINIC`, `PATIENT`, or `NONE`. Existing direct appointment endpoints remain
 compatible.
 
-### Verified public first-appointment conversation
+### Public first-appointment conversation
 
 Public intake creates `PENDING_CLINIC`; patient-portal requests keep their existing `PENDING`/`PROPOSED` lifecycle.
 Reception retains `ADMINISTRATOR`/`SECRETARY` access to list/detail, dentist assignment and proposal actions. A
@@ -612,14 +612,14 @@ non-clinical clinic message to the conversation. Reception can inspect one denti
 Guatemala clinic date with `GET /api/v1/appointment-requests/{requestId}/availability?professionalId={uuid}&date=YYYY-MM-DD`;
 this response contains no patient details, and proposal submission checks the slot again.
 
-The anonymous conversation routes are `POST /api/v1/public/appointment-requests/{requestId}/verification-codes`
-(`{"channel":"SMS"|"EMAIL"}`), `POST .../{requestId}/verification` (`{"code":"123456"}`),
-`GET .../{requestId}/conversation`, and `POST .../{requestId}/decision` (`{"decision":"ACCEPT"|"REJECT"}`).
-The OTP lasts 10 minutes, has five attempts, and is sent only to the phone/email captured on that request; the
-request-code response is generic to prevent request enumeration. SMS uses Twilio credentials from environment;
-email uses configured SMTP. Successful verification returns a random 256-bit bearer token stored only as SHA-256,
-scoped to exactly one request and valid for 24 hours. Invalid token is 401, expired token/code/proposal is 410, and
-per-IP throttling returns 429 with `Retry-After`. OTPs are BCrypt hashes and never returned.
+The receipt from `POST /api/v1/public/appointment-requests` includes a random 256-bit `conversationToken`,
+`tokenType: "Bearer"`, and `conversationExpiresAt` seven days from issuance. The token is returned only by intake
+and same-key/same-payload retries; such retries rotate the token and invalidate the previous one. The raw token is
+never persisted. Keep the token in `sessionStorage`, do not put it in a URL, and do not log it. There is no contact
+verification and no recovery if both the token and original idempotency key are lost. Possession authorizes only
+that request's non-clinical scheduling conversation; it does not prove phone/email ownership or legal identity.
+The legacy OTP endpoints remain available to existing clients. Invalid/missing token returns 401, expired token or
+proposal returns 410, and per-IP throttling returns 429 with `Retry-After`.
 
 Conversation reads and decisions require `Authorization: Bearer <conversationToken>`. `Idempotency-Key` (UUID) is
 required for decisions. Rejecting or expiring a proposal returns the request to `PENDING_CLINIC`; it remains open.

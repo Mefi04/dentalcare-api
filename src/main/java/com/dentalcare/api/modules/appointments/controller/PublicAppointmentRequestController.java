@@ -28,7 +28,7 @@ public class PublicAppointmentRequestController {
 
     @PostMapping
     @Operation(summary = "Request a first appointment without an account",
-            description = "Returns an acknowledgment only. requestedAt is a preference, not a confirmed or reserved appointment. Reuse the same UUID Idempotency-Key for retries.")
+            description = "Returns a one-time, seven-day conversation bearer token; save it because it cannot be recovered. A retry with the same Idempotency-Key and payload rotates and returns a new token without persisting token material in plaintext. requestedAt is a preference, not a confirmed or reserved appointment. No email/SMS verification is required.")
     public ResponseEntity<PublicAppointmentRequestReceipt> create(
             @RequestHeader("Idempotency-Key") UUID idempotencyKey,
             @Valid @RequestBody CreatePublicAppointmentRequest request) {

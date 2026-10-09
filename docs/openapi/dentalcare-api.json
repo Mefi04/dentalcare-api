@@ -5412,11 +5412,24 @@
       "PublicAppointmentRequestReceipt" : {
         "description" : "Safe acknowledgment for an anonymous appointment request",
         "properties" : {
+          "conversationExpiresAt" : {
+            "description" : "Conversation-token expiry; an idempotent retry with the same key and payload issues a replacement token.",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "conversationToken" : {
+            "description" : "One-time 256-bit bearer secret scoped to this request. Save securely; it is never stored in plaintext.",
+            "type" : "string"
+          },
           "message" : {
             "type" : "string"
           },
           "requestId" : {
             "format" : "uuid",
+            "type" : "string"
+          },
+          "tokenType" : {
+            "example" : "Bearer",
             "type" : "string"
           }
         },
@@ -25986,7 +25999,7 @@
     },
     "/api/v1/public/appointment-requests" : {
       "post" : {
-        "description" : "Returns an acknowledgment only. requestedAt is a preference, not a confirmed or reserved appointment. Reuse the same UUID Idempotency-Key for retries.",
+        "description" : "Returns a one-time, seven-day conversation bearer token; save it because it cannot be recovered. A retry with the same Idempotency-Key and payload rotates and returns a new token without persisting token material in plaintext. requestedAt is a preference, not a confirmed or reserved appointment. No email/SMS verification is required.",
         "operationId" : "create_5",
         "parameters" : [ {
           "in" : "header",

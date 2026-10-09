@@ -77,6 +77,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
     private static final java.time.Duration OTP_TTL = java.time.Duration.ofMinutes(10);
     private static final java.time.Duration CONVERSATION_TTL = java.time.Duration.ofHours(24);
+    private static final java.time.Duration PUBLIC_REQUEST_CONVERSATION_TTL = java.time.Duration.ofDays(7);
     private static final java.time.Duration PROPOSAL_TTL = java.time.Duration.ofHours(24);
     private static final int OTP_MAX_ATTEMPTS = 5;
 
@@ -136,7 +137,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             if (!payloadHash.equals(repeated.get().getIdempotencyPayloadHash())) {
                 throw new ConflictException("Idempotency key was already used with different request data");
             }
-            return publicReceipt(repeated.get().getId());
+            return issuePublicRequestReceipt(repeated.get().getId());
         }
 
         User professional = request.professionalId() == null ? null : publicDentist(request.professionalId());
@@ -153,7 +154,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
                 "Recibimos tu solicitud. El horario solicitado es una preferencia y aún no está confirmado.", now));
         auditService.success(AuditActions.APPOINTMENT_REQUEST_CREATED, "APPOINTMENTS",
                 "PublicAppointmentRequest", saved.getId(), null);
-        return publicReceipt(saved.getId());
+        return issuePublicRequestReceipt(saved.getId());
     }
 
     @Override
@@ -330,11 +331,6 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
 
     private String nullToEmpty(String value) {
         return value == null ? "" : value;
-    }
-
-    private PublicAppointmentRequestReceipt publicReceipt(UUID requestId) {
-        return new PublicAppointmentRequestReceipt(requestId,
-                "We received your request. The clinic will contact you to confirm or propose a time.");
     }
 
     @Override
@@ -690,7 +686,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
                 .filter(value -> requestId.equals(value.getAppointmentRequestId()))
                 .orElseThrow(() -> new UnauthorizedException("Invalid conversation token"));
         if (conversation.getConversationExpiresAt() == null || !conversation.getConversationExpiresAt().isAfter(clock.instant())) {
-            throw new GoneException("Conversation token has expired; verify your contact again");
+            throw new GoneException("Conversation token has expired; retry the original request with its Idempotency-Key to obtain a new key");
         }
         return conversation;
     }
@@ -896,6 +892,22 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     private String randomToken() {
         byte[] bytes = new byte[32]; RANDOM.nextBytes(bytes);
         return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private PublicAppointmentRequestReceipt issuePublicRequestReceipt(UUID requestId) {
+        Instant now = clock.instant();
+        Instant expiresAt = now.plus(PUBLIC_REQUEST_CONVERSATION_TTL);
+        String token = randomToken();
+        AppointmentPublicConversation conversation = conversations.findForUpdate(requestId).orElse(null);
+        if (conversation == null) {
+            conversation = new AppointmentPublicConversation(requestId, "WEB", null, null, now);
+        }
+        conversation.issueToken(sha256(token), expiresAt, now);
+        conversations.saveAndFlush(conversation);
+        return new PublicAppointmentRequestReceipt(requestId,
+                "Recibimos tu solicitud. Guarda la clave privada para volver a esta conversación. "
+                        + "El horario solicitado es una preferencia y todavía no está confirmado.",
+                token, "Bearer", expiresAt);
     }
 
     private String sha256(String value) {

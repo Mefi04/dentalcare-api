@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.dentalcare.api.modules.auth.controller.MobileAuthController;
@@ -110,10 +111,12 @@ class CorsSecurityIntegrationTests {
 
         UUID idempotencyKey = UUID.randomUUID();
         UUID requestId = UUID.randomUUID();
+        String conversationToken = "test-private-conversation-token";
         when(appointmentRequestService.createPublic(
                 org.mockito.ArgumentMatchers.any(CreatePublicAppointmentRequest.class),
                 org.mockito.ArgumentMatchers.eq(idempotencyKey)))
-                .thenReturn(new PublicAppointmentRequestReceipt(requestId, "Request received"));
+                .thenReturn(new PublicAppointmentRequestReceipt(requestId, "Request received",
+                        conversationToken, "Bearer", java.time.Instant.parse("2099-10-09T15:00:00Z")));
         mockMvc.perform(post("/api/v1/public/appointment-requests")
                         .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
                         .header("Idempotency-Key", idempotencyKey)
@@ -123,6 +126,8 @@ class CorsSecurityIntegrationTests {
                                  "requestedAt":"2099-10-02T15:00:00Z"}
                                 """))
                 .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.conversationToken").value(conversationToken))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
     }

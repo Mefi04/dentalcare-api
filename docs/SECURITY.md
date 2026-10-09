@@ -107,9 +107,19 @@ the UUID idempotency key; a different payload with that key receives only a gene
 Only administrators and secretaries can assign/reassign an active dentist on an open public request. Assignment
 is audited and does not reserve a time or transition the request out of its open state.
 
-Public conversation reads/writes require a short-lived scoped bearer token created only after OTP verification.
+Public first-appointment intake issues a random 256-bit scoped bearer token directly in the successful receipt;
+it expires after seven days and is stored only as SHA-256. The same UUID `Idempotency-Key` and identical body may
+be retried to rotate and receive a fresh token, while a different body receives a generic conflict. This supports
+lost HTTP responses without storing a recoverable token. The token grants access only to its single scheduling
+conversation; it is not proof of legal identity or ownership of the submitted phone/email. CUI is never used as
+authentication. The visitor should save the token securely in browser session storage and must not place it in a
+URL. There is no email/SMS verification or automatic recovery; losing both the token and original idempotency key
+means the conversation cannot be recovered. Reception's existing identity verification remains required before
+linking/creating a patient record and accepting a proposal.
+
 Messages are limited to 500 characters, plain text, logistics-only language, with a per-request rate limit and
-sender/request idempotency key. Stored message rendering must remain text-only. Notification outbox recipients and
+sender/request idempotency key. Stored message rendering must remain text-only. The previous OTP endpoints remain
+available for compatibility, but the first-appointment web flow does not require them. Notification outbox recipients and
 payloads are AES-256-GCM encrypted at rest and erased after terminal processing; provider status never exposes
 contact details. The administrative WhatsApp route only constructs a reviewed manual draft and never sends it.
 

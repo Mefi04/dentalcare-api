@@ -86,8 +86,16 @@ class AppointmentRequestServiceImplTests {
     void publicRequestNeverLooksUpOrLinksPatientByCuiAndOnlyAcknowledgesPublicly() {
         UUID idempotencyKey = UUID.randomUUID();
         var request = publicRequest(dentist.getId());
+        java.util.concurrent.atomic.AtomicReference<AppointmentPublicConversation> storedConversation =
+                new java.util.concurrent.atomic.AtomicReference<>();
         when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(dentist));
         when(requests.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(conversations.findForUpdate(any())).thenAnswer(invocation -> Optional.ofNullable(storedConversation.get()));
+        when(conversations.saveAndFlush(any())).thenAnswer(invocation -> {
+            AppointmentPublicConversation value = invocation.getArgument(0);
+            storedConversation.set(value);
+            return value;
+        });
 
         var receipt = service.createPublic(request, idempotencyKey);
 
@@ -99,13 +107,24 @@ class AppointmentRequestServiceImplTests {
         assertThat(persisted.getRequesterCui()).isEqualTo("1234567890123");
         assertThat(persisted.getIdempotencyKey()).isEqualTo(idempotencyKey);
         assertThat(receipt.requestId()).isEqualTo(persisted.getId());
+        assertThat(receipt.conversationToken()).isNotBlank();
+        assertThat(receipt.tokenType()).isEqualTo("Bearer");
+        assertThat(receipt.conversationExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(7)));
+        assertThat(storedConversation.get().getChannel()).isEqualTo("WEB");
+        assertThat(storedConversation.get().getConversationTokenHash()).isNotEqualTo(receipt.conversationToken());
         assertThat(receipt.message()).doesNotContain("1234567890123", "maria@example.test", "5555-0101");
         verifyNoInteractions(appointments);
+        verifyNoInteractions(codeDelivery, notificationOutbox);
         verify(patients, never()).findByDpi(anyString());
 
         when(requests.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(persisted));
         var retry = service.createPublic(request, idempotencyKey);
-        assertThat(retry).isEqualTo(receipt);
+        assertThat(retry.requestId()).isEqualTo(receipt.requestId());
+        assertThat(retry.conversationToken()).isNotEqualTo(receipt.conversationToken());
+        assertThat(storedConversation.get().getConversationTokenHash()).isNotEqualTo(
+                tokenHash(receipt.conversationToken()));
+        assertThat(storedConversation.get().getConversationTokenHash()).isEqualTo(
+                tokenHash(retry.conversationToken()));
         verify(requests, times(1)).saveAndFlush(any());
     }
 

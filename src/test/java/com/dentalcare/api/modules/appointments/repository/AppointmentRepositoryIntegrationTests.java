@@ -8,6 +8,7 @@ import com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestRe
 import com.dentalcare.api.modules.appointments.mapper.AppointmentRequestMapper;
 import com.dentalcare.api.modules.appointments.model.WaitingRoomEntry;
 import com.dentalcare.api.modules.appointments.model.AppointmentRequestMessage;
+import com.dentalcare.api.modules.appointments.model.AppointmentPublicConversation;
 import com.dentalcare.api.modules.appointments.model.AppointmentNotificationOutboxEvent;
 import com.dentalcare.api.modules.appointments.model.AppointmentNotificationStatus;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRequestMessageRepository;
@@ -74,6 +75,7 @@ class AppointmentRepositoryIntegrationTests {
     @Autowired AppointmentRepository appointments;
     @Autowired AppointmentRequestRepository appointmentRequests;
     @Autowired AppointmentRequestMessageRepository messages;
+    @Autowired AppointmentPublicConversationRepository publicConversations;
     @Autowired AppointmentNotificationOutboxRepository notificationOutbox;
     @Autowired WaitingRoomRepository waitingRoom;
     @Autowired PatientRepository patients;
@@ -224,6 +226,27 @@ class AppointmentRepositoryIntegrationTests {
         assertThat(detail.assignedProfessional().id()).isEqualTo(dentist.getId());
         assertThat(detail.status()).isEqualTo(AppointmentRequestStatus.PENDING_CLINIC);
         assertThat(detail.appointmentId()).isNull();
+    }
+
+    @Test
+    void postgresStoresWebConversationCapabilityOnlyAsHash() {
+        UUID requestId = UUID.randomUUID();
+        appointmentRequests.saveAndFlush(new AppointmentRequest(requestId, null, null, SCHEDULED_AT,
+                AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "First-time visitor", null,
+                "+502 5555-0101", null, null, UUID.randomUUID(), "b".repeat(64)));
+        String tokenHash = "c".repeat(64);
+        AppointmentPublicConversation conversation = new AppointmentPublicConversation(
+                requestId, "WEB", null, null, NOW);
+        conversation.issueToken(tokenHash, NOW.plusSeconds(7 * 24 * 60 * 60L), NOW);
+
+        publicConversations.saveAndFlush(conversation);
+
+        AppointmentPublicConversation stored = publicConversations.findByConversationTokenHash(tokenHash)
+                .orElseThrow();
+        assertThat(stored.getAppointmentRequestId()).isEqualTo(requestId);
+        assertThat(stored.getChannel()).isEqualTo("WEB");
+        assertThat(stored.getConversationTokenHash()).isEqualTo(tokenHash);
+        assertThat(stored.getConversationExpiresAt()).isEqualTo(NOW.plusSeconds(7 * 24 * 60 * 60L));
     }
 
     @Test

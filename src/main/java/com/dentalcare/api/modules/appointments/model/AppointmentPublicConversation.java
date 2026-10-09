@@ -62,6 +62,10 @@ public class AppointmentPublicConversation {
 
     public void registerFailedAttempt(Instant now) { verificationAttempts++; updatedAt = now; }
     public void consumeCode(String tokenHash, Instant expiresAt, Instant now) {
+        issueToken(tokenHash, expiresAt, now);
+    }
+
+    public void issueToken(String tokenHash, Instant expiresAt, Instant now) {
         verificationCodeHash = null;
         verificationExpiresAt = null;
         conversationTokenHash = tokenHash;
