@@ -4,6 +4,8 @@ import com.dentalcare.api.modules.appointments.model.Appointment;
 import com.dentalcare.api.modules.appointments.model.AppointmentStatus;
 import com.dentalcare.api.modules.appointments.model.AppointmentRequest;
 import com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestResponse;
+import com.dentalcare.api.modules.appointments.mapper.AppointmentRequestMapper;
 import com.dentalcare.api.modules.appointments.model.WaitingRoomEntry;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
@@ -116,6 +118,41 @@ class AppointmentRepositoryIntegrationTests {
         AppointmentRequest duplicate = new AppointmentRequest(UUID.randomUUID(), patient, dentist,
                 SCHEDULED_AT.plusSeconds(3600), AppointmentRequestStatus.PENDING, NOW, NOW);
         duplicate.confirm(appointment, dentist, NOW.plusSeconds(2));
+        assertThatThrownBy(() -> appointmentRequests.saveAndFlush(duplicate))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void publicUnlinkedRequestAppearsInTheUnfilteredAdministrativeInbox() {
+        UUID id = UUID.randomUUID();
+        AppointmentRequest publicRequest = new AppointmentRequest(id, null, null, SCHEDULED_AT,
+                AppointmentRequestStatus.PENDING, NOW, NOW, "First-time visitor", null,
+                "+502 5555-0101", "visitor@example.test", "Afternoon preferred",
+                UUID.randomUUID(), "a".repeat(64));
+        appointmentRequests.saveAndFlush(publicRequest);
+
+        var inbox = appointmentRequests.findAll(org.springframework.data.jpa.domain.Specification.unrestricted(),
+                PageRequest.of(0, 100, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
+        AppointmentRequestResponse visible = inbox.map(new AppointmentRequestMapper()::toResponse)
+                .getContent().stream().filter(value -> value.id().equals(id)).findFirst().orElseThrow();
+
+        assertThat(visible.status()).isEqualTo(AppointmentRequestStatus.PENDING);
+        assertThat(visible.patient()).isNull();
+        assertThat(visible.publicRequester().fullName()).isEqualTo("First-time visitor");
+        assertThat(visible.publicRequester().phone()).isEqualTo("+502 5555-0101");
+        assertThat(visible.appointmentId()).isNull();
+    }
+
+    @Test
+    void postgresPreventsDuplicateActivePublicRequestForSameCuiAndPreferredSlot() {
+        appointmentRequests.saveAndFlush(new AppointmentRequest(UUID.randomUUID(), patient, dentist,
+                SCHEDULED_AT, AppointmentRequestStatus.PENDING, NOW, NOW, "Appointment Patient",
+                patient.getDpi(), "55550000", null, null, UUID.randomUUID(), "b".repeat(64)));
+
+        AppointmentRequest duplicate = new AppointmentRequest(UUID.randomUUID(), patient, dentist,
+                SCHEDULED_AT, AppointmentRequestStatus.PENDING, NOW, NOW, "Another submitted name",
+                patient.getDpi(), "55551234", null, null, UUID.randomUUID(), "c".repeat(64));
+
         assertThatThrownBy(() -> appointmentRequests.saveAndFlush(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }

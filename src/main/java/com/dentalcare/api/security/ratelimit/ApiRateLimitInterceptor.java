@@ -36,7 +36,8 @@ public class ApiRateLimitInterceptor implements HandlerInterceptor {
         if (path.equals("/api/v1/auth/login") ||
             path.equals("/api/v1/auth/mobile/login") ||
             path.equals("/api/v1/auth/password-recovery/request") ||
-            path.equals("/api/v1/public/contact-inquiries")) {
+            path.equals("/api/v1/public/contact-inquiries") ||
+            path.equals("/api/v1/public/appointment-requests")) {
             return true;
         }
 
