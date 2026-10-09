@@ -1,0 +1,17 @@
+# Optional override for the EXISTING monitoring stack. Only sanitized status is mounted.
+services:
+  backup-status:
+    profiles: [backup-monitoring]
+    build: {context: ., dockerfile: operations/backup/Dockerfile}
+    command: [serve]
+    volumes: ['${BACKUP_STATUS_DIRECTORY:?Directory containing only status.json and latest.json}:/lab:ro']
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: '3'}
+    # No host ports, database settings, object access or decryption keys.
+  prometheus:
+    command: ['--config.file=/etc/prometheus/prometheus-backup.yml', '--storage.tsdb.retention.time=7d', '--storage.tsdb.retention.size=512MB']
