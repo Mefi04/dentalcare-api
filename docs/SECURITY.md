@@ -197,6 +197,10 @@ The refresh token is transported in a host-only cookie with:
 
 The frontend must not read the refresh token or store it in `localStorage`, `sessionStorage`, or persistent JavaScript variables. Cross-origin browser clients require an explicit allowed origin from `FRONTEND_URL` and credentialed CORS requests; wildcard origins are incompatible with credentials.
 
+### Isolating browser tabs
+
+Web clients that allow separate accounts in separate tabs must generate one random UUID per tab and persist that identifier in that tab's `sessionStorage`. They send it in `X-Client-Session-Id` on web login, refresh, and logout. The API validates it as a canonical UUID and uses it only to select a cookie name (`refreshToken-<uuid>`); the refresh token remains HttpOnly and is never exposed to JavaScript. Logout expires only the cookie selected by that identifier. The access token returned by login or refresh must also be held in tab-scoped `sessionStorage`, not shared `localStorage`, so each tab sends its own Bearer token. The identifier is a namespace, not an authentication credential. Requests without the header retain the legacy `refreshToken` cookie behavior.
+
 ## Session policy
 
 Each successful login creates an independent refresh-token family, allowing multiple devices or browsers. Phase one imposes no maximum number of concurrent sessions.
