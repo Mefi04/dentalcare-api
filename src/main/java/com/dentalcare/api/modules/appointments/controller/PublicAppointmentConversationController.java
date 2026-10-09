@@ -67,7 +67,7 @@ public class PublicAppointmentConversationController {
 
     @PostMapping("/decision")
     @Operation(summary = "Accept or reject the current public appointment proposal",
-            description = "Requires Idempotency-Key UUID. 400 invalid decision/key; 401 invalid token; 409 state conflict, PATIENT_RECORD_LINK_REQUIRED, or APPOINTMENT_TIME_UNAVAILABLE (no appointment is created); 410 expired/responded proposal or token; 429 rate limit.")
+            description = "Requires Idempotency-Key UUID. Acceptance reserves an appointment with public contact; patient registration and physical DPI verification occur on the appointment day. 400 invalid decision/key; 401 invalid token; 409 state conflict or APPOINTMENT_TIME_UNAVAILABLE (no appointment is created); 410 expired/responded proposal or token; 429 rate limit.")
     public ResponseEntity<PublicAppointmentConversationResponse> decide(@PathVariable UUID requestId,
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestHeader(value = "Idempotency-Key", required = false) UUID key,
@@ -76,7 +76,11 @@ public class PublicAppointmentConversationController {
     }
 
     private String bearer(String header) {
-        if (header == null || !header.startsWith("Bearer ")) return null;
-        return header.substring(7).trim();
+        if (header == null || header.isBlank()) return null;
+        String trimmed = header.trim();
+        if (trimmed.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return trimmed.substring(7).trim();
+        }
+        return trimmed;
     }
 }

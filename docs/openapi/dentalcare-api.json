@@ -118,6 +118,9 @@
           "professional" : {
             "$ref" : "#/components/schemas/AppointmentProfessionalResponse"
           },
+          "publicContact" : {
+            "$ref" : "#/components/schemas/PublicAppointmentRequesterResponse"
+          },
           "scheduledAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -1813,7 +1816,8 @@
         "description" : "Non-clinical information needed to request a first appointment",
         "properties" : {
           "cui" : {
-            "description" : "Optional Guatemalan DPI/CUI; never authenticates the visitor or auto-links an expediente",
+            "description" : "Optional unverified DPI/CUI supplied by legacy clients; not required for scheduling and never used to create or link a clinical record. Reception verifies the physical DPI in person on the appointment day",
+            "example" : "1234567890123",
             "pattern" : "^[0-9]{13}$",
             "type" : "string"
           },
@@ -5371,6 +5375,17 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "confirmedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "confirmedProfessional" : {
+            "$ref" : "#/components/schemas/AppointmentProfessionalResponse"
+          },
+          "conversationExpiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
           "messages" : {
             "items" : {
               "$ref" : "#/components/schemas/AppointmentRequestMessageResponse"
@@ -8267,7 +8282,7 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
-        "summary" : "Link an existing patient record after reception verifies requester identity",
+        "summary" : "Link an existing patient record after in-person physical DPI verification on the confirmed appointment day",
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
@@ -8607,7 +8622,7 @@
     },
     "/api/v1/appointment-requests/{requestId}/register-patient" : {
       "post" : {
-        "description" : "Requires a prior identity-verification record and PATIENT_CREATE. Body uses CreatePatientRequest; all required administrative fields (including DPI, birthDate and gender) must be supplied by reception. Does not create portal access.",
+        "description" : "Requires a confirmed appointment on its clinic date, prior IN_PERSON physical DPI verification and PATIENT_CREATE. Body uses CreatePatientRequest; reception enters DPI, birthDate and gender from the in-person registration. Does not create portal access.",
         "operationId" : "registerPatient",
         "parameters" : [ {
           "in" : "path",
@@ -8817,7 +8832,7 @@
     },
     "/api/v1/appointment-requests/{requestId}/verify-requester-identity" : {
       "post" : {
-        "description" : "Administrative attestation only; CUI match or public-channel OTP alone does not establish the link. Methods: IN_PERSON, CALLBACK_TO_REGISTERED_CONTACT, DOCUMENT_REVIEW.",
+        "description" : "Only IN_PERSON is accepted for a public appointment. The public CUI, if submitted, is unverified and is not used to establish the link.",
         "operationId" : "verifyRequesterIdentity",
         "parameters" : [ {
           "in" : "path",
@@ -8922,7 +8937,7 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
-        "summary" : "Record reception's identity verification before linking or registering a patient",
+        "summary" : "Record in-person physical DPI verification on the confirmed appointment day",
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
@@ -25999,7 +26014,7 @@
     },
     "/api/v1/public/appointment-requests" : {
       "post" : {
-        "description" : "Returns a one-time, seven-day conversation bearer token; save it because it cannot be recovered. A retry with the same Idempotency-Key and payload rotates and returns a new token without persisting token material in plaintext. requestedAt is a preference, not a confirmed or reserved appointment. No email/SMS verification is required.",
+        "description" : "Returns a scoped 30-day conversation bearer token; save it because it cannot be recovered. An authenticated conversation read renews it when fewer than seven days remain. A retry with the same Idempotency-Key and payload rotates and returns a new token without persisting token material in plaintext. requestedAt is a preference, not a confirmed or reserved appointment. DPI is optional at intake and is verified in person before patient registration. No email/SMS verification is required.",
         "operationId" : "create_5",
         "parameters" : [ {
           "in" : "header",
@@ -26349,7 +26364,7 @@
     },
     "/api/v1/public/appointment-requests/{requestId}/decision" : {
       "post" : {
-        "description" : "Requires Idempotency-Key UUID. 400 invalid decision/key; 401 invalid token; 409 state conflict, PATIENT_RECORD_LINK_REQUIRED, or APPOINTMENT_TIME_UNAVAILABLE (no appointment is created); 410 expired/responded proposal or token; 429 rate limit.",
+        "description" : "Requires Idempotency-Key UUID. Acceptance reserves an appointment with public contact; patient registration and physical DPI verification occur on the appointment day. 400 invalid decision/key; 401 invalid token; 409 state conflict or APPOINTMENT_TIME_UNAVAILABLE (no appointment is created); 410 expired/responded proposal or token; 429 rate limit.",
         "operationId" : "decide",
         "parameters" : [ {
           "in" : "path",

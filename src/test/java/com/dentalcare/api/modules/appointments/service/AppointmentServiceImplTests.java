@@ -79,6 +79,21 @@ class AppointmentServiceImplTests {
     }
 
     @Test
+    void createsPublicAppointmentWithoutPatientOrPatientNotification() {
+        when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(dentist));
+        when(appointments.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Appointment result = service.createPublic("Visitante", "5555-0198", dentist.getId(), SCHEDULED_AT);
+
+        assertThat(result.getPatient()).isNull();
+        assertThat(result.getPublicContactName()).isEqualTo("Visitante");
+        assertThat(result.getPublicContactPhone()).isEqualTo("5555-0198");
+        assertThat(result.getStatus()).isEqualTo(AppointmentStatus.SCHEDULED);
+        verify(patients, never()).findById(any());
+        org.mockito.Mockito.verifyNoInteractions(notificationPublisher);
+    }
+
+    @Test
     void rejectsMissingPatient() {
         when(patients.findById(patient.getId())).thenReturn(Optional.empty());
 

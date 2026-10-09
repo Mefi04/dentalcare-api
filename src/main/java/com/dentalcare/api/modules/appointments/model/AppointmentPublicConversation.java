@@ -55,8 +55,6 @@ public class AppointmentPublicConversation {
         this.verificationCodeHash = hash;
         this.verificationExpiresAt = expiresAt;
         this.verificationAttempts = 0;
-        this.conversationTokenHash = null;
-        this.conversationExpiresAt = null;
         this.updatedAt = now;
     }
 
@@ -71,5 +69,12 @@ public class AppointmentPublicConversation {
         conversationTokenHash = tokenHash;
         conversationExpiresAt = expiresAt;
         updatedAt = now;
+    }
+
+    public void extendTokenExpiry(Instant expiresAt, Instant now) {
+        if (conversationExpiresAt != null && expiresAt.isAfter(conversationExpiresAt)) {
+            conversationExpiresAt = expiresAt;
+            updatedAt = now;
+        }
     }
 }

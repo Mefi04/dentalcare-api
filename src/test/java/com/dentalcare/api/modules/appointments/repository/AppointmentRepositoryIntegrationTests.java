@@ -111,6 +111,22 @@ class AppointmentRepositoryIntegrationTests {
     }
 
     @Test
+    void publicAppointmentReservesTheSlotWithoutCreatingAPatientRecord() {
+        long patientsBefore = patients.count();
+        Appointment guest = appointments.saveAndFlush(Appointment.forPublicRequest(
+                UUID.randomUUID(), "Visitante de prueba", "5555-0198", dentist, SCHEDULED_AT, NOW));
+
+        Appointment recovered = appointments.findById(guest.getId()).orElseThrow();
+        assertThat(recovered.getPatient()).isNull();
+        assertThat(recovered.getPublicContactName()).isEqualTo("Visitante de prueba");
+        assertThat(recovered.getPublicContactPhone()).isEqualTo("5555-0198");
+        assertThat(patients.count()).isEqualTo(patientsBefore);
+        assertThatThrownBy(() -> appointments.saveAndFlush(new Appointment(UUID.randomUUID(), patient, dentist,
+                SCHEDULED_AT, AppointmentStatus.SCHEDULED, NOW, NOW)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void persistsExplicitSupportedStatus() {
         UUID id = UUID.randomUUID();
         appointments.saveAndFlush(new Appointment(id, patient, dentist, SCHEDULED_AT,

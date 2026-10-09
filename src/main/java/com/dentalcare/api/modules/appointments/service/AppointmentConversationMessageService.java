@@ -12,6 +12,7 @@ import com.dentalcare.api.modules.appointments.model.AppointmentRequest;
 import com.dentalcare.api.modules.appointments.model.AppointmentRequestMessage;
 import com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus;
 import com.dentalcare.api.modules.appointments.repository.AppointmentPublicConversationRepository;
+import com.dentalcare.api.modules.appointments.repository.AppointmentPublicConversationTokenRepository;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRequestMessageRepository;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRequestRepository;
 import com.dentalcare.api.modules.appointments.dto.request.PublicVerificationChannelRequest;
@@ -34,6 +35,7 @@ public class AppointmentConversationMessageService {
     private final AppointmentRequestRepository requests;
     private final AppointmentRequestMessageRepository messages;
     private final AppointmentPublicConversationRepository conversations;
+    private final AppointmentPublicConversationTokenRepository retainedTokens;
     private final UserRepository users;
     private final AppointmentNotificationOutboxService notificationOutbox;
     private final PublicAppointmentCodeDelivery delivery;
@@ -41,11 +43,13 @@ public class AppointmentConversationMessageService {
 
     public AppointmentConversationMessageService(AppointmentRequestRepository requests,
             AppointmentRequestMessageRepository messages, AppointmentPublicConversationRepository conversations,
+            AppointmentPublicConversationTokenRepository retainedTokens,
             UserRepository users, AppointmentNotificationOutboxService notificationOutbox,
             PublicAppointmentCodeDelivery delivery, Clock clock) {
         this.requests = requests;
         this.messages = messages;
         this.conversations = conversations;
+        this.retainedTokens = retainedTokens;
         this.users = users;
         this.notificationOutbox = notificationOutbox;
         this.delivery = delivery;
@@ -151,11 +155,32 @@ public class AppointmentConversationMessageService {
 
     private void authorize(UUID requestId, String token) {
         if (token == null || token.isBlank()) throw new UnauthorizedException("Conversation token is required");
-        var conversation = conversations.findByConversationTokenHash(sha256(token))
+        String hash = sha256(token);
+        Instant now = clock.instant();
+        var current = conversations.findByConversationTokenHash(hash)
+                .filter(value -> requestId.equals(value.getAppointmentRequestId()));
+        if (current.isPresent()) {
+            var conv = current.get();
+            Instant expiresAt = conv.getConversationExpiresAt();
+            if (expiresAt == null || !expiresAt.isAfter(now)) {
+                throw new GoneException("Conversation token has expired; verify your contact again");
+            }
+            if (expiresAt.isBefore(now.plus(java.time.Duration.ofDays(7)))) {
+                conv.extendTokenExpiry(now.plus(java.time.Duration.ofDays(30)), now);
+                conversations.save(conv);
+            }
+            return;
+        }
+        var retained = retainedTokens.findById(hash)
                 .filter(value -> requestId.equals(value.getAppointmentRequestId()))
                 .orElseThrow(() -> new UnauthorizedException("Invalid conversation token"));
-        if (conversation.getConversationExpiresAt() == null || !conversation.getConversationExpiresAt().isAfter(clock.instant())) {
+        Instant expiresAt = retained.getExpiresAt();
+        if (expiresAt == null || !expiresAt.isAfter(now)) {
             throw new GoneException("Conversation token has expired; verify your contact again");
+        }
+        if (expiresAt.isBefore(now.plus(java.time.Duration.ofDays(7)))) {
+            retained.extendExpiry(now.plus(java.time.Duration.ofDays(30)));
+            retainedTokens.save(retained);
         }
     }
 
@@ -167,7 +192,10 @@ public class AppointmentConversationMessageService {
 
     private boolean isOpen(AppointmentRequest request) {
         return request.getStatus() == AppointmentRequestStatus.PENDING_CLINIC
-                || request.getStatus() == AppointmentRequestStatus.PENDING_PATIENT;
+                || request.getStatus() == AppointmentRequestStatus.PENDING_PATIENT
+                || request.getStatus() == AppointmentRequestStatus.CONFIRMED
+                || request.getStatus() == AppointmentRequestStatus.PENDING
+                || request.getStatus() == AppointmentRequestStatus.PROPOSED;
     }
 
     private void enqueueNotice(AppointmentRequest request, String text) {

@@ -128,7 +128,7 @@ public class AdministrativeAppointmentRequestController {
     }
 
     @PostMapping("/{requestId}/link-patient")
-    @Operation(summary = "Link an existing patient record after reception verifies requester identity")
+    @Operation(summary = "Link an existing patient record after in-person physical DPI verification on the confirmed appointment day")
     public ResponseEntity<AppointmentRequestResponse> linkPatient(
             @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
             @Valid @RequestBody LinkAppointmentRequestPatientRequest request) {
@@ -137,8 +137,8 @@ public class AdministrativeAppointmentRequestController {
     }
 
     @PostMapping("/{requestId}/verify-requester-identity")
-    @Operation(summary = "Record reception's identity verification before linking or registering a patient",
-            description = "Administrative attestation only; CUI match or public-channel OTP alone does not establish the link. Methods: IN_PERSON, CALLBACK_TO_REGISTERED_CONTACT, DOCUMENT_REVIEW.")
+    @Operation(summary = "Record in-person physical DPI verification on the confirmed appointment day",
+            description = "Only IN_PERSON is accepted for a public appointment. The public CUI, if submitted, is unverified and is not used to establish the link.")
     public ResponseEntity<AppointmentRequestResponse> verifyRequesterIdentity(
             @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
             @Valid @RequestBody VerifyPublicRequesterIdentityRequest request) {
@@ -149,7 +149,7 @@ public class AdministrativeAppointmentRequestController {
     @PostMapping("/{requestId}/register-patient")
     @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'SECRETARY') and hasAuthority('PATIENT_CREATE')")
     @Operation(summary = "Create a new patient through the official patient service and link it atomically",
-            description = "Requires a prior identity-verification record and PATIENT_CREATE. Body uses CreatePatientRequest; all required administrative fields (including DPI, birthDate and gender) must be supplied by reception. Does not create portal access.")
+            description = "Requires a confirmed appointment on its clinic date, prior IN_PERSON physical DPI verification and PATIENT_CREATE. Body uses CreatePatientRequest; reception enters DPI, birthDate and gender from the in-person registration. Does not create portal access.")
     public ResponseEntity<AppointmentRequestResponse> registerPatient(
             @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
             @Valid @RequestBody CreatePatientRequest request) {

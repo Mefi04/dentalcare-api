@@ -75,8 +75,26 @@ class AppointmentFlowControllerSecurityTests {
                         .header("Idempotency-Key", UUID.randomUUID())
                         .contentType("application/json")
                         .content("""
-                                {"fullName":" ","phone":"invalid","requestedAt":"2000-01-01T00:00:00Z"}
+                                {"fullName":"Valid Name","requestedAt":"2099-10-02T15:00:00Z"}
                                 """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(requestService);
+    }
+
+    @Test
+    void publicAppointmentRequestRejectsBlankOrMalformedCui() throws Exception {
+        String request = """
+                {"fullName":"Valid Name","cui":"%s","phone":"+502 5555-0101","requestedAt":"2099-10-02T15:00:00Z"}
+                """;
+
+        mockMvc.perform(post("/api/v1/public/appointment-requests")
+                        .header("Idempotency-Key", UUID.randomUUID()).contentType("application/json")
+                        .content(request.formatted(" ")))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(post("/api/v1/public/appointment-requests")
+                        .header("Idempotency-Key", UUID.randomUUID()).contentType("application/json")
+                        .content(request.formatted("12345")))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(requestService);

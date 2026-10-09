@@ -139,6 +139,10 @@ public class AdministrativeAppointmentServiceImpl implements AdministrativeAppoi
                 || status != AppointmentStatus.COMPLETED) {
             throw new ConflictException("Invalid appointment status transition");
         }
+        if (appointment.getPatient() == null) {
+            throw new ConflictException("PATIENT_RECORD_LINK_REQUIRED",
+                    "Verify the physical DPI and link or register the patient before completing the appointment");
+        }
 
         appointment.setStatus(status);
         appointment.setUpdatedAt(clock.instant());

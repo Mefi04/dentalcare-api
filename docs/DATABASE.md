@@ -373,6 +373,9 @@ Changeset `043-public-request-identity-and-safe-deduplication` stores the recept
 attestation (`verified_at`, staff user, and a controlled verification method) required before linking or creating a
 patient from an anonymous request. Public intake never queries or auto-links a patient by submitted DPI/CUI. The
 active-request uniqueness index now uses the normalized full-payload hash, avoiding CUI-based existence probes.
+The public intake API requires a 13-digit DPI/CUI, but the persisted snapshot remains nullable for legacy requests;
+schema changes are not required. Reception identity-verifies the requester and matches this value against an
+existing or newly registered patient's DPI before the request can be confirmed.
 The same changeset expands sender labels to `BOT` and `RECEPTION`; legacy `CLINIC` messages remain readable.
 Reception patient registration calls the existing `PatientService` and links within the same transaction; it does
 not create portal access. No existing request, patient, appointment, or applied migration is deleted or rewritten.

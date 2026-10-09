@@ -23,9 +23,15 @@ public class Appointment {
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "patient_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "patient_id")
     private Patient patient;
+
+    @Column(name = "public_contact_name", length = 150)
+    private String publicContactName;
+
+    @Column(name = "public_contact_phone", length = 30)
+    private String publicContactPhone;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "professional_id", nullable = false)
@@ -57,8 +63,19 @@ public class Appointment {
         this.updatedAt = updatedAt;
     }
 
+    public static Appointment forPublicRequest(UUID id, String fullName, String phone, User professional,
+                                                Instant scheduledAt, Instant now) {
+        Appointment appointment = new Appointment(id, null, professional, scheduledAt,
+                AppointmentStatus.SCHEDULED, now, now);
+        appointment.publicContactName = fullName;
+        appointment.publicContactPhone = phone;
+        return appointment;
+    }
+
     public UUID getId() { return id; }
     public Patient getPatient() { return patient; }
+    public String getPublicContactName() { return publicContactName; }
+    public String getPublicContactPhone() { return publicContactPhone; }
     public User getProfessional() { return professional; }
     public Instant getScheduledAt() { return scheduledAt; }
     public AppointmentStatus getStatus() { return status; }
@@ -67,6 +84,7 @@ public class Appointment {
     public void setScheduledAt(Instant scheduledAt) { this.scheduledAt = scheduledAt; }
     public void setStatus(AppointmentStatus status) { this.status = status; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    public void linkPatient(Patient patient, Instant now) { this.patient = patient; this.updatedAt = now; }
 
     @Override
     public boolean equals(Object object) {

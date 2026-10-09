@@ -91,3 +91,7 @@ databaseChangeLog:
       file: db/changelog/changes/045-appointment-chat-messages-and-notification-outbox.sql
   - include:
       file: db/changelog/changes/046-public-appointment-web-conversation-token.sql
+  - include:
+      file: db/changelog/changes/047-confirm-public-appointments-before-patient-registration.sql
+  - include:
+      file: db/changelog/changes/048-retain-public-conversation-tokens.sql

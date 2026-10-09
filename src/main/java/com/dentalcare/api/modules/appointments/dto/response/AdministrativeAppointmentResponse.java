@@ -12,5 +12,11 @@ public record AdministrativeAppointmentResponse(
         Instant scheduledAt,
         AppointmentStatus status,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        PublicAppointmentRequesterResponse publicContact) {
+    public AdministrativeAppointmentResponse(UUID id, AdministrativeAppointmentPatientResponse patient,
+            AppointmentProfessionalResponse professional, Instant scheduledAt, AppointmentStatus status,
+            Instant createdAt, Instant updatedAt) {
+        this(id, patient, professional, scheduledAt, status, createdAt, updatedAt, null);
+    }
 }

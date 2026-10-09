@@ -489,13 +489,16 @@ source of truth.
 
 `POST /api/v1/public/appointment-requests` is an anonymous intake endpoint separate from contact inquiries and
 from the authenticated patient endpoint. It accepts `Idempotency-Key` as a UUID header and a JSON body with
+required `cui` (exactly 13 digits), used by reception to verify and match or register the patient record. CUI is
+never authentication and is not used to look up or automatically link a patient.
 required `fullName` (1–150 characters), `phone` (7–30 allowed phone characters; 7–15 digits after normalization),
-and `requestedAt` (future ISO-8601 instant). Optional fields are `cui` (13 digits; only used to associate an
-already-existing patient), `email` (valid address, at most 255 characters), `professionalId` (active dentist), and
+and `requestedAt` (future ISO-8601 instant). Optional fields are `email` (valid address, at most 255 characters), `professionalId` (active dentist), and
 `reason` (at most 300 characters; scheduling context only, no symptoms or clinical data). No account or patient
-record is created and the endpoint never searches patients by CUI. A supplied CUI is stored as an unverified
-claim for reception's later identity-verification workflow; it never authenticates the visitor or associates an
-expediente. The anonymous response never confirms whether a CUI exists in DentalCare.
+record is created and the endpoint never searches patients by CUI. The required CUI is stored as an unverified
+claim for reception's later identity-verification workflow; it never authenticates the visitor or auto-associates an
+expediente. After reception verifies identity, the CUI must match an existing patient record or the DPI entered
+when reception registers a new patient, so the request is linked to the correct record before confirmation. The
+anonymous response never confirms whether a CUI exists in DentalCare.
 
 Example request:
 
@@ -550,7 +553,7 @@ audited and returned in administrative `identityVerification`. OTP ownership of 
 proof of legal identity, and CUI alone is not proof either.
 
 For an existing patient, `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
-`{ "patientId": "<uuid>" }`; after staff identity verification, a submitted CUI, when present, must match the
+`{ "patientId": "<uuid>" }`; after staff identity verification, the required submitted CUI must match the
 selected patient's DPI. For a new patient, reception uses
 `POST /api/v1/appointment-requests/{requestId}/register-patient` with the existing `CreatePatientRequest` DTO.
 It requires `PATIENT_CREATE`, all required patient-administration fields (including real DPI, birth date and

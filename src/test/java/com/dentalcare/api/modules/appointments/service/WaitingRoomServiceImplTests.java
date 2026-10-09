@@ -52,6 +52,19 @@ class WaitingRoomServiceImplTests {
     }
 
     @Test
+    void guestAppointmentRequiresInPersonPatientLinkBeforeCheckIn() {
+        Appointment guest = Appointment.forPublicRequest(UUID.randomUUID(), "Visitante", "5555-0198",
+                appointment.getProfessional(), NOW.plusSeconds(3600), NOW);
+        when(users.findById(actor.getId())).thenReturn(Optional.of(actor));
+        when(appointments.findById(guest.getId())).thenReturn(Optional.of(guest));
+
+        assertThatThrownBy(() -> service.checkIn(actor.getId(), guest.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "PATIENT_RECORD_LINK_REQUIRED");
+        verifyNoInteractions(waitingRoom);
+    }
+
+    @Test
     void rejectsDuplicateCancelledAndDifferentClinicDayCheckIn() {
         when(users.findById(actor.getId())).thenReturn(Optional.of(actor));
         when(appointments.findById(appointment.getId())).thenReturn(Optional.of(appointment));

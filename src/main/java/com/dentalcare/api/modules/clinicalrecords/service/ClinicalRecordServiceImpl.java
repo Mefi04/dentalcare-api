@@ -142,7 +142,7 @@ public class ClinicalRecordServiceImpl implements ClinicalRecordService {
         if (request.appointmentId() != null) {
             appointment = appointmentRepository.findById(request.appointmentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
-            if (!appointment.getPatient().getId().equals(patientId)) {
+            if (appointment.getPatient() == null || !appointment.getPatient().getId().equals(patientId)) {
                 throw new BadRequestException("Appointment does not belong to the patient");
             }
         }

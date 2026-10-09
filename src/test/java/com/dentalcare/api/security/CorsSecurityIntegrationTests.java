@@ -122,7 +122,7 @@ class CorsSecurityIntegrationTests {
                         .header("Idempotency-Key", idempotencyKey)
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("""
-                                {"fullName":"Maria Lopez","phone":"5555-0101",
+                                {"fullName":"Maria Lopez","cui":"1234567890123","phone":"5555-0101",
                                  "requestedAt":"2099-10-02T15:00:00Z"}
                                 """))
                 .andExpect(status().isAccepted())
@@ -130,6 +130,30 @@ class CorsSecurityIntegrationTests {
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+    }
+
+    @Test
+    @DisplayName("Public appointment 429 exposes Retry-After to the web frontend")
+    void publicAppointmentRateLimitExposesRetryAfter() throws Exception {
+        when(appointmentRequestService.createPublic(
+                org.mockito.ArgumentMatchers.any(CreatePublicAppointmentRequest.class),
+                org.mockito.ArgumentMatchers.any(UUID.class)))
+                .thenThrow(new com.dentalcare.api.security.ratelimit.RateLimitExceededException(60));
+
+        mockMvc.perform(post("/api/v1/public/appointment-requests")
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .header("Idempotency-Key", UUID.randomUUID())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName":"Maria Lopez","cui":"1234567890123","phone":"5555-0101",
+                                 "requestedAt":"2099-10-02T15:00:00Z"}
+                                """))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "60"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS,
+                        containsString(HttpHeaders.RETRY_AFTER)));
     }
 
     @Test

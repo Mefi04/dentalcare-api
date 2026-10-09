@@ -77,6 +77,32 @@ public class AppointmentServiceImpl implements AppointmentService {
     }
 
     @Override
+    @Transactional
+    public Appointment createPublic(String fullName, String phone, UUID professionalId, Instant scheduledAt) {
+        if (fullName == null || fullName.isBlank() || phone == null || phone.isBlank()) {
+            throw new BadRequestException("Public appointment contact is required");
+        }
+        if (professionalId == null) throw new BadRequestException("Professional id is required");
+        if (scheduledAt == null || !scheduledAt.isAfter(clock.instant())) {
+            throw new BadRequestException("Appointment date and time must be in the future");
+        }
+        User professional = userRepository.findWithRolesById(professionalId)
+                .orElseThrow(() -> new ResourceNotFoundException("Professional not found"));
+        validateDentist(professional);
+        if (appointmentRepository.existsByProfessional_IdAndScheduledAtAndStatus(
+                professionalId, scheduledAt, AppointmentStatus.SCHEDULED)) {
+            throw new ConflictException("Appointment time is not available");
+        }
+        Appointment appointment = Appointment.forPublicRequest(UUID.randomUUID(), fullName, phone,
+                professional, scheduledAt, clock.instant());
+        try {
+            return appointmentRepository.saveAndFlush(appointment);
+        } catch (DataIntegrityViolationException exception) {
+            throw new ConflictException("Appointment time is not available");
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Appointment findById(UUID id) {
         if (id == null) throw new BadRequestException("Appointment id is required");
@@ -94,8 +120,10 @@ public class AppointmentServiceImpl implements AppointmentService {
         appointment.setStatus(AppointmentStatus.CANCELLED);
         appointment.setUpdatedAt(clock.instant());
         Appointment saved = appointmentRepository.saveAndFlush(appointment);
-        notificationPublisher.publish(appointment.getPatient().getId(), NotificationEventType.APPOINTMENT_CANCELLED,
-                "Cita cancelada", "Tu cita fue cancelada. Consulta Mis citas para ver los detalles.");
+        if (appointment.getPatient() != null) {
+            notificationPublisher.publish(appointment.getPatient().getId(), NotificationEventType.APPOINTMENT_CANCELLED,
+                    "Cita cancelada", "Tu cita fue cancelada. Consulta Mis citas para ver los detalles.");
+        }
         return saved;
     }
 
@@ -125,8 +153,10 @@ public class AppointmentServiceImpl implements AppointmentService {
         appointment.setUpdatedAt(clock.instant());
         try {
             Appointment saved = appointmentRepository.saveAndFlush(appointment);
-            notificationPublisher.publish(appointment.getPatient().getId(), NotificationEventType.APPOINTMENT_RESCHEDULED,
-                    "Cita reprogramada", "Tu cita cambió de fecha u hora. Consulta Mis citas para ver los detalles.");
+            if (appointment.getPatient() != null) {
+                notificationPublisher.publish(appointment.getPatient().getId(), NotificationEventType.APPOINTMENT_RESCHEDULED,
+                        "Cita reprogramada", "Tu cita cambió de fecha u hora. Consulta Mis citas para ver los detalles.");
+            }
             return saved;
         } catch (DataIntegrityViolationException exception) {
             throw new ConflictException("Appointment time is not available");

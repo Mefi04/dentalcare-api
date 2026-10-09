@@ -99,10 +99,10 @@ Patient identity comes from the JWT-linked `Patient`; foreign request ids return
 The anonymous `POST /api/v1/public/appointment-requests` endpoint accepts only bounded, non-clinical scheduling
 and contact data, is rate limited by IP, and returns an opaque acknowledgment without patient data or a CUI match
 signal. Conversation verification and message writes are additionally
-rate limited by request identity. Supplied CUI is stored only as a contact snapshot; it is not used to find or link a patient
+rate limited by request identity. Required CUI is stored only as a contact snapshot; it is not used to find or automatically link a patient
 and does not authenticate the requester. No account or patient is automatically created. Contact snapshots are
 exposed only through the staff-authorized appointment-request inbox. Unmatched
-requests must be identity-verified and linked by authorized staff before confirmation. Client retries must reuse
+requests must be identity-verified and linked by authorized staff before confirmation. The required CUI must match the selected patient DPI or reception-entered DPI when registering a new patient. Client retries must reuse
 the UUID idempotency key; a different payload with that key receives only a generic conflict response.
 Only administrators and secretaries can assign/reassign an active dentist on an open public request. Assignment
 is audited and does not reserve a time or transition the request out of its open state.

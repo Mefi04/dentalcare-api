@@ -36,11 +36,13 @@ class AppointmentConversationMessageServiceTests {
     private final AppointmentRequestRepository requests = mock(AppointmentRequestRepository.class);
     private final AppointmentRequestMessageRepository messages = mock(AppointmentRequestMessageRepository.class);
     private final AppointmentPublicConversationRepository conversations = mock(AppointmentPublicConversationRepository.class);
+    private final com.dentalcare.api.modules.appointments.repository.AppointmentPublicConversationTokenRepository retainedTokens =
+            mock(com.dentalcare.api.modules.appointments.repository.AppointmentPublicConversationTokenRepository.class);
     private final UserRepository users = mock(UserRepository.class);
     private final AppointmentNotificationOutboxService outbox = mock(AppointmentNotificationOutboxService.class);
     private final PublicAppointmentCodeDelivery delivery = mock(PublicAppointmentCodeDelivery.class);
     private final AppointmentConversationMessageService service = new AppointmentConversationMessageService(
-            requests, messages, conversations, users, outbox, delivery, Clock.fixed(NOW, ZoneOffset.UTC));
+            requests, messages, conversations, retainedTokens, users, outbox, delivery, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     void scopedTokenCannotReadAnotherRequestConversation() {

@@ -28,7 +28,7 @@ public class PublicAppointmentRequestController {
 
     @PostMapping
     @Operation(summary = "Request a first appointment without an account",
-            description = "Returns a one-time, seven-day conversation bearer token; save it because it cannot be recovered. A retry with the same Idempotency-Key and payload rotates and returns a new token without persisting token material in plaintext. requestedAt is a preference, not a confirmed or reserved appointment. No email/SMS verification is required.")
+            description = "Returns a scoped 30-day conversation bearer token; save it because it cannot be recovered. An authenticated conversation read renews it when fewer than seven days remain. A retry with the same Idempotency-Key and payload rotates and returns a new token without persisting token material in plaintext. requestedAt is a preference, not a confirmed or reserved appointment. DPI is optional at intake and is verified in person before patient registration. No email/SMS verification is required.")
     public ResponseEntity<PublicAppointmentRequestReceipt> create(
             @RequestHeader("Idempotency-Key") UUID idempotencyKey,
             @Valid @RequestBody CreatePublicAppointmentRequest request) {

@@ -74,6 +74,10 @@ public class WaitingRoomServiceImpl implements WaitingRoomService {
         if (appointment.getStatus() != AppointmentStatus.SCHEDULED) {
             throw new ConflictException("Only scheduled appointments can check in");
         }
+        if (appointment.getPatient() == null) {
+            throw new ConflictException("PATIENT_RECORD_LINK_REQUIRED",
+                    "Verify the physical DPI and link or register the patient before check-in");
+        }
         LocalDate appointmentDate = appointment.getScheduledAt().atZone(CLINIC_ZONE).toLocalDate();
         LocalDate today = LocalDate.now(clock.withZone(CLINIC_ZONE));
         if (!appointmentDate.equals(today)) {
