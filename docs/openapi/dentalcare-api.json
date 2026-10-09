@@ -6820,7 +6820,7 @@
         "type" : "http"
       },
       "refreshCookie" : {
-        "description" : "HttpOnly refresh-session cookie used only by web refresh and logout.",
+        "description" : "HttpOnly refresh-session cookie used only by web refresh and logout. Browser clients may use the X-Client-Session-Id header to select a tab-specific cookie.",
         "in" : "cookie",
         "name" : "refreshToken",
         "type" : "apiKey"
@@ -8525,6 +8525,14 @@
     "/api/v1/auth/login" : {
       "post" : {
         "operationId" : "login_1",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Client-Session-Id",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -8605,8 +8613,8 @@
       "post" : {
         "operationId" : "logout_1",
         "parameters" : [ {
-          "in" : "cookie",
-          "name" : "refreshToken",
+          "in" : "header",
+          "name" : "X-Client-Session-Id",
           "required" : false,
           "schema" : {
             "type" : "string"
@@ -9199,8 +9207,8 @@
       "post" : {
         "operationId" : "refresh",
         "parameters" : [ {
-          "in" : "cookie",
-          "name" : "refreshToken",
+          "in" : "header",
+          "name" : "X-Client-Session-Id",
           "required" : false,
           "schema" : {
             "type" : "string"
