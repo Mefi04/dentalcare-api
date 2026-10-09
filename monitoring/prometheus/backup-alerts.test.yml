@@ -106,3 +106,37 @@ tests:
       - eval_time: 6m
         alertname: BackupMonitoringUnavailable
         exp_alerts: [{exp_labels: {severity: critical}}]
+
+  # Completed yesterday/today does not imply the ciphertext still exists.
+  - interval: 1m
+    input_series:
+      - series: dentalcare_backup_last_complete_timestamp_seconds
+        values: '1x10'
+      - series: dentalcare_backup_payload_available
+        values: '1 0 0 1x7'
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: BackupPayloadUnavailable
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: BackupPayloadUnavailable
+        exp_alerts: [{exp_labels: {severity: critical}}]
+      - eval_time: 2m
+        alertname: BackupMissing
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: BackupPayloadUnavailable
+        exp_alerts: []
+    promql_expr_test:
+      - expr: dentalcare_backup_payload_available
+        eval_time: 2m
+        exp_samples: [{labels: 'dentalcare_backup_payload_available', value: 0}]
+      - expr: dentalcare_backup_payload_available
+        eval_time: 3m
+        exp_samples: [{labels: 'dentalcare_backup_payload_available', value: 1}]
+  - interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BackupPayloadUnavailable
+        exp_alerts: [{exp_labels: {severity: critical}}]

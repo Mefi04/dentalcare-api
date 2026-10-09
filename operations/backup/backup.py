@@ -11,6 +11,7 @@ import re
 from pathlib import Path, PurePosixPath
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tarfile
@@ -566,6 +567,20 @@ def restore(identity, bundle=None):
             raise
 
 
+def payload_available():
+    """Presence/size only; integrity and restore verification are separate operations."""
+    try:
+        info = latest(require_payload=False)
+        sets = Path(os.getenv('BACKUP_SETS_PATH', str(ROOT / 'sets')))
+        directory = sets / PurePosixPath(info['file']).parts[1]
+        require(stat.S_ISDIR(sets.lstat().st_mode)
+                and stat.S_ISDIR(directory.lstat().st_mode), 'integrity')
+        payload = (directory / 'backup.age').lstat()
+        return int(stat.S_ISREG(payload.st_mode) and 0 < payload.st_size <= MAX_CIPHER)
+    except (OSError, Failure, KeyError, TypeError):
+        return 0
+
+
 def metrics():
     try:
         s = json.loads((ROOT / 'status.json').read_text())
@@ -590,6 +605,8 @@ def metrics():
         if field == 'last_result' and value not in (0, 1):
             value = 0
         lines += [f'# TYPE dentalcare_backup_{metric} gauge', f'dentalcare_backup_{metric} {value}']
+    lines += ['# TYPE dentalcare_backup_payload_available gauge',
+              f'dentalcare_backup_payload_available {payload_available()}']
     lines.append('# TYPE dentalcare_backup_failures_total counter')
     for stage in STAGES:
         failures = s.get('failures', {})

@@ -6,7 +6,7 @@ Executed locally on **2026-10-09**, branch
 No Supabase database, clinical R2 bucket, real document or external notification service
 was accessed by the backup laboratory. No commit, push, merge or PR was created.
 
-## Executed results
+## Executed results — phase-1 baseline (before availability follow-up)
 
 | Verification | Actual result |
 |---|---|
@@ -141,7 +141,7 @@ ambiguous commit. No clinical service behavior was changed. The proposed minimal
 separate-ticket recommendation are in `BACKUP-RECOVERY.md`.
 
 The document adapter is a local synthetic object store matching backend keys, not a real
-S3/R2 integration. The lab uses small fixtures and bounded in-memory payloads. Format 2 rejects older phase-1 sets. Completed sets are immutable to the operator but not to Docker/root administrators; latest-reference atomicity depends on filesystem guarantees. Failure after rename but before directory fsync has an ambiguous durability outcome. There is no historical pruning or automatic orphan selection. A metadata-only exporter cannot independently verify ciphertext availability; periodic restore verification and storage supervision remain necessary. Source data has no
+S3/R2 integration. The lab uses small fixtures and bounded in-memory payloads. Format 2 rejects older phase-1 sets. Completed sets are immutable to the operator but not to Docker/root administrators; latest-reference atomicity depends on filesystem guarantees. Failure after rename but before directory fsync has an ambiguous durability outcome. There is no historical pruning or automatic orphan selection. The phase-1 baseline metadata-only exporter could not verify ciphertext availability. The availability follow-up below adds a separate read-only ciphertext mount and presence metric; periodic restore verification remains necessary. Source data has no
 independent historic hash; an already-corrupt same-size original cannot be diagnosed by a
 newly calculated hash alone. PostgreSQL/filesystem publication is not a distributed
 transaction. The lab restores without original owners/ACLs and runs no application workers.
@@ -158,3 +158,52 @@ and explicit handling of restored conversation credentials and notification outb
 
 **Verdict: APROBABLE for the authorized synthetic phase 1. Not authorized or certified for
 real clinical backup/restore.**
+
+## Ciphertext availability follow-up — PR #164
+
+New executions on 2026-10-09, without real Supabase/R2 access:
+
+| Check | Executed result |
+|---|---|
+| Baseline reproduction, before correction | Valid synthetic encrypted set temporarily removed from its referenced pathname; exported metrics unchanged; restore selection rejected missing ciphertext; file restored in finally |
+| Full `run-lab.ps1`, after correction | Exit 0; 45 tests, 0 failures/errors |
+| Real HTTP exporter observation | Presence 1 → missing 0 → recovered 1; historical completion timestamp unchanged |
+| Independent restore | 66 tables, 1 document, 1 metadata-only record; 8.904 seconds under the previously documented measurement conditions |
+| Promtool existing alerts and backup alerts | Both SUCCESS; seven backup alerts now include payload availability, absent series and recovery |
+| Dashboard | JSON and instant query/mappings validated; PromQL fixture evaluates 0 when missing and 1 after recovery |
+| Optional Compose configuration | Synthetic placeholders; metadata and encrypted sets mounted separately read-only; exporter/Prometheus no host ports; Grafana loopback preserved |
+| Diff/cleanup | Whitespace check passed; no remaining laboratory containers, volumes, networks or temporary credential files |
+
+Sanitized evidence:
+
+```json
+{"event":"availability_baseline","ciphertext_missing":true,"metrics_unchanged":true,"restore_selection_rejected":true}
+{"event":"payload_availability_verified","present_missing_recovered":[1,0,1],"completion_timestamp_preserved":true}
+{"event":"backup_tests_completed","tests":45,"failures":0,"errors":0,"failed_tests":[]}
+```
+
+New tests 44–45 use the actual valid encrypted baseline set. They remove its referenced
+pathname temporarily and restore it in finally, exercise the real private HTTP endpoint,
+check rejection by restore selection, check recovery, reject symlink/empty payloads and
+exercise the separate metadata/ciphertext mounts. A guard rejects hashing from the
+availability probe. The implementation uses filesystem metadata only during scrapes.
+
+`BackupMissing` deliberately remains clear when historical completion metadata exists.
+`BackupPayloadUnavailable` becomes critical after one minute of zero/absent availability
+and clears when the file returns. `last_restore_timestamp_seconds` remains historical;
+it does not establish current restorability or identify the latest set. The dashboard's
+presence panel uses an instant query and labels absent values as Unobserved.
+
+The Grafana UI and full application stack were not started in this follow-up; dashboard
+verification covers JSON, query results and value mappings, not browser rendering or
+notification delivery. Maven/backend Docker Build were not rerun because no Java, Maven,
+backend Dockerfile or business logic changed; the affected operator image was rebuilt by
+the laboratory. Prior phase-1 Maven results above are historical, not new executions.
+
+Presence does not establish cryptographic integrity: same-size corruption or a wrong
+identity still requires explicit verification/restoration. An unavailable or mismatched
+mount yields zero. Mount only the paired encrypted sets, not plaintext laboratory state.
+No decryption key is exposed to the exporter. This increases ciphertext visibility to that
+private service but does not expose a public port. No commit, push or merge was performed.
+
+**Follow-up verdict: APROBABLE for synthetic phase 1; not production certification.**

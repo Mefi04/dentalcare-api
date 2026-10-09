@@ -528,3 +528,63 @@ b.main()
                 with self.assertRaises(b.Failure):
                     b.latest_bundle()
                 self.assertNotIn('sets/', b.metrics())
+
+    def test_44_missing_payload_http_and_recovery(self):
+        path = b.latest_bundle()
+        held = path.with_name('temporarily-held.age')
+        process = subprocess.Popen(['python3', '/opt/backup/backup.py', 'serve'],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        def scrape():
+            with urllib.request.urlopen('http://127.0.0.1:8000/metrics', timeout=1) as response:
+                return response.read().decode()
+        try:
+            for _ in range(50):
+                try:
+                    present = scrape()
+                    break
+                except (OSError, urllib.error.URLError):
+                    time.sleep(0.1)
+            else:
+                self.fail('Exporter did not start')
+            self.assertIn('dentalcare_backup_payload_available 1', present)
+            path.rename(held)
+            missing = scrape()
+            self.assertIn('dentalcare_backup_payload_available 0', missing)
+            historical = f'dentalcare_backup_last_complete_timestamp_seconds {self.previous}'
+            self.assertIn(historical, missing)
+            with self.assertRaises(b.Failure):
+                b.latest_bundle()
+            held.rename(path)
+            self.assertIn('dentalcare_backup_payload_available 1', scrape())
+            with patch.object(b, 'file_sha', side_effect=AssertionError('scrape must not hash')):
+                self.assertEqual(1, b.payload_available())
+            print(json.dumps({'event': 'payload_availability_verified', 'present_missing_recovered': [1, 0, 1],
+                              'completion_timestamp_preserved': True}))
+        finally:
+            if held.exists():
+                held.rename(path)
+            process.terminate()
+            process.communicate(timeout=10)
+
+    def test_45_separate_ciphertext_mount_and_invalid_payload(self):
+        path = b.latest_bundle()
+        with tempfile.TemporaryDirectory(dir='/work') as directory:
+            metadata = Path(directory)
+            for name in ('status.json', 'latest.json'):
+                shutil.copyfile(b.ROOT / name, metadata / name)
+            sets = b.ROOT / 'sets'
+            with patch.object(b, 'ROOT', metadata), patch.dict(os.environ, {'BACKUP_SETS_PATH': str(sets)}):
+                self.assertEqual(1, b.payload_available())
+                held = path.with_name('temporarily-held.age')
+                path.rename(held)
+                try:
+                    path.symlink_to(held)
+                    self.assertEqual(0, b.payload_available())
+                    path.unlink()
+                    path.touch()
+                    self.assertEqual(0, b.payload_available())
+                    path.unlink()
+                finally:
+                    path.unlink(missing_ok=True)
+                    held.rename(path)
+                self.assertEqual(1, b.payload_available())

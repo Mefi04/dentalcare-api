@@ -1,4 +1,4 @@
-# Backup and recovery — issue #150, phase 1
+# Backup and recovery â€” issue #150, phase 1
 
 ## Scope and safety boundary
 
@@ -77,7 +77,7 @@ The controlled laboratory has no concurrent application writers. Canonical table
 constraint definitions and sequence values are compared around capture and after restore.
 These comparisons detect changed data but do not replace write coordination in a real
 multi-writer system. A future real procedure must pause every writer and drain in-flight
-uploads/jobs for a coordinated PostgreSQL–R2 cut. A PostgreSQL snapshot alone cannot
+uploads/jobs for a coordinated PostgreSQLâ€“R2 cut. A PostgreSQL snapshot alone cannot
 provide an atomic R2 backup.
 
 The encrypted tar bundle contains `database.dump`, numbered object payloads and
@@ -233,6 +233,7 @@ The existing #149 stack remains unchanged unless the optional override is select
 
 ```powershell
 # Set BACKUP_STATUS_DIRECTORY to an absolute directory containing ONLY sanitized status.json and latest.json metadata.
+# Set BACKUP_SETS_DIRECTORY to the matching sets directory containing ONLY encrypted sets.
 docker compose -f docker-compose.yml -f operations/backup/compose.monitoring.yml `
   --profile monitoring --profile backup-monitoring up -d --build
 ```
@@ -240,7 +241,9 @@ docker compose -f docker-compose.yml -f operations/backup/compose.monitoring.yml
 This command starts the normal API stack and therefore needs its normal authorized
 configuration. It is **not** part of the synthetic laboratory launcher. Do not run it
 against real providers for this phase. The private exporter has no published port and
-receives only a read-only metadata directory, no database/object credentials or keys.
+receives a read-only metadata directory plus a separate read-only encrypted-sets directory,
+no plaintext documents, database/object credentials or decryption keys. Both mounts must
+refer to the same laboratory publication. Do not mount the entire laboratory state volume.
 Prometheus scrapes it over the Docker network. Existing Actuator isolation and Grafana
 authentication/loopback exposure are preserved. Grafana provisions an additional backup
 dashboard using the existing Prometheus datasource.
@@ -251,12 +254,32 @@ survives an exporter restart if its directory persists. Concurrent lock rejectio
 safely rewrite the status owned by another writer and is returned as a fixed error stage.
 The exporter whitelists numeric fields; it never exports arbitrary status content.
 The latest reference is the authoritative complete-backup marker, independent of attempt
-status. Persist both sanitized JSON files in the exporter directory; never mount sets,
-objects or keys into that service. A missing/corrupt reference exposes zero freshness.
+status. Persist both sanitized JSON files in the exporter directory; mount only the matching
+encrypted sets separately at `/backup-sets`. Never mount plaintext objects or keys.
+A missing/corrupt reference exposes zero freshness.
 
-Six optional alerts cover: missing complete backup (5 minutes), failed operation,
+Three signals have different meanings:
+
+- `last_complete_timestamp_seconds`: historical completion time from the latest reference;
+  removing ciphertext does not rewrite history. `BackupMissing` covers missing completion metadata.
+- `payload_available`: current presence of a regular, nonempty ciphertext within the size
+  ceiling. Each scrape uses only bounded filesystem metadata checks; no archive read, hash
+  or decryption. Missing/inaccessible mounts, missing files, symlinks and invalid sizes report
+  zero. A valid file returns one again after recovery without modifying history.
+- `last_restore_timestamp_seconds`: historical successful isolated restore rehearsal. It
+  does not certify that the latest set remains intact or is the same set that was rehearsed.
+
+The dashboard shows these signals separately. Presence does not prove integrity, producer
+identity, correct keys or restorability: same-size corruption remains a restore-validation
+concern. Periodic isolated restoration is still required. The exporter can inspect encrypted
+bytes through its read-only mount, but has no decryption identity; encrypted metadata is
+additional exposure, so keep the service private and the mount limited to ciphertext.
+
+Seven optional alerts cover: missing complete backup (5 minutes), failed operation,
 age over 26 hours (warning), age over 48 hours (critical), restore verification older than
-30 days or absent (5 minutes), and unavailable/absent exporter (1 minute). A failure timestamp is persisted on each observed failure and survives immediate success
+30 days or absent (5 minutes), unavailable/absent exporter (1 minute), and missing/invalid ciphertext or absent availability
+series (1 minute). `BackupPayloadUnavailable` fires independently of historical completion
+and resolves when the payload becomes available again. A failure timestamp is persisted on each observed failure and survives immediate success
 and exporter restart. The failure alert stays observable for five minutes even if the failure
 and success both preceded the first scrape; an unsuccessful latest operation also keeps it
 firing. Recovery follows successful operation plus expiry of that window. A backup success does not fabricate a successful

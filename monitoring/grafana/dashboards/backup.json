@@ -2,7 +2,7 @@
   "uid": "dentalcare-backup",
   "title": "DentalCare backup laboratory",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "15s",
   "time": {
     "from": "now-6h",
@@ -28,7 +28,8 @@
           "expr": "time() - dentalcare_backup_last_complete_timestamp_seconds",
           "refId": "A"
         }
-      ]
+      ],
+      "description": "Historical completion time; does not prove ciphertext presence or current restorability."
     },
     {
       "id": 2,
@@ -91,7 +92,8 @@
           "expr": "time() - dentalcare_backup_last_restore_timestamp_seconds",
           "refId": "A"
         }
-      ]
+      ],
+      "description": "Historical successful restore rehearsal; not a current integrity guarantee for the latest set."
     },
     {
       "id": 5,
@@ -113,6 +115,65 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Latest ciphertext available (presence only)",
+      "description": "1 = regular nonempty file within size limit; 0 = missing, invalid or inaccessible. No hash/decryption is performed.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "dentalcare_backup_payload_available",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Unavailable",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Present (not integrity verified)",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "noValue": "Unobserved"
+        },
+        "overrides": []
+      }
     }
   ]
 }
