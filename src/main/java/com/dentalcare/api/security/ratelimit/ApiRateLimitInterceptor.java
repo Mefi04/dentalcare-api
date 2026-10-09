@@ -61,6 +61,15 @@ public class ApiRateLimitInterceptor implements HandlerInterceptor {
     }
 
     private RateLimitPolicy determinePolicy(String method, String path) {
+        if ("POST".equalsIgnoreCase(method)
+                && path.matches("^/api/v1/patients/[^/]+/documents/upload$")) {
+            return RateLimitPolicy.CLINICAL_DOCUMENT_UPLOAD;
+        }
+        if ("GET".equalsIgnoreCase(method) && path.endsWith("/download")
+                && (path.matches("^/api/v1/patients/[^/]+/documents/[^/]+/download$")
+                || path.matches("^/api/v1/patients/me/documents/[^/]+/download$"))) {
+            return RateLimitPolicy.CLINICAL_DOCUMENT_DOWNLOAD;
+        }
         if (path.startsWith("/api/v1/reports")) {
             return RateLimitPolicy.REPORTS;
         }

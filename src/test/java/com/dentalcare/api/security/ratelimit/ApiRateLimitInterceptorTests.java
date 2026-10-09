@@ -39,4 +39,21 @@ class ApiRateLimitInterceptorTests {
         assertTrue(result);
         verify(service, never()).checkIp(any(), any());
     }
+
+    @Test
+    void appliesSpecificPoliciesToClinicalDocumentTransferRoutes() throws Exception {
+        RateLimitService service = mock(RateLimitService.class);
+        ApiRateLimitInterceptor interceptor = new ApiRateLimitInterceptor(service);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockHttpServletRequest upload = new MockHttpServletRequest(
+                "POST", "/api/v1/patients/p1/documents/upload");
+        MockHttpServletRequest download = new MockHttpServletRequest(
+                "GET", "/api/v1/patients/me/documents/d1/download");
+
+        interceptor.preHandle(upload, response, new Object());
+        interceptor.preHandle(download, response, new Object());
+
+        verify(service).checkIp(RateLimitPolicy.CLINICAL_DOCUMENT_UPLOAD, upload);
+        verify(service).checkIp(RateLimitPolicy.CLINICAL_DOCUMENT_DOWNLOAD, download);
+    }
 }

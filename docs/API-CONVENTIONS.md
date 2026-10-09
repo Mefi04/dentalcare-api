@@ -449,6 +449,16 @@ under the current stateless architecture and expire according to the normal shor
 
 ## Clinical documents endpoints
 
+Clinical-document upload errors use `413 Payload Too Large` for configured or observed size violations,
+`415 Unsupported Media Type` for MIME/extension violations, `422 Unprocessable Entity` for corrupt or truncated
+content, and `429 Too Many Requests` with `Retry-After` for frequency or concurrency saturation. Upload and
+download thresholds are deployment configuration, not client-controlled values.
+
+Private web and mobile clients must treat `413` as the standard response for every oversized multipart request
+(previous clients may have mapped this condition to `400`), must not automatically retry the same file after
+`415` or `422`, and should honor `Retry-After` before retrying a `429`. The multipart field names and successful
+upload/download response contracts are unchanged.
+
 Endpoints for managing patient clinical document metadata:
 
 | Method | Path | Authorization | Success | Notes |

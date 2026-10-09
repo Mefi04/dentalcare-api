@@ -119,6 +119,27 @@ user and server timestamp. `/api/v1/patients/me/documents/**` resolves the patie
 owned documents whose visibility is enabled, and uses an indistinguishable `404` for private, foreign, and unknown
 identifiers. Download authorization is checked before accessing the private R2 object, and storage keys are never
 included in patient responses.
+
+Clinical document uploads accept only PDF, JPEG, and PNG files up to the configured 10 MB default. Validation
+normalizes the filename, checks MIME/extension agreement, and streams the content through bounded buffers. PDF
+validation checks version, objects, catalog, cross-reference target, trailer/root and EOF; JPEG validation walks
+marker segment lengths through scan data and EOI; PNG validation walks chunk lengths and verifies IHDR, CRCs and
+final IEND. These structural checks are not antimalware analysis. The bytes consumed by R2 are counted again and
+must exactly match the validated multipart size. Files are spooled by the servlet instead of being retained in
+application heap. Invalid size, unsupported
+type, corrupt content, and throttling return 413, 415, 422, and 429 respectively.
+
+Upload and download frequency reuse the shared PostgreSQL-backed rate limiter. Separate configurable per-instance
+semaphores bound simultaneous R2 transfers; these concurrency limits are intentionally not distributed. R2 calls
+have explicit attempt and total timeouts. Downloads are attachments with `Cache-Control: no-store, private` and
+`X-Content-Type-Options: nosniff`. The application does not claim antimalware scanning or quarantine; no scanner or
+paid external service is part of this implementation.
+
+R2 and PostgreSQL cannot participate in one atomic transaction. An uploaded object is therefore registered for
+compensating deletion whenever the database transaction does not commit, including failures after the metadata
+flush. Cleanup is best effort and deliberately logs neither patient identifiers nor object keys. Operations must
+still monitor cleanup failures because an unavailable R2 service can leave an object requiring operational
+reconciliation.
 Staff responsible for processing and check-in also comes exclusively from JWT.
 
 ## Settings permission matrix
