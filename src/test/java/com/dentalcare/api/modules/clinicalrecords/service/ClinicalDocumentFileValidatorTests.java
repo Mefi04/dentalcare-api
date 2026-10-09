@@ -7,6 +7,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.zip.CRC32;
+import java.util.zip.DeflaterOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,7 +27,7 @@ class ClinicalDocumentFileValidatorTests {
     @Test
     @DisplayName("Valid PDF file with %PDF magic bytes passes validation")
     void validPdfPassesValidation() {
-        byte[] pdfBytes = "%PDF-1.4 test content".getBytes(StandardCharsets.UTF_8);
+        byte[] pdfBytes = validPdf();
         MockMultipartFile file = new MockMultipartFile(
                 "file", "radiography.pdf", "application/pdf", pdfBytes);
 
@@ -33,7 +37,7 @@ class ClinicalDocumentFileValidatorTests {
     @Test
     @DisplayName("Valid JPEG file with 0xFF 0xD8 magic bytes passes validation")
     void validJpegPassesValidation() {
-        byte[] jpegBytes = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10};
+        byte[] jpegBytes = validJpeg();
         MockMultipartFile file = new MockMultipartFile(
                 "file", "photo.jpg", "image/jpeg", jpegBytes);
 
@@ -43,7 +47,7 @@ class ClinicalDocumentFileValidatorTests {
     @Test
     @DisplayName("Valid PNG file with 0x89 PNG magic bytes passes validation")
     void validPngPassesValidation() {
-        byte[] pngBytes = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+        byte[] pngBytes = validPng();
         MockMultipartFile file = new MockMultipartFile(
                 "file", "capture.png", "image/png", pngBytes);
 
@@ -156,5 +160,88 @@ class ClinicalDocumentFileValidatorTests {
         assertThatThrownBy(() -> validator.validate(file))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("File content does not match PDF format");
+    }
+
+    @Test
+    void markerOnlyPdfIsRejected() {
+        assertThatThrownBy(() -> validator.validate(file("fake.pdf", "application/pdf",
+                "%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\nstartxref\n9\n%%EOF".getBytes(StandardCharsets.US_ASCII))))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void markerOnlyAndTruncatedJpegAreRejected() {
+        assertThatThrownBy(() -> validator.validate(file("fake.jpg", "image/jpeg",
+                new byte[]{(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xd9})))
+                .isInstanceOf(BadRequestException.class);
+        byte[] truncated = validJpeg();
+        assertThatThrownBy(() -> validator.validate(file("truncated.jpg", "image/jpeg",
+                java.util.Arrays.copyOf(truncated, truncated.length - 1))))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void pngWithoutIhdrAndPngWithBadCrcAreRejected() {
+        byte[] markerOnly = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+                0, 0, 0, 0, 'I', 'E', 'N', 'D', (byte) 0xae, 0x42, 0x60, (byte) 0x82};
+        assertThatThrownBy(() -> validator.validate(file("fake.png", "image/png", markerOnly)))
+                .isInstanceOf(BadRequestException.class);
+        byte[] badCrc = validPng();
+        badCrc[badCrc.length - 1] ^= 1;
+        assertThatThrownBy(() -> validator.validate(file("bad.png", "image/png", badCrc)))
+                .isInstanceOf(BadRequestException.class);
+    }
+
+    private MockMultipartFile file(String name, String type, byte[] content) {
+        return new MockMultipartFile("file", name, type, content);
+    }
+
+    private static byte[] validPdf() {
+        String objects = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+                + "2 0 obj\n<< /Type /Pages /Count 0 /Kids [] >>\nendobj\n";
+        int xref = objects.getBytes(StandardCharsets.US_ASCII).length;
+        String references = "xref\n0 3\n0000000000 65535 f \n0000000009 00000 n \n0000000062 00000 n \n"
+                + "trailer\n<< /Size 3 /Root 1 0 R >>\nstartxref\n" + xref + "\n%%EOF\n";
+        return (objects + references).getBytes(StandardCharsets.US_ASCII);
+    }
+
+    private static byte[] validJpeg() {
+        return new byte[]{
+                (byte) 0xff, (byte) 0xd8,
+                (byte) 0xff, (byte) 0xc0, 0, 11, 8, 0, 1, 0, 1, 1, 1, 0x11, 0,
+                (byte) 0xff, (byte) 0xda, 0, 8, 1, 1, 0, 0, 63, 0,
+                0,
+                (byte) 0xff, (byte) 0xd9};
+    }
+
+    private static byte[] validPng() {
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            output.write(new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a});
+            writeChunk(output, "IHDR", new byte[]{0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0});
+            ByteArrayOutputStream compressed = new ByteArrayOutputStream();
+            try (DeflaterOutputStream deflater = new DeflaterOutputStream(compressed)) {
+                deflater.write(new byte[]{0, 0, 0, 0});
+            }
+            writeChunk(output, "IDAT", compressed.toByteArray());
+            writeChunk(output, "IEND", new byte[0]);
+            return output.toByteArray();
+        } catch (IOException exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private static void writeChunk(ByteArrayOutputStream output, String type, byte[] data) throws IOException {
+        output.write(new byte[]{(byte) (data.length >>> 24), (byte) (data.length >>> 16),
+                (byte) (data.length >>> 8), (byte) data.length});
+        byte[] typeBytes = type.getBytes(StandardCharsets.US_ASCII);
+        output.write(typeBytes);
+        output.write(data);
+        CRC32 crc = new CRC32();
+        crc.update(typeBytes);
+        crc.update(data);
+        long value = crc.getValue();
+        output.write(new byte[]{(byte) (value >>> 24), (byte) (value >>> 16),
+                (byte) (value >>> 8), (byte) value});
     }
 }

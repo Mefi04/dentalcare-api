@@ -30,6 +30,21 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(PayloadTooLargeException.class)
+    ResponseEntity<ApiErrorResponse> handlePayloadTooLarge(PayloadTooLargeException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(UnsupportedMediaTypeException.class)
+    ResponseEntity<ApiErrorResponse> handleUnsupportedMediaType(UnsupportedMediaTypeException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(UnprocessableEntityException.class)
+    ResponseEntity<ApiErrorResponse> handleUnprocessableEntity(UnprocessableEntityException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     ResponseEntity<ApiErrorResponse> handleNotFound(ResourceNotFoundException exception, HttpServletRequest request) {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
@@ -53,8 +68,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageException.class)
     ResponseEntity<ApiErrorResponse> handleDocumentStorage(
             com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentStorageException exception, HttpServletRequest request) {
-        LOGGER.error("Document storage failure while processing {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage(), exception);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, exception.getMessage(), request, Map.of());
+        LOGGER.error("Document storage operation failed while processing {} {}: {}",
+                request.getMethod(), request.getRequestURI(), exception.getClass().getSimpleName());
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Failed to process clinical document storage operation", request, Map.of());
     }
 
     @ExceptionHandler(ConflictException.class)
@@ -122,7 +139,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
     ResponseEntity<ApiErrorResponse> handleMaxUploadSizeExceeded(
             org.springframework.web.multipart.MaxUploadSizeExceededException exception, HttpServletRequest request) {
-        return buildResponse(HttpStatus.BAD_REQUEST, "File size exceeds the configured maximum upload limit", request, Map.of());
+        return buildResponse(HttpStatus.PAYLOAD_TOO_LARGE, "File size exceeds the configured maximum upload limit", request, Map.of());
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})

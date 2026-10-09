@@ -35,6 +35,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -55,6 +57,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class ClinicalDocumentServiceImplTests {
@@ -83,6 +86,11 @@ class ClinicalDocumentServiceImplTests {
                 fileValidator,
                 clock
         );
+        lenient().when(fileValidator.validate(any())).thenAnswer(invocation -> {
+            org.springframework.web.multipart.MultipartFile file = invocation.getArgument(0);
+            return new ValidatedClinicalDocumentFile(
+                    file.getOriginalFilename(), file.getContentType(), file.getSize());
+        });
     }
 
     @Test
@@ -452,6 +460,41 @@ class ClinicalDocumentServiceImplTests {
 
         // Compensating delete MUST be executed with the exact generated key
         verify(clinicalDocumentStorage).delete(generatedKey);
+    }
+
+    @Test
+    @DisplayName("uploadDocument removes the R2 object when the transaction rolls back after flush")
+    void uploadDocument_whenTransactionRollsBackAfterFlush_executesCompensatingDelete() {
+        UUID patientId = UUID.randomUUID();
+        UUID authUserId = UUID.randomUUID();
+        Patient patient = new Patient();
+        patient.setId(patientId);
+        User author = new User();
+        author.setId(authUserId);
+        author.setStatus(UserStatus.ACTIVE);
+        when(patientRepository.findById(patientId)).thenReturn(Optional.of(patient));
+        when(userRepository.findById(authUserId)).thenReturn(Optional.of(author));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "doc.pdf", "application/pdf", "%PDF-1.4\n%%EOF".getBytes(StandardCharsets.UTF_8));
+        UploadClinicalDocumentRequest request = new UploadClinicalDocumentRequest(
+                file, "Titulo", ClinicalDocumentType.OTHER, null, null);
+        String key = "patients/" + patientId + "/documents/rollback.pdf";
+        when(clinicalDocumentStorage.store(any())).thenReturn(
+                new StoredDocument(key, "doc.pdf", file.getSize(), "application/pdf"));
+        when(clinicalDocumentRepository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponse(any())).thenReturn(mock(ClinicalDocumentResponse.class));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.uploadDocument(patientId, request, authUserId);
+            TransactionSynchronizationManager.getSynchronizations().forEach(
+                    synchronization -> synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        verify(clinicalDocumentStorage).delete(key);
     }
 
     @Test

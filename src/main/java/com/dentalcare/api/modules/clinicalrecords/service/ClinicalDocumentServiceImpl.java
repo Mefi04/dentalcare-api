@@ -31,6 +31,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -126,7 +128,7 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
             throw new BadRequestException("Upload request is required");
         }
 
-        fileValidator.validate(request.file());
+        ValidatedClinicalDocumentFile validatedFile = fileValidator.validate(request.file());
 
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new ResourceNotFoundException("Patient not found"));
@@ -147,16 +149,18 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
         try (InputStream is = request.file().getInputStream()) {
             UploadDocumentCommand uploadCommand = new UploadDocumentCommand(
                     patientId,
-                    request.file().getOriginalFilename(),
-                    request.file().getContentType(),
-                    request.file().getSize(),
+                    validatedFile.fileName(),
+                    validatedFile.contentType(),
+                    validatedFile.fileSize(),
                     is
             );
             stored = clinicalDocumentStorage.store(uploadCommand);
         } catch (IOException e) {
-            LOGGER.error("Failed to read upload file stream for patient {}", patientId, e);
+            LOGGER.warn("Could not open validated clinical document upload stream");
             throw new BadRequestException("Failed to read uploaded file");
         }
+
+        boolean cleanupRegistered = registerRollbackCleanup(stored.storageObjectKey());
 
         ClinicalDocument document = new ClinicalDocument(
                 UUID.randomUUID(),
@@ -178,13 +182,8 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
         try {
             saved = clinicalDocumentRepository.saveAndFlush(document);
         } catch (Exception e) {
-            LOGGER.error("Database persistence failed after storing document in R2. Executing compensating delete for key: {}", stored.storageObjectKey(), e);
-            try {
-                clinicalDocumentStorage.delete(stored.storageObjectKey());
-            } catch (Exception deleteException) {
-                LOGGER.error("CRITICAL: Compensating delete failed for orphaned R2 object with key: {}. Cause: {}",
-                        stored.storageObjectKey(), deleteException.getMessage());
-            }
+            LOGGER.error("Clinical document metadata persistence failed after object upload");
+            if (!cleanupRegistered) compensateStorage(stored.storageObjectKey());
             throw e;
         }
 
@@ -351,6 +350,26 @@ public class ClinicalDocumentServiceImpl implements ClinicalDocumentService {
     private static void requireId(UUID id, String message) {
         if (id == null) {
             throw new BadRequestException(message);
+        }
+    }
+
+    private boolean registerRollbackCleanup(String storageObjectKey) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return false;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != TransactionSynchronization.STATUS_COMMITTED) compensateStorage(storageObjectKey);
+            }
+        });
+        return true;
+    }
+
+    private void compensateStorage(String storageObjectKey) {
+        try {
+            clinicalDocumentStorage.delete(storageObjectKey);
+        } catch (RuntimeException cleanupFailure) {
+            LOGGER.error("Clinical document rollback cleanup failed: {}",
+                    cleanupFailure.getClass().getSimpleName());
         }
     }
 }

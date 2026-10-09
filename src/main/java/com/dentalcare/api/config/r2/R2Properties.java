@@ -3,6 +3,7 @@ package com.dentalcare.api.config.r2;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
@@ -15,6 +16,8 @@ public class R2Properties {
     private String endpoint = "";
     private String accessKeyId = "";
     private String secretAccessKey = "";
+    private Duration apiCallTimeout = Duration.ofSeconds(30);
+    private Duration apiCallAttemptTimeout = Duration.ofSeconds(15);
 
     public void validateRequiredWhenEnabled() {
         if (!enabled) {
@@ -36,6 +39,11 @@ public class R2Properties {
         }
 
         validateEndpoint();
+        if (apiCallTimeout == null || apiCallTimeout.isZero() || apiCallTimeout.isNegative()
+                || apiCallAttemptTimeout == null || apiCallAttemptTimeout.isZero() || apiCallAttemptTimeout.isNegative()
+                || apiCallAttemptTimeout.compareTo(apiCallTimeout) > 0) {
+            throw new IllegalStateException("R2 timeouts must be positive and attempt timeout must not exceed call timeout");
+        }
     }
 
     private void validateEndpoint() {
@@ -104,4 +112,9 @@ public class R2Properties {
     public void setSecretAccessKey(String secretAccessKey) {
         this.secretAccessKey = secretAccessKey;
     }
+
+    public Duration getApiCallTimeout() { return apiCallTimeout; }
+    public void setApiCallTimeout(Duration apiCallTimeout) { this.apiCallTimeout = apiCallTimeout; }
+    public Duration getApiCallAttemptTimeout() { return apiCallAttemptTimeout; }
+    public void setApiCallAttemptTimeout(Duration apiCallAttemptTimeout) { this.apiCallAttemptTimeout = apiCallAttemptTimeout; }
 }

@@ -50,6 +50,20 @@ class GlobalExceptionHandlerTests {
     }
 
     @Test
+    void returnsExpectedClinicalDocumentUploadStatuses() throws Exception {
+        mockMvc.perform(get("/test/errors/payload-too-large")).andExpect(status().isPayloadTooLarge());
+        mockMvc.perform(get("/test/errors/unsupported-media")).andExpect(status().isUnsupportedMediaType());
+        mockMvc.perform(get("/test/errors/unprocessable")).andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void returns413ForMultipartLimitRegardlessOfCallingModule() throws Exception {
+        mockMvc.perform(get("/test/errors/multipart-too-large"))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.message").value("File size exceeds the configured maximum upload limit"));
+    }
+
+    @Test
     void returnsNotFoundResponse() throws Exception {
         mockMvc.perform(get("/test/errors/not-found"))
                 .andExpect(status().isNotFound())
@@ -122,6 +136,20 @@ class GlobalExceptionHandlerTests {
         @GetMapping("/bad-request")
         void badRequest() {
             throw new BadRequestException("Invalid request");
+        }
+
+        @GetMapping("/payload-too-large")
+        void payloadTooLarge() { throw new PayloadTooLargeException("too large"); }
+
+        @GetMapping("/unsupported-media")
+        void unsupportedMedia() { throw new UnsupportedMediaTypeException("unsupported"); }
+
+        @GetMapping("/unprocessable")
+        void unprocessable() { throw new UnprocessableEntityException("corrupt"); }
+
+        @GetMapping("/multipart-too-large")
+        void multipartTooLarge() {
+            throw new org.springframework.web.multipart.MaxUploadSizeExceededException(1024L);
         }
 
         @GetMapping("/not-found")

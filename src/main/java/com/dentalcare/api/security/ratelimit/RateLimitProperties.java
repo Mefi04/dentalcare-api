@@ -21,6 +21,8 @@ public class RateLimitProperties {
     @Valid private Rule publicAppointmentRequest = new Rule(Duration.ofMinutes(15), 5, 0);
     @Valid private Rule apiRead = new Rule(Duration.ofMinutes(1), 600, 300);
     @Valid private Rule apiWrite = new Rule(Duration.ofMinutes(1), 100, 50);
+    @Valid private Rule clinicalDocumentUpload = new Rule(Duration.ofMinutes(1), 40, 20);
+    @Valid private Rule clinicalDocumentDownload = new Rule(Duration.ofMinutes(1), 240, 120);
     @Valid private Rule reports = new Rule(Duration.ofMinutes(1), 30, 15);
 
     public boolean isEnabled() { return enabled; }
@@ -41,6 +43,10 @@ public class RateLimitProperties {
     public void setApiWrite(Rule apiWrite) { this.apiWrite = apiWrite; }
     public Rule getReports() { return reports; }
     public void setReports(Rule reports) { this.reports = reports; }
+    public Rule getClinicalDocumentUpload() { return clinicalDocumentUpload; }
+    public void setClinicalDocumentUpload(Rule value) { this.clinicalDocumentUpload = value; }
+    public Rule getClinicalDocumentDownload() { return clinicalDocumentDownload; }
+    public void setClinicalDocumentDownload(Rule value) { this.clinicalDocumentDownload = value; }
 
     public Rule rule(RateLimitPolicy policy) {
         return switch (policy) {
@@ -50,6 +56,8 @@ public class RateLimitProperties {
             case PUBLIC_APPOINTMENT_REQUEST -> publicAppointmentRequest;
             case API_READ -> apiRead;
             case API_WRITE -> apiWrite;
+            case CLINICAL_DOCUMENT_UPLOAD -> clinicalDocumentUpload;
+            case CLINICAL_DOCUMENT_DOWNLOAD -> clinicalDocumentDownload;
             case REPORTS -> reports;
         };
     }

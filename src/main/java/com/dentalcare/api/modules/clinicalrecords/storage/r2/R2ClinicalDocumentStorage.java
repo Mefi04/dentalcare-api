@@ -26,8 +26,10 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
-import java.io.IOException;
 import java.time.Instant;
+import java.io.FilterInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -56,33 +58,39 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
         String sanitizedName = sanitizeFileName(command.originalFileName());
 
         try {
-            byte[] bytes = command.inputStream().readAllBytes();
+            if (command.contentLength() <= 0) {
+                throw new IllegalArgumentException("Document content length must be positive");
+            }
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(properties.getBucket())
                     .key(objectKey)
                     .contentType(command.contentType())
-                    .contentLength((long) bytes.length)
+                    .contentLength(command.contentLength())
                     .build();
 
-            s3Client.putObject(putRequest, RequestBody.fromBytes(bytes));
+            BoundedCountingInputStream transferStream =
+                    new BoundedCountingInputStream(command.inputStream(), command.contentLength());
+            s3Client.putObject(putRequest,
+                    RequestBody.fromInputStream(transferStream, command.contentLength()));
+            transferStream.verifyFullyConsumed();
 
             return new StoredDocument(
                     objectKey,
                     sanitizedName,
-                    (long) bytes.length,
+                    command.contentLength(),
                     command.contentType()
             );
-        } catch (IOException exception) {
-            LOGGER.error("Failed to read document stream: {}", exception.getMessage(), exception);
-            throw new DocumentStorageException("Failed to read document content", exception);
         } catch (S3Exception exception) {
-            LOGGER.error("Failed to store document in R2 storage: status={}", exception.statusCode(), exception);
+            bestEffortDeleteAfterFailedUpload(objectKey);
+            LOGGER.error("R2 upload failed with status {}", exception.statusCode());
             throw translateAwsException("Failed to store document in storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during upload: {}", exception.getMessage(), exception);
+            bestEffortDeleteAfterFailedUpload(objectKey);
+            LOGGER.error("R2 upload client failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error during document upload to storage: {}", exception.getMessage(), exception);
+            bestEffortDeleteAfterFailedUpload(objectKey);
+            LOGGER.error("Unexpected R2 upload failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageException("Failed to store document in storage", exception);
         }
     }
@@ -115,13 +123,13 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
             if (exception.statusCode() == 404) {
                 throw new DocumentNotFoundInStorageException("Document not found in storage", exception);
             }
-            LOGGER.error("Failed to retrieve document from R2 storage: status={}", exception.statusCode(), exception);
+            LOGGER.error("R2 download failed with status {}", exception.statusCode());
             throw translateAwsException("Failed to retrieve document from storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during download: {}", exception.getMessage(), exception);
+            LOGGER.error("R2 download client failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error retrieving document from storage: {}", exception.getMessage(), exception);
+            LOGGER.error("Unexpected R2 download failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageException("Failed to retrieve document from storage", exception);
         }
     }
@@ -153,13 +161,13 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
             if (exception.statusCode() == 404) {
                 throw new DocumentNotFoundInStorageException("Document not found in storage", exception);
             }
-            LOGGER.error("Failed to check metadata in R2 storage: status={}", exception.statusCode(), exception);
+            LOGGER.error("R2 metadata request failed with status {}", exception.statusCode());
             throw translateAwsException("Failed to retrieve document metadata from storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during headObject: {}", exception.getMessage(), exception);
+            LOGGER.error("R2 metadata client failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error checking document metadata in storage: {}", exception.getMessage(), exception);
+            LOGGER.error("Unexpected R2 metadata failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageException("Failed to check document metadata in storage", exception);
         }
     }
@@ -184,13 +192,13 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
             if (exception.statusCode() == 404) {
                 return false;
             }
-            LOGGER.error("Failed to check existence in R2 storage: status={}", exception.statusCode(), exception);
+            LOGGER.error("R2 existence request failed with status {}", exception.statusCode());
             throw translateAwsException("Failed to check document existence in storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during exists check: {}", exception.getMessage(), exception);
+            LOGGER.error("R2 existence client failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error checking document existence in storage: {}", exception.getMessage(), exception);
+            LOGGER.error("Unexpected R2 existence failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageException("Failed to check document existence in storage", exception);
         }
     }
@@ -207,18 +215,18 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
 
             s3Client.deleteObject(deleteRequest);
         } catch (NoSuchKeyException exception) {
-            LOGGER.debug("Object already absent from storage during delete: {}", storageObjectKey);
+            LOGGER.debug("R2 object was already absent during delete");
         } catch (S3Exception exception) {
             if (exception.statusCode() == 404) {
                 return;
             }
-            LOGGER.error("Failed to delete document from R2 storage: status={}", exception.statusCode(), exception);
+            LOGGER.error("R2 delete failed with status {}", exception.statusCode());
             throw translateAwsException("Failed to delete document from storage", exception);
         } catch (SdkClientException exception) {
-            LOGGER.error("R2 storage client error during delete: {}", exception.getMessage(), exception);
+            LOGGER.error("R2 delete client failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         } catch (Exception exception) {
-            LOGGER.error("Unexpected error deleting document from storage: {}", exception.getMessage(), exception);
+            LOGGER.error("Unexpected R2 delete failure: {}", exception.getClass().getSimpleName());
             throw new DocumentStorageException("Failed to delete document from storage", exception);
         }
     }
@@ -279,5 +287,51 @@ public class R2ClinicalDocumentStorage implements ClinicalDocumentStorage {
             return new DocumentStorageUnavailableException("Storage service is currently unavailable", exception);
         }
         return new DocumentStorageException(defaultMessage, exception);
+    }
+
+    private void bestEffortDeleteAfterFailedUpload(String objectKey) {
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(properties.getBucket()).key(objectKey).build());
+        } catch (RuntimeException cleanupFailure) {
+            LOGGER.error("Cleanup after an ambiguous R2 upload failure also failed: {}",
+                    cleanupFailure.getClass().getSimpleName());
+        }
+    }
+
+    private static final class BoundedCountingInputStream extends FilterInputStream {
+        private final long expectedLength;
+        private long consumed;
+
+        private BoundedCountingInputStream(InputStream input, long expectedLength) {
+            super(input);
+            this.expectedLength = expectedLength;
+        }
+
+        @Override
+        public int read() throws IOException {
+            if (consumed >= expectedLength) return -1;
+            int value = super.read();
+            if (value >= 0) consumed++;
+            return value;
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            if (consumed >= expectedLength) return -1;
+            int allowed = (int) Math.min(length, expectedLength - consumed);
+            int read = super.read(buffer, offset, allowed);
+            if (read > 0) consumed += read;
+            return read;
+        }
+
+        private void verifyFullyConsumed() throws IOException {
+            if (consumed != expectedLength) {
+                throw new IOException("Upload stream ended before the validated content length");
+            }
+            if (in.read() != -1) {
+                throw new IOException("Upload stream exceeded the validated content length");
+            }
+        }
     }
 }
