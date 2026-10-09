@@ -1,0 +1,280 @@
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="401"}'
+        values: '0+10x6 60+0x10'
+      - series: 'dentalcare_http_window_requests{status="401",route="application"}'
+        values: '40x6 0x20'
+      - series: 'dentalcare_storage_transfers_total{result="failure"}'
+        values: '0+2x6 12+0x10'
+      - series: 'dentalcare_audit_failures_total'
+        values: '0+1x6 6+0x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: AuthenticationFailures
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 5m
+        alertname: StorageFailures
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 5m
+        alertname: AuditPersistenceFailure
+        exp_alerts:
+          - exp_labels: {severity: critical}
+      - eval_time: 15m
+        alertname: AuthenticationFailures
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: StorageFailures
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: AuditPersistenceFailure
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'dentalcare_http_window_requests{status="403",route="application"}'
+        values: '40x11 0x15'
+      - series: 'dentalcare_http_window_requests{status="429",route="application"}'
+        values: '40x11 0x15'
+      - series: 'dentalcare_http_window_requests{status="5xx",route="application"}'
+        values: '100x11 0x15'
+      - series: 'dentalcare_http_window_requests{status="other",route="application"}'
+        values: '500x11 0x15'
+      - series: 'up{job="dentalcare"}'
+        values: '0x10 1x15'
+      - series: 'http_server_requests_seconds_count{status="403"}'
+        values: '0+5x10 50+0x15'
+      - series: 'http_server_requests_seconds_count{status="429"}'
+        values: '0+5x10 50+0x15'
+      - series: 'http_server_requests_seconds_count{status="500"}'
+        values: '0+20x10 200+0x15'
+      - series: 'http_server_requests_seconds_count{status="200"}'
+        values: '0+100x10 1000+0x15'
+      - series: 'http_server_requests_seconds_bucket{uri="api",le="1.0"}'
+        values: '0x25'
+      - series: 'http_server_requests_seconds_bucket{uri="api",le="2.0"}'
+        values: '0+100x10 1000+0x15'
+      - series: 'http_server_requests_seconds_bucket{uri="api",le="+Inf"}'
+        values: '0+100x10 1000+0x15'
+      - series: 'hikaricp_connections_active'
+        values: '9x10 1x15'
+      - series: 'hikaricp_connections_max'
+        values: '10x25'
+      - series: 'hikaricp_connections_pending'
+        values: '1x10 0x15'
+      - series: 'hikaricp_connections_timeout_total'
+        values: '0+1x10 10+0x15'
+      - series: 'dentalcare_database_errors_total{kind="connection"}'
+        values: '0+2x10 20+0x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BackendUnavailable
+        exp_alerts:
+          - exp_labels: {severity: critical, job: dentalcare}
+            exp_annotations: {summary: 'Backend scrape unavailable; see incident runbook'}
+      - eval_time: 10m
+        alertname: AuthorizationFailures
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 10m
+        alertname: RateLimitSurge
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 10m
+        alertname: ServerErrors
+        exp_alerts:
+          - exp_labels: {severity: critical}
+      - eval_time: 10m
+        alertname: HighLatency
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 10m
+        alertname: DatabasePoolPressure
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 10m
+        alertname: DatabaseConnectionTimeout
+        exp_alerts:
+          - exp_labels: {severity: critical}
+      - eval_time: 10m
+        alertname: DatabaseErrors
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 25m
+        alertname: BackendUnavailable
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: AuthorizationFailures
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: RateLimitSurge
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: ServerErrors
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: HighLatency
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: DatabasePoolPressure
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: DatabaseConnectionTimeout
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: DatabaseErrors
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{status="500"}'
+        values: '0+1x10'
+      - series: 'http_server_requests_seconds_count{status="200"}'
+        values: '0+100x10'
+      - series: 'dentalcare_http_window_requests{status="5xx",route="application"}'
+        values: '10x20'
+      - series: 'dentalcare_http_window_requests{status="other",route="application"}'
+        values: '1000x20'
+      - series: 'dentalcare_database_errors_total{kind="constraint"}'
+        values: '0+100x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: ServerErrors
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: DatabaseErrors
+        exp_alerts: []
+
+
+  # The first scrape is AFTER the complete burst. No zero sample or later traffic.
+  # HttpWindowMetricsTests verifies these gauge values from real observations and a controlled clock.
+  - interval: 15s
+    input_series:
+      - series: 'dentalcare_http_window_requests{job="dentalcare",instance="backend:9091",route="application",status="401"}'
+        values: '40x19 0x21'
+      - series: 'dentalcare_http_window_requests{job="dentalcare",instance="backend:9091",route="application",status="403"}'
+        values: '20x19 0x21'
+      - series: 'dentalcare_http_window_requests{job="dentalcare",instance="backend:9091",route="application",status="429"}'
+        values: '20x19 0x21'
+      - series: 'dentalcare_http_window_requests{job="dentalcare",instance="backend:9091",route="application",status="5xx"}'
+        values: '10x19 0x21'
+    alert_rule_test:
+      - eval_time: 0s
+        alertname: AuthenticationFailures
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 4m
+        alertname: AuthenticationFailures
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 6m
+        alertname: AuthenticationFailures
+        exp_alerts: []
+      - eval_time: 0s
+        alertname: AuthorizationFailures
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 4m
+        alertname: AuthorizationFailures
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 6m
+        alertname: AuthorizationFailures
+        exp_alerts: []
+      - eval_time: 0s
+        alertname: RateLimitSurge
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 4m
+        alertname: RateLimitSurge
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 6m
+        alertname: RateLimitSurge
+        exp_alerts: []
+      - eval_time: 0s
+        alertname: ServerErrors
+        exp_alerts:
+          - exp_labels: {severity: critical}
+      - eval_time: 4m
+        alertname: ServerErrors
+        exp_alerts:
+          - exp_labels: {severity: critical}
+      - eval_time: 6m
+        alertname: ServerErrors
+        exp_alerts: []
+    promql_expr_test:
+      - expr: sum(dentalcare_http_window_requests)
+        eval_time: 1m
+        exp_samples:
+          - labels: '{}'
+            value: 90
+      - expr: sum(dentalcare_http_window_requests)
+        eval_time: 6m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+  - interval: 15s
+    input_series:
+      - series: 'dentalcare_http_window_requests{status="401",route="application"}'
+        values: '0x4 40x19 0x17'
+      - series: 'dentalcare_transaction_commit_failures_total{completion="unknown"}'
+        values: '0x4 3+0x36'
+    alert_rule_test:
+      - eval_time: 0s
+        alertname: AuthenticationFailures
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: AuthenticationFailures
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 8m
+        alertname: AuthenticationFailures
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: DatabaseErrors
+        exp_alerts:
+          - exp_labels: {severity: warning}
+      - eval_time: 8m
+        alertname: DatabaseErrors
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: AuditPersistenceFailure
+        exp_alerts: []
+  - interval: 15s
+    input_series:
+      - series: 'dentalcare_http_window_requests{status="401",route="application"}'
+        values: '0x40'
+      - series: 'dentalcare_http_window_requests{status="403",route="application"}'
+        values: '0x40'
+      - series: 'dentalcare_http_window_requests{status="429",route="application"}'
+        values: '0x40'
+      - series: 'dentalcare_http_window_requests{status="5xx",route="application"}'
+        values: '0x40'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AuthenticationFailures
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: AuthenticationFailures
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: AuthorizationFailures
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: AuthorizationFailures
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: RateLimitSurge
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: RateLimitSurge
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: ServerErrors
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: ServerErrors
+        exp_alerts: []

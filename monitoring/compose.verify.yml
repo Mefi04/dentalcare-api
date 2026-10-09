@@ -1,0 +1,37 @@
+# Isolated disposable verification. Never uses Supabase, R2, SMTP or production credentials.
+services:
+  backend:
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:postgresql://verification-db:5432/dentalcare_verify
+      DB_USERNAME: verify
+      DB_PASSWORD: ${VERIFY_DB_PASSWORD:?Generate a disposable password}
+      JWT_PRIVATE_KEY: ${VERIFY_JWT_PRIVATE_KEY:?Generate a disposable RSA key}
+      JWT_PUBLIC_KEY: ${VERIFY_JWT_PUBLIC_KEY:?Generate a disposable RSA key}
+      INITIAL_ADMIN_ENABLED: "false"
+      INITIAL_ADMIN_FULL_NAME: ""
+      INITIAL_ADMIN_CUI: ""
+      INITIAL_ADMIN_EMAIL: ""
+      INITIAL_ADMIN_PASSWORD: ""
+      R2_ENABLED: "false"
+      R2_ACCOUNT_ID: ""
+      R2_BUCKET: verification-only
+      R2_ENDPOINT: ""
+      R2_ACCESS_KEY_ID: ""
+      R2_SECRET_ACCESS_KEY: ""
+      FRONTEND_URL: http://localhost:3000
+    ports: !override ["127.0.0.1:18080:8080"]
+    depends_on:
+      verification-db:
+        condition: service_healthy
+  verification-db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: dentalcare_verify
+      POSTGRES_USER: verify
+      POSTGRES_PASSWORD: ${VERIFY_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U verify -d dentalcare_verify"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
