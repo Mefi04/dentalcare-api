@@ -5,6 +5,10 @@ import com.dentalcare.api.config.SecurityConfig;
 import com.dentalcare.api.modules.auth.controller.AuthController;
 import com.dentalcare.api.modules.auth.dto.response.RefreshResponse;
 import com.dentalcare.api.modules.auth.service.AuthService;
+import com.dentalcare.api.modules.appointments.controller.PublicAppointmentRequestController;
+import com.dentalcare.api.modules.appointments.dto.request.CreatePublicAppointmentRequest;
+import com.dentalcare.api.modules.appointments.dto.response.PublicAppointmentRequestReceipt;
+import com.dentalcare.api.modules.appointments.service.AppointmentRequestService;
 import com.dentalcare.api.security.cookie.AuthCookieManager;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
 import com.dentalcare.api.security.handler.RestAccessDeniedHandler;
@@ -39,7 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.dentalcare.api.modules.auth.controller.MobileAuthController;
 
-@WebMvcTest(controllers = {AuthController.class, TestSecurityController.class, MobileAuthController.class}, properties = "FRONTEND_URL=http://localhost:3000")
+@WebMvcTest(controllers = {AuthController.class, TestSecurityController.class, MobileAuthController.class,
+        PublicAppointmentRequestController.class}, properties = "dentalcare.cors.allowed-origin=http://localhost:3000")
 @Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class, AuthCookieManager.class})
 class CorsSecurityIntegrationTests {
@@ -52,6 +57,9 @@ class CorsSecurityIntegrationTests {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private AppointmentRequestService appointmentRequestService;
 
     @MockitoBean
     private JwtService jwtService;
@@ -81,6 +89,40 @@ class CorsSecurityIntegrationTests {
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Authorization")))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Content-Type")))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Accept")));
+    }
+
+    @Test
+    @DisplayName("Public appointment request preflight allows the web origin, credentials and idempotency header")
+    void publicAppointmentRequestPreflightAndPostAreCorsApproved() throws Exception {
+        mockMvc.perform(options("/api/v1/public/appointment-requests")
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name())
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "Content-Type,Idempotency-Key"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, containsString("POST")))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, containsString("OPTIONS")))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Content-Type")))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Idempotency-Key")));
+
+        UUID idempotencyKey = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+        when(appointmentRequestService.createPublic(
+                org.mockito.ArgumentMatchers.any(CreatePublicAppointmentRequest.class),
+                org.mockito.ArgumentMatchers.eq(idempotencyKey)))
+                .thenReturn(new PublicAppointmentRequestReceipt(requestId, "Request received"));
+        mockMvc.perform(post("/api/v1/public/appointment-requests")
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .header("Idempotency-Key", idempotencyKey)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"fullName":"Maria Lopez","phone":"5555-0101",
+                                 "requestedAt":"2099-10-02T15:00:00Z"}
+                                """))
+                .andExpect(status().isAccepted())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
     }
 
     @ParameterizedTest
