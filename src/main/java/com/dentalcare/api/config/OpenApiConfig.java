@@ -37,8 +37,10 @@ public class OpenApiConfig {
             "/api/v1/auth/mobile/login", "/api/v1/auth/mobile/refresh", "/api/v1/auth/mobile/logout",
             "/api/v1/auth/password-recovery/request", "/api/v1/auth/password-recovery/confirm");
     private static final Set<String> AUTHENTICATION_FAILURE_PATHS = Set.of(
-            "/api/v1/auth/login", "/api/v1/auth/mobile/login", "/api/v1/auth/mobile/refresh");
+            "/api/v1/auth/login", "/api/v1/auth/mobile/login", "/api/v1/auth/mobile/refresh",
+            "/api/v1/auth/password/change-initial");
     private static final Set<String> PATIENT_AUTH_PATHS = Set.of("/api/v1/auth/mobile/password");
+    private static final String INITIAL_PASSWORD_CHANGE_PATH = "/api/v1/auth/password/change-initial";
 
     @Bean
     OpenAPI dentalCareOpenApi() {
@@ -49,7 +51,7 @@ public class OpenApiConfig {
                 .addSecuritySchemes(REFRESH_COOKIE, new SecurityScheme()
                         .type(SecurityScheme.Type.APIKEY).in(SecurityScheme.In.COOKIE)
                         .name(AuthCookieManager.REFRESH_TOKEN_COOKIE_NAME)
-                        .description("HttpOnly refresh-session cookie used only by web refresh and logout."));
+                        .description("HttpOnly refresh-session cookie used only by web refresh and logout. Browser clients may use the X-Client-Session-Id header to select a tab-specific cookie."));
         return new OpenAPI()
                 .info(new Info().title("DentalCare API").version("1.0")
                         .description("Versioned REST contract consumed by DentalCare Web and Mobile clients."))
@@ -60,6 +62,8 @@ public class OpenApiConfig {
                                 .description("Requires staff permissions documented by each operation."),
                         new Tag().name("Audience: Patient self-service")
                                 .description("Requires ROLE_PATIENT and derives ownership exclusively from the JWT."),
+                        new Tag().name("Audience: Initial password change")
+                                .description("Requires a restricted, short-lived initial password-change token."),
                         new Tag().name("Audience: Authenticated")
                                 .description("Available to any authenticated account type.")));
     }
@@ -85,13 +89,18 @@ public class OpenApiConfig {
                 .addProperty("error", new StringSchema())
                 .addProperty("message", new StringSchema())
                 .addProperty("path", new StringSchema())
+                .addProperty("code", new StringSchema()
+                        .description("Stable application error code when the client needs to distinguish conflict types."))
                 .addProperty("fieldErrors", new ObjectSchema()
                         .description("Validation errors keyed by request field; values are human-readable strings."))
                 .required(List.of("timestamp", "status", "error", "message", "path", "fieldErrors"));
     }
 
     private void classifyAndSecure(String path, Operation operation) {
-        if (path.startsWith("/api/v1/patients/me") || PATIENT_AUTH_PATHS.contains(path)) {
+        if (INITIAL_PASSWORD_CHANGE_PATH.equals(path)) {
+            operation.addTagsItem("Audience: Initial password change");
+            operation.setSecurity(List.of(new SecurityRequirement().addList(BEARER_AUTH)));
+        } else if (path.startsWith("/api/v1/patients/me") || PATIENT_AUTH_PATHS.contains(path)) {
             operation.addTagsItem("Audience: Patient self-service");
             operation.setSecurity(List.of(new SecurityRequirement().addList(BEARER_AUTH)));
         } else if (path.startsWith("/api/v1/public/") || PUBLIC_AUTH_PATHS.contains(path)) {

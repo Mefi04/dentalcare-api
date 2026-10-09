@@ -110,6 +110,7 @@ class MobileAuthFlowIntegrationTests {
         );
 
         when(userRepository.findWithRolesAndPermissionsByCui(CUI)).thenAnswer(inv -> Optional.of(user));
+        when(userRepository.findByCuiForUpdate(CUI)).thenAnswer(inv -> Optional.of(user));
         when(userRepository.findWithRolesAndPermissionsById(user.getId())).thenAnswer(inv -> Optional.of(user));
         when(userRepository.findById(user.getId())).thenAnswer(inv -> Optional.of(user));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));

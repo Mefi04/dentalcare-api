@@ -19,6 +19,8 @@ public interface PatientRepository extends JpaRepository<Patient, UUID> {
 
     boolean existsByDpi(String dpi);
 
+    Optional<Patient> findByDpi(String dpi);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Patient p WHERE p.id = :id")
     Optional<Patient> findByIdForUpdate(@Param("id") UUID id);

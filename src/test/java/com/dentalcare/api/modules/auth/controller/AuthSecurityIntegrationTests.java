@@ -102,7 +102,7 @@ class AuthSecurityIntegrationTests {
 
     @Test
     void invalidLoginCredentialsReturnGeneric401() throws Exception {
-        when(authService.login(new LoginRequest("0000000000000", "wrong")))
+        when(authService.loginWeb(new LoginRequest("0000000000000", "wrong")))
                 .thenThrow(new UnauthorizedException("Invalid credentials"));
 
         mockMvc.perform(post("/api/v1/auth/login")
@@ -120,7 +120,8 @@ class AuthSecurityIntegrationTests {
         LoginResponse loginResponse = new LoginResponse("access-token-123", "Bearer", 1800L, userResponse);
         AuthService.LoginResult loginResult = new AuthService.LoginResult(loginResponse, "raw-refresh-cookie-value", Duration.ofDays(7));
 
-        when(authService.login(new LoginRequest("1234567890123", "password123"))).thenReturn(loginResult);
+        when(authService.loginWeb(new LoginRequest("1234567890123", "password123")))
+                .thenReturn(new com.dentalcare.api.modules.auth.service.AuthService.WebLoginResult(loginResult, null));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -353,6 +353,16 @@ proposal, explicit lifecycle (`PENDING`, `PROPOSED`, `CONFIRMED`, `REJECTED`, `C
 audit timestamps, and a unique optional `appointment_id`. A confirmed request must reference exactly one
 persisted appointment. Confirmation locks the request and creates the appointment in the same transaction.
 
+Changeset `040-public-appointment-requests` extends this workflow for anonymous first-appointment intake without
+creating users or patient records. Public contact snapshots, idempotency key/hash, and nullable patient/preferred
+dentist links support unassociated pending requests. Partial unique indexes enforce idempotency keys and equivalent
+active requests for an existing CUI and preferred slot. A preferred public time is not reserved; only the existing
+appointment creation/availability path creates a confirmed slot.
+
+Changeset `041-add-assigned-professional-to-appointment-requests` separates reception's assigned dentist from
+the original requested dentist. Assignment is persisted independently, leaves request status unchanged, and
+does not create or reserve an appointment.
+
 `appointment_waiting_room_entries` has a unique one-to-one foreign key to `appointments` and stores
 `ARRIVED -> WAITING -> READY -> CLOSED`, transition timestamps, check-in staff and latest responsible staff.
 Check-in is limited to a `SCHEDULED` appointment on the current `America/Guatemala` clinic day. Cancelling or

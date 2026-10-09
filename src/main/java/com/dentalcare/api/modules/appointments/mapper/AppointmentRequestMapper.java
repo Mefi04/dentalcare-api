@@ -8,9 +8,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class AppointmentRequestMapper {
     public AppointmentRequestResponse toResponse(AppointmentRequest request) {
+        return toResponse(request, false);
+    }
+
+    public AppointmentRequestResponse toAdministrativeResponse(AppointmentRequest request) {
+        return toResponse(request, true);
+    }
+
+    private AppointmentRequestResponse toResponse(AppointmentRequest request, boolean administrative) {
+        boolean publicRequest = request.getRequesterFullName() != null;
+        PublicAppointmentRequesterResponse contact = publicRequest ? new PublicAppointmentRequesterResponse(
+                request.getRequesterFullName(), request.getRequesterCui(), request.getRequesterPhone(),
+                request.getRequesterEmail(), request.getRequestReason()) : null;
         return new AppointmentRequestResponse(
                 request.getId(),
-                new AdministrativeAppointmentPatientResponse(
+                request.getPatient() == null ? null : new AdministrativeAppointmentPatientResponse(
                         request.getPatient().getId(), request.getPatient().getCode(),
                         request.getPatient().getName(), request.getPatient().getPhone()),
                 professional(request.getRequestedProfessional()),
@@ -20,7 +32,11 @@ public class AppointmentRequestMapper {
                 request.getStatus(),
                 actionRequiredBy(request.getStatus()),
                 request.getAppointment() == null ? null : request.getAppointment().getId(),
-                request.getCreatedAt(), request.getUpdatedAt());
+                request.getCreatedAt(), request.getUpdatedAt(),
+                contact,
+                administrative ? (publicRequest ? "PUBLIC" : "PATIENT_PORTAL") : null,
+                administrative ? contact : null,
+                administrative && publicRequest ? professional(request.getAssignedProfessional()) : null);
     }
 
     private AppointmentProfessionalResponse professional(com.dentalcare.api.modules.users.model.User user) {

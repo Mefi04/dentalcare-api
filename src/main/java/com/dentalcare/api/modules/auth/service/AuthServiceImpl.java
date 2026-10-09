@@ -1,15 +1,20 @@
 package com.dentalcare.api.modules.auth.service;
 
 import com.dentalcare.api.exception.UnauthorizedException;
+import com.dentalcare.api.exception.BadRequestException;
+import com.dentalcare.api.exception.ConflictException;
 import com.dentalcare.api.modules.audit.service.AuditActions;
 import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.auth.dto.request.ActivateAccountRequest;
 import com.dentalcare.api.modules.auth.dto.request.ChangePasswordRequest;
+import com.dentalcare.api.modules.auth.dto.request.ChangeInitialPasswordRequest;
 import com.dentalcare.api.modules.auth.dto.request.LoginRequest;
 import com.dentalcare.api.modules.auth.dto.response.ActivateAccountResponse;
 import com.dentalcare.api.modules.auth.dto.response.LoginResponse;
 import com.dentalcare.api.modules.auth.dto.response.RefreshResponse;
 import com.dentalcare.api.modules.auth.dto.response.UserResponse;
+import com.dentalcare.api.modules.auth.dto.response.PasswordChangeRequiredResponse;
+import com.dentalcare.api.modules.auth.dto.response.InitialPasswordChangeUserResponse;
 import com.dentalcare.api.modules.auth.mapper.AuthUserMapper;
 import com.dentalcare.api.modules.auth.model.RefreshSession;
 import com.dentalcare.api.modules.users.model.User;
@@ -110,27 +115,77 @@ public class AuthServiceImpl implements AuthService {
             throw new UnauthorizedException(INVALID_CREDENTIALS);
         }
 
+        return createLoginResult(user);
+    }
+
+    @Override
+    @Transactional
+    public WebLoginResult loginWeb(LoginRequest request) {
+        String cui = User.normalizeCui(request.cui());
+        User user = userRepository.findByCuiForUpdate(cui).orElse(null);
+        if (user == null || (user.getStatus() != UserStatus.PENDING_ACTIVATION
+                && user.getStatus() != UserStatus.ACTIVE)
+                || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            auditLoginFailure(user != null ? user.getId() : null);
+            throw new UnauthorizedException(INVALID_CREDENTIALS);
+        }
+
+        if (user.getStatus() == UserStatus.PENDING_ACTIVATION) {
+            String token = jwtService.createInitialPasswordChangeToken(user.getId());
+            PasswordChangeRequiredResponse response = new PasswordChangeRequiredResponse(
+                    true, token, new InitialPasswordChangeUserResponse(user.getId(), user.getFullName()));
+            return new WebLoginResult(null, response);
+        }
+
+        return new WebLoginResult(createLoginResult(user), null);
+    }
+
+    @Override
+    @Transactional
+    public LoginResult completeInitialPasswordChange(String passwordChangeToken,
+                                                     ChangeInitialPasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmation())) {
+            throw new BadRequestException("Password confirmation does not match");
+        }
+        PasswordPolicy.validate(request.newPassword());
+
+        UUID userId;
+        try {
+            userId = jwtService.parseInitialPasswordChangeToken(passwordChangeToken);
+        } catch (RuntimeException invalidToken) {
+            throw new UnauthorizedException("Initial password-change token is invalid or expired");
+        }
+
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new UnauthorizedException("Initial password-change token is invalid or expired"));
+        if (user.getStatus() != UserStatus.PENDING_ACTIVATION) {
+            throw new ConflictException("Initial password change has already been completed");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        user.setStatus(UserStatus.ACTIVE);
+        user.setUpdatedAt(clock.instant());
+        user.setLastLoginAt(clock.instant());
+        if (auditService != null) {
+            auditService.success(AuditActions.AUTH_ACCOUNT_ACTIVATED, "AUTH", "User", user.getId(), user.getId());
+        }
+        return createLoginResult(user);
+    }
+
+    private LoginResult createLoginResult(User user) {
         user.setLastLoginAt(clock.instant());
         userRepository.save(user);
-
         String accessToken = jwtService.createAccessToken(user.getId(), mapper.authorities(user));
-        LoginResponse response = new LoginResponse(
-                accessToken,
-                "Bearer",
-                jwtService.getAccessTokenLifetimeSeconds(),
-                mapper.toResponse(user)
-        );
-
+        LoginResponse response = new LoginResponse(accessToken, "Bearer",
+                jwtService.getAccessTokenLifetimeSeconds(), mapper.toResponse(user));
         UUID familyId = UUID.randomUUID();
         String rawRefreshToken = refreshTokenService.generateRawToken();
         Duration refreshExpiration = jwtProperties.refreshExpiration() != null
-                ? jwtProperties.refreshExpiration()
-                : Duration.ofDays(7);
-        Instant expiresAt = clock.instant().plus(refreshExpiration);
-
-        refreshTokenService.createSession(user, familyId, rawRefreshToken, expiresAt);
-        if (auditService != null) auditService.success(AuditActions.AUTH_LOGIN_SUCCEEDED, "AUTH", "User", user.getId(), user.getId());
-
+                ? jwtProperties.refreshExpiration() : Duration.ofDays(7);
+        refreshTokenService.createSession(user, familyId, rawRefreshToken, clock.instant().plus(refreshExpiration));
+        if (auditService != null) {
+            auditService.success(AuditActions.AUTH_LOGIN_SUCCEEDED, "AUTH", "User", user.getId(), user.getId());
+        }
         return new LoginResult(response, rawRefreshToken, refreshExpiration);
     }
 

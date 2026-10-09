@@ -153,6 +153,10 @@
       },
       "ApiErrorResponse" : {
         "properties" : {
+          "code" : {
+            "description" : "Stable application error code when the client needs to distinguish conflict types.",
+            "type" : "string"
+          },
           "error" : {
             "type" : "string"
           },
@@ -220,6 +224,14 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "assignedProfessional" : {
+            "$ref" : "#/components/schemas/AppointmentProfessionalResponse",
+            "description" : "Reception assignment; null when no dentist has been assigned"
+          },
+          "contact" : {
+            "$ref" : "#/components/schemas/PublicAppointmentRequesterResponse",
+            "description" : "Non-clinical contact details for public submissions"
+          },
           "createdAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -238,12 +250,19 @@
           "proposedProfessional" : {
             "$ref" : "#/components/schemas/AppointmentProfessionalResponse"
           },
+          "publicRequester" : {
+            "$ref" : "#/components/schemas/PublicAppointmentRequesterResponse"
+          },
           "requestedAt" : {
             "format" : "date-time",
             "type" : "string"
           },
           "requestedProfessional" : {
             "$ref" : "#/components/schemas/AppointmentProfessionalResponse"
+          },
+          "source" : {
+            "description" : "Administrative source classification: PUBLIC or PATIENT_PORTAL",
+            "type" : "string"
           },
           "status" : {
             "enum" : [ "PENDING", "PROPOSED", "CONFIRMED", "REJECTED", "CANCELLED" ],
@@ -254,6 +273,16 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "AssignAppointmentRequestProfessionalRequest" : {
+        "properties" : {
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "professionalId" ],
         "type" : "object"
       },
       "AssignMedicalHistoryQuestionnaireRequest" : {
@@ -437,6 +466,23 @@
             "type" : "string"
           }
         },
+        "type" : "object"
+      },
+      "ChangeInitialPasswordRequest" : {
+        "properties" : {
+          "confirmation" : {
+            "description" : "Must exactly match newPassword",
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "newPassword" : {
+            "description" : "Permanent password to set for the account",
+            "maxLength" : 128,
+            "minLength" : 8,
+            "type" : "string"
+          }
+        },
+        "required" : [ "confirmation", "newPassword" ],
         "type" : "object"
       },
       "ChangePasswordRequest" : {
@@ -1591,6 +1637,56 @@
         "required" : [ "basePrice", "category", "code", "durationMinutes", "name" ],
         "type" : "object"
       },
+      "CreatePublicAppointmentRequest" : {
+        "description" : "Non-clinical information needed to request a first appointment",
+        "properties" : {
+          "cui" : {
+            "description" : "Optional Guatemalan DPI/CUI, used only to associate an existing patient record",
+            "pattern" : "^[0-9]{13}$",
+            "type" : "string"
+          },
+          "email" : {
+            "example" : "maria@example.com",
+            "format" : "email",
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "fullName" : {
+            "example" : "María López",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "phone" : {
+            "example" : "+502 5555-0101",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "pattern" : "^[+0-9() .-]{7,30}$",
+            "type" : "string"
+          },
+          "professionalId" : {
+            "description" : "Optional preferred active dentist; omit or send null if there is no preference",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Optional non-clinical scheduling context only. Do not include symptoms or medical details.",
+            "example" : "Primera consulta, horario de tarde",
+            "maxLength" : 300,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "requestedAt" : {
+            "description" : "Preferred future time in ISO-8601 UTC. This is a request, not a reservation.",
+            "example" : "2027-03-15T16:00:00Z",
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "fullName", "phone", "requestedAt" ],
+        "type" : "object"
+      },
       "CreatePurchaseItemRequest" : {
         "properties" : {
           "consumableId" : {
@@ -1925,6 +2021,18 @@
         },
         "type" : "object"
       },
+      "InitialPasswordChangeUserResponse" : {
+        "properties" : {
+          "fullName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "InstallmentResponse" : {
         "properties" : {
           "amount" : {
@@ -2082,6 +2190,16 @@
         "type" : "object"
       },
       "JsonNode" : { },
+      "LinkAppointmentRequestPatientRequest" : {
+        "properties" : {
+          "patientId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "patientId" ],
+        "type" : "object"
+      },
       "LoginRequest" : {
         "properties" : {
           "cui" : {
@@ -4267,6 +4385,21 @@
         },
         "type" : "object"
       },
+      "PasswordChangeRequiredResponse" : {
+        "properties" : {
+          "passwordChangeToken" : {
+            "type" : "string"
+          },
+          "requiresPasswordChange" : {
+            "example" : true,
+            "type" : "boolean"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/InitialPasswordChangeUserResponse"
+          }
+        },
+        "type" : "object"
+      },
       "PasswordRecoveryRequest" : {
         "properties" : {
           "cui" : {
@@ -5058,6 +5191,40 @@
           }
         },
         "required" : [ "proposedAt" ],
+        "type" : "object"
+      },
+      "PublicAppointmentRequestReceipt" : {
+        "description" : "Safe acknowledgment for an anonymous appointment request",
+        "properties" : {
+          "message" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PublicAppointmentRequesterResponse" : {
+        "description" : "Contact details supplied for a public request; visible only to authorized clinic staff",
+        "properties" : {
+          "cui" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "fullName" : {
+            "type" : "string"
+          },
+          "phone" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "PublicClinicResponse" : {
@@ -6820,7 +6987,7 @@
         "type" : "http"
       },
       "refreshCookie" : {
-        "description" : "HttpOnly refresh-session cookie used only by web refresh and logout.",
+        "description" : "HttpOnly refresh-session cookie used only by web refresh and logout. Browser clients may use the X-Client-Session-Id header to select a tab-specific cookie.",
         "in" : "cookie",
         "name" : "refreshToken",
         "type" : "apiKey"
@@ -7068,6 +7235,325 @@
             "type" : "string"
           }
         } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-requests/{requestId}/assign-professional" : {
+      "post" : {
+        "description" : "Reception may assign or reassign a dentist on an open public request. This does not confirm or reserve an appointment. 409 codes distinguish an ineligible request state (APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE), a non-public request (APPOINTMENT_REQUEST_NOT_PUBLIC), and an unavailable dentist (PROFESSIONAL_NOT_AVAILABLE).",
+        "operationId" : "assignProfessional",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AssignAppointmentRequestProfessionalRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Assign an active dentist to a public appointment request",
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-requests/{requestId}/confirm-public-proposal" : {
+      "post" : {
+        "operationId" : "confirmPublicProposal",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-requests/{requestId}/link-patient" : {
+      "post" : {
+        "operationId" : "linkPatient",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LinkAppointmentRequestPatientRequest"
+              }
+            }
+          },
+          "required" : true
+        },
         "responses" : {
           "200" : {
             "content" : {
@@ -7496,7 +7982,7 @@
         "tags" : [ "Administrative appointments", "Audience: Staff" ]
       },
       "post" : {
-        "operationId" : "create_15",
+        "operationId" : "create_16",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -8455,6 +8941,7 @@
     },
     "/api/v1/auth/activate" : {
       "post" : {
+        "description" : "Compatible legacy flow. New clients should use login and change-initial.",
         "operationId" : "activate",
         "requestBody" : {
           "content" : {
@@ -8518,13 +9005,22 @@
           }
         },
         "security" : [ ],
-        "summary" : "Activate account with temporary password and set new permanent password",
+        "summary" : "Legacy account activation retained for existing clients",
         "tags" : [ "auth-controller", "Audience: Public" ]
       }
     },
     "/api/v1/auth/login" : {
       "post" : {
+        "description" : "Active accounts receive an authenticated session. A correct initial temporary password receives only a short-lived password-change token.",
         "operationId" : "login_1",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Client-Session-Id",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -8540,7 +9036,11 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/LoginResponse"
+                  "oneOf" : [ {
+                    "$ref" : "#/components/schemas/LoginResponse"
+                  }, {
+                    "$ref" : "#/components/schemas/PasswordChangeRequiredResponse"
+                  } ]
                 }
               }
             },
@@ -8605,8 +9105,8 @@
       "post" : {
         "operationId" : "logout_1",
         "parameters" : [ {
-          "in" : "cookie",
-          "name" : "refreshToken",
+          "in" : "header",
+          "name" : "X-Client-Session-Id",
           "required" : false,
           "schema" : {
             "type" : "string"
@@ -9195,12 +9695,119 @@
         "tags" : [ "Password Recovery", "Audience: Public" ]
       }
     },
+    "/api/v1/auth/password/change-initial" : {
+      "post" : {
+        "description" : "Requires Authorization: Bearer <passwordChangeToken> from login. Confirmation must exactly equal newPassword. Success returns the normal login response and sets the HttpOnly refresh cookie selected by X-Client-Session-Id.",
+        "operationId" : "changeInitialPassword",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "Authorization",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-Client-Session-Id",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ChangeInitialPasswordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Change the initial password and create a tab-scoped authenticated session",
+        "tags" : [ "auth-controller", "Audience: Initial password change" ]
+      }
+    },
     "/api/v1/auth/refresh" : {
       "post" : {
         "operationId" : "refresh",
         "parameters" : [ {
-          "in" : "cookie",
-          "name" : "refreshToken",
+          "in" : "header",
+          "name" : "X-Client-Session-Id",
           "required" : false,
           "schema" : {
             "type" : "string"
@@ -10602,7 +11209,7 @@
       },
       "post" : {
         "description" : "Registers either a consumable or an instrument with their specific attributes.",
-        "operationId" : "create_14",
+        "operationId" : "create_15",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -11604,7 +12211,7 @@
       },
       "post" : {
         "description" : "Creates a purchase in PENDING status. Does not modify inventory stock.",
-        "operationId" : "create_13",
+        "operationId" : "create_14",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -11993,7 +12600,7 @@
         "tags" : [ "Inventory Suppliers", "Audience: Staff" ]
       },
       "post" : {
-        "operationId" : "create_12",
+        "operationId" : "create_13",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -12823,7 +13430,7 @@
     },
     "/api/v1/medical-history/templates" : {
       "post" : {
-        "operationId" : "create_11",
+        "operationId" : "create_12",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -13193,7 +13800,7 @@
         "tags" : [ "Patients", "Audience: Staff" ]
       },
       "post" : {
-        "operationId" : "create_5",
+        "operationId" : "create_6",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -13518,7 +14125,7 @@
         "tags" : [ "Patient appointment requests", "Audience: Patient self-service" ]
       },
       "post" : {
-        "operationId" : "create_10",
+        "operationId" : "create_11",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -17731,7 +18338,7 @@
       },
       "post" : {
         "description" : "Installment amounts and the plan total are calculated from the charge pending balance.",
-        "operationId" : "create_9",
+        "operationId" : "create_10",
         "parameters" : [ {
           "in" : "path",
           "name" : "patientId",
@@ -22961,7 +23568,7 @@
     },
     "/api/v1/patients/{patientId}/payments/{paymentId}/refunds" : {
       "post" : {
-        "operationId" : "create_8",
+        "operationId" : "create_9",
         "parameters" : [ {
           "in" : "path",
           "name" : "patientId",
@@ -23602,7 +24209,7 @@
         "tags" : [ "prescription-controller", "Audience: Staff" ]
       },
       "post" : {
-        "operationId" : "create_7",
+        "operationId" : "create_8",
         "parameters" : [ {
           "in" : "path",
           "name" : "patientId",
@@ -23914,7 +24521,7 @@
         "tags" : [ "Treatment plans", "Audience: Staff" ]
       },
       "post" : {
-        "operationId" : "create_6",
+        "operationId" : "create_7",
         "parameters" : [ {
           "in" : "path",
           "name" : "patientId",
@@ -24221,6 +24828,85 @@
         } ],
         "summary" : "Get prescription detail",
         "tags" : [ "prescription-controller", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/public/appointment-requests" : {
+      "post" : {
+        "description" : "Returns an acknowledgment only. requestedAt is a preference, not a confirmed or reserved appointment. Reuse the same UUID Idempotency-Key for retries.",
+        "operationId" : "create_5",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreatePublicAppointmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublicAppointmentRequestReceipt"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ],
+        "summary" : "Request a first appointment without an account",
+        "tags" : [ "Public appointment requests", "Audience: Public" ]
       }
     },
     "/api/v1/public/clinic" : {
@@ -28904,6 +29590,9 @@
   }, {
     "description" : "Requires staff permissions documented by each operation.",
     "name" : "Audience: Staff"
+  }, {
+    "description" : "Requires a restricted, short-lived initial password-change token.",
+    "name" : "Audience: Initial password change"
   }, {
     "description" : "Auditable inventory movements and Kardex",
     "name" : "Inventory movements"

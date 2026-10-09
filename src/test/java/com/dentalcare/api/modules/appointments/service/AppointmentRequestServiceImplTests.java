@@ -2,6 +2,7 @@ package com.dentalcare.api.modules.appointments.service;
 
 import com.dentalcare.api.exception.*;
 import com.dentalcare.api.modules.appointments.mapper.AppointmentRequestMapper;
+import com.dentalcare.api.modules.appointments.dto.request.CreatePublicAppointmentRequest;
 import com.dentalcare.api.modules.appointments.model.*;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRequestRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
@@ -58,6 +59,184 @@ class AppointmentRequestServiceImplTests {
         assertThat(result.actionRequiredBy()).isEqualTo("CLINIC");
         assertThat(result.appointmentId()).isNull();
         verifyNoInteractions(appointments);
+    }
+
+    @Test
+    void publicRequestLinksExistingPatientButOnlyAcknowledgesPublicly() {
+        UUID idempotencyKey = UUID.randomUUID();
+        var request = publicRequest(dentist.getId());
+        when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(dentist));
+        when(patients.findByDpi("1234567890123")).thenReturn(Optional.of(patient));
+        when(requests.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var receipt = service.createPublic(request, idempotencyKey);
+
+        ArgumentCaptor<AppointmentRequest> captor = ArgumentCaptor.forClass(AppointmentRequest.class);
+        verify(requests).saveAndFlush(captor.capture());
+        AppointmentRequest persisted = captor.getValue();
+        assertThat(persisted.getPatient()).isSameAs(patient);
+        assertThat(persisted.getStatus()).isEqualTo(AppointmentRequestStatus.PENDING);
+        assertThat(persisted.getRequesterCui()).isEqualTo("1234567890123");
+        assertThat(persisted.getIdempotencyKey()).isEqualTo(idempotencyKey);
+        assertThat(receipt.requestId()).isEqualTo(persisted.getId());
+        assertThat(receipt.message()).doesNotContain("1234567890123", "maria@example.test", "5555-0101");
+        verifyNoInteractions(appointments);
+
+        when(requests.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(persisted));
+        var retry = service.createPublic(request, idempotencyKey);
+        assertThat(retry).isEqualTo(receipt);
+        verify(requests, times(1)).saveAndFlush(any());
+    }
+
+    @Test
+    void publicRequestWithoutMatchingPatientRemainsUnlinkedAndDoesNotCreateUserOrPatient() {
+        when(patients.findByDpi("9999999999999")).thenReturn(Optional.empty());
+        when(requests.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.createPublic(publicRequest(null, "9999999999999"), UUID.randomUUID());
+
+        ArgumentCaptor<AppointmentRequest> captor = ArgumentCaptor.forClass(AppointmentRequest.class);
+        verify(requests).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getPatient()).isNull();
+        assertThat(captor.getValue().getRequestedProfessional()).isNull();
+        verify(patients).findByDpi("9999999999999");
+        verifyNoInteractions(users, appointments);
+    }
+
+    @Test
+    void receptionistCanAssignActiveDentistToPublicRequestWithoutConfirmingIt() {
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), null, null, FUTURE,
+                AppointmentRequestStatus.PENDING, NOW, NOW, "Maria Lopez", null, "5555-0101",
+                null, null, UUID.randomUUID(), "hash");
+        when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
+        when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
+        when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(dentist));
+        when(requests.saveAndFlush(request)).thenReturn(request);
+
+        var assigned = service.assignPublicRequestProfessional(secretary.getId(), request.getId(), dentist.getId());
+
+        assertThat(assigned.status()).isEqualTo(AppointmentRequestStatus.PENDING);
+        assertThat(assigned.source()).isEqualTo("PUBLIC");
+        assertThat(assigned.contact().fullName()).isEqualTo("Maria Lopez");
+        assertThat(assigned.contact().phone()).isEqualTo("5555-0101");
+        assertThat(assigned.contact().cui()).isNull();
+        assertThat(assigned.requestedProfessional()).isNull();
+        assertThat(assigned.assignedProfessional().id()).isEqualTo(dentist.getId());
+        assertThat(assigned.appointmentId()).isNull();
+        assertThat(request.getAssignedProfessional()).isSameAs(dentist);
+        assertThat(request.getRequestedProfessional()).isNull();
+        verifyNoInteractions(appointments);
+    }
+
+    @Test
+    void receptionistCanChangeAssignmentOnProposedPublicRequestWithoutConfirmingIt() {
+        User reassignedDentist = user("DENTIST");
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), patient, dentist, FUTURE,
+                AppointmentRequestStatus.PENDING, NOW, NOW, "Maria Lopez", patient.getDpi(),
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        request.assignProfessional(dentist, NOW);
+        request.propose(dentist, FUTURE.plusSeconds(3600), secretary, NOW.plusSeconds(1));
+        when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
+        when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
+        when(users.findWithRolesById(reassignedDentist.getId())).thenReturn(Optional.of(reassignedDentist));
+        when(requests.saveAndFlush(request)).thenReturn(request);
+
+        var reassigned = service.assignPublicRequestProfessional(
+                secretary.getId(), request.getId(), reassignedDentist.getId());
+
+        assertThat(reassigned.status()).isEqualTo(AppointmentRequestStatus.PROPOSED);
+        assertThat(reassigned.assignedProfessional().id()).isEqualTo(reassignedDentist.getId());
+        assertThat(reassigned.requestedProfessional().id()).isEqualTo(dentist.getId());
+        assertThat(reassigned.proposedProfessional().id()).isEqualTo(dentist.getId());
+        assertThat(reassigned.appointmentId()).isNull();
+        verifyNoInteractions(appointments);
+    }
+
+    @Test
+    void assignmentConflictsExplainNonPublicStateAndUnavailableDentist() {
+        AppointmentRequest patientRequest = request(AppointmentRequestStatus.PENDING);
+        when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
+        when(requests.findDetailedByIdForUpdate(patientRequest.getId())).thenReturn(Optional.of(patientRequest));
+        assertThatThrownBy(() -> service.assignPublicRequestProfessional(
+                secretary.getId(), patientRequest.getId(), dentist.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "APPOINTMENT_REQUEST_NOT_PUBLIC");
+
+        AppointmentRequest closedPublic = new AppointmentRequest(UUID.randomUUID(), null, null, FUTURE,
+                AppointmentRequestStatus.CONFIRMED, NOW, NOW, "Maria Lopez", null,
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        when(requests.findDetailedByIdForUpdate(closedPublic.getId())).thenReturn(Optional.of(closedPublic));
+        assertThatThrownBy(() -> service.assignPublicRequestProfessional(
+                secretary.getId(), closedPublic.getId(), dentist.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE")
+                .hasMessageContaining("CONFIRMED")
+                .hasMessageContaining("PENDING and PROPOSED");
+
+        AppointmentRequest pendingPublic = new AppointmentRequest(UUID.randomUUID(), null, null, FUTURE,
+                AppointmentRequestStatus.PENDING, NOW, NOW, "Maria Lopez", null,
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        when(requests.findDetailedByIdForUpdate(pendingPublic.getId())).thenReturn(Optional.of(pendingPublic));
+        when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(user("ASSISTANT")));
+        assertThatThrownBy(() -> service.assignPublicRequestProfessional(
+                secretary.getId(), pendingPublic.getId(), dentist.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "PROFESSIONAL_NOT_AVAILABLE");
+    }
+
+    @Test
+    void publicConfirmationDistinguishesOccupiedTimeFromIneligibleState() {
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), patient, dentist, FUTURE,
+                AppointmentRequestStatus.PENDING, NOW, NOW, "Maria Lopez", patient.getDpi(),
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        request.propose(dentist, FUTURE.plusSeconds(3600), secretary, NOW);
+        when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
+        when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
+        when(appointments.create(patient.getId(), dentist.getId(), FUTURE.plusSeconds(3600)))
+                .thenThrow(new ConflictException("Appointment time is not available"));
+
+        assertThatThrownBy(() -> service.confirmPublicProposal(secretary.getId(), request.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "APPOINTMENT_TIME_UNAVAILABLE")
+                .hasMessageContaining("already occupied");
+
+        request.reject(secretary, NOW);
+        assertThatThrownBy(() -> service.confirmPublicProposal(secretary.getId(), request.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE")
+                .hasMessageContaining("REJECTED");
+    }
+
+    @Test
+    void publicRequestRejectsEquivalentActiveRequestAndInactivePreferredProfessional() {
+        when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(dentist));
+        when(requests.existsByRequesterCuiAndRequestedAtAndRequestedProfessional_IdAndStatusIn(
+                "1234567890123", FUTURE, dentist.getId(), List.of(
+                        AppointmentRequestStatus.PENDING, AppointmentRequestStatus.PROPOSED))).thenReturn(true);
+        assertThatThrownBy(() -> service.createPublic(publicRequest(dentist.getId()), UUID.randomUUID()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("An equivalent appointment request is already active");
+
+        when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(user("ASSISTANT")));
+        assertThatThrownBy(() -> service.createPublic(publicRequest(dentist.getId()), UUID.randomUUID()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Professional is not an active dentist");
+    }
+
+    @Test
+    void publicRequestRejectsReusingIdempotencyKeyForDifferentPayloadAndPastDate() {
+        AppointmentRequest existing = new AppointmentRequest(UUID.randomUUID(), patient, dentist, FUTURE,
+                AppointmentRequestStatus.PENDING, NOW, NOW, "Maria Lopez", "1234567890123", "5555-0101",
+                "maria@example.test", "First visit", UUID.randomUUID(), "different-hash");
+        UUID key = existing.getIdempotencyKey();
+        when(requests.findByIdempotencyKey(key)).thenReturn(Optional.of(existing));
+        assertThatThrownBy(() -> service.createPublic(publicRequest(dentist.getId()), key))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Idempotency key");
+
+        assertThatThrownBy(() -> service.createPublic(publicRequest(dentist.getId(), "1234567890123", NOW), UUID.randomUUID()))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("must be in the future");
     }
 
     @Test
@@ -130,6 +309,19 @@ class AppointmentRequestServiceImplTests {
     private Appointment appointment() {
         return new Appointment(UUID.randomUUID(), patient, dentist, FUTURE,
                 AppointmentStatus.SCHEDULED, NOW, NOW);
+    }
+
+    private CreatePublicAppointmentRequest publicRequest(UUID professionalId) {
+        return publicRequest(professionalId, "1234567890123", FUTURE);
+    }
+
+    private CreatePublicAppointmentRequest publicRequest(UUID professionalId, String cui) {
+        return publicRequest(professionalId, cui, FUTURE);
+    }
+
+    private CreatePublicAppointmentRequest publicRequest(UUID professionalId, String cui, Instant requestedAt) {
+        return new CreatePublicAppointmentRequest("Maria Lopez", cui, "5555-0101", "maria@example.test",
+                requestedAt, professionalId, "First visit");
     }
 
     private Patient patient() {

@@ -76,7 +76,19 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     ResponseEntity<ApiErrorResponse> handleConflict(ConflictException exception, HttpServletRequest request) {
-        return buildResponse(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
+        return buildResponse(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of(), exception.getCode());
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+            org.springframework.dao.DataIntegrityViolationException exception, HttpServletRequest request) {
+        if ("/api/v1/public/appointment-requests".equals(request.getRequestURI())) {
+            return buildResponse(HttpStatus.CONFLICT,
+                    "An equivalent appointment request already exists or the idempotency key was already used",
+                    request, Map.of());
+        }
+        LOGGER.error("Database constraint rejected {} {}", request.getMethod(), request.getRequestURI(), exception);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, UNEXPECTED_ERROR_MESSAGE, request, Map.of());
     }
 
     @ExceptionHandler(UnauthorizedException.class)
@@ -143,8 +155,15 @@ public class GlobalExceptionHandler {
 
     private ResponseEntity<ApiErrorResponse> buildResponse(
             HttpStatus status, String message, HttpServletRequest request, Map<String, String> fieldErrors) {
+        return buildResponse(status, message, request, fieldErrors, null);
+    }
+
+    private ResponseEntity<ApiErrorResponse> buildResponse(
+            HttpStatus status, String message, HttpServletRequest request,
+            Map<String, String> fieldErrors, String code) {
         ApiErrorResponse body = new ApiErrorResponse(
-                Instant.now(), status.value(), status.getReasonPhrase(), message, request.getRequestURI(), fieldErrors);
+                Instant.now(), status.value(), status.getReasonPhrase(), message, request.getRequestURI(), fieldErrors,
+                code);
         return ResponseEntity.status(status).body(body);
     }
 }

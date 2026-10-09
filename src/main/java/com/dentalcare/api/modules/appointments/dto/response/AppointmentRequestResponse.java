@@ -1,9 +1,11 @@
 package com.dentalcare.api.modules.appointments.dto.response;
 
 import com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record AppointmentRequestResponse(
         UUID id,
@@ -16,5 +18,13 @@ public record AppointmentRequestResponse(
         String actionRequiredBy,
         UUID appointmentId,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) PublicAppointmentRequesterResponse publicRequester,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @Schema(description = "Administrative source classification: PUBLIC or PATIENT_PORTAL") String source,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @Schema(description = "Non-clinical contact details for public submissions") PublicAppointmentRequesterResponse contact,
+        @JsonInclude(JsonInclude.Include.ALWAYS)
+        @Schema(description = "Reception assignment; null when no dentist has been assigned")
+        AppointmentProfessionalResponse assignedProfessional) {
 }

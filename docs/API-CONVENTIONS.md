@@ -122,13 +122,18 @@ Authentication uses `/api/v1/auth`. Detailed token, cookie, rotation, and sessio
 
 | Method | Path | Authentication input | Success | Notes |
 |---|---|---|---|---|
-| `POST` | `/api/v1/auth/activate` | JSON `cui`, `temporaryPassword`, and `newPassword` | `200 OK` with status `ACTIVE` and success message | Activates a `PENDING_ACTIVATION` user, replaces temporary password with new BCrypt hash. Does NOT return tokens. Invalid credentials or non-pending status return generic `401`. |
-| `POST` | `/api/v1/auth/login` | JSON `cui` (exactly 13 digits) and `password` | `200 OK` with access token and user view | Sets refresh token only in an HttpOnly cookie. Invalid credentials return generic `401`; request validation returns `400`. |
-| `POST` | `/api/v1/auth/refresh` | Refresh cookie; no token in body | `200 OK` with a new access token | Rotates the refresh cookie. Invalid, expired, revoked, or reused tokens return generic `401`. |
-| `POST` | `/api/v1/auth/logout` | Refresh cookie | `204 No Content` | Revokes the identified session and clears the cookie; idempotent where practical. |
+| `POST` | `/api/v1/auth/activate` | JSON `cui`, `temporaryPassword`, and `newPassword` | `200 OK` with status `ACTIVE` and success message | Compatible legacy activation flow retained for existing clients; no removal is scheduled. New clients should use normal login and `change-initial`. Invalid credentials return generic `401`. |
+| `POST` | `/api/v1/auth/login` | JSON `cui` (exactly 13 digits) and `password`; optional `X-Client-Session-Id` UUID | `200 OK` with access token or initial-password-change challenge | A correct temporary password returns only `requiresPasswordChange`, a 10-minute one-use password-change token, and minimal user data; it creates no session/cookie. Active accounts receive the normal response and tab-scoped HttpOnly refresh cookie. Invalid credentials return generic `401`. |
+| `POST` | `/api/v1/auth/password/change-initial` | Bearer `passwordChangeToken`, JSON `newPassword`, `confirmation`; optional `X-Client-Session-Id` UUID | `200 OK` with normal login response and tab-scoped refresh cookie | Confirmation must exactly match `newPassword`. Token cannot access normal routes, is bound to the user and expires after 10 minutes. Invalid/expired token returns `401`, replay after completion `409`, invalid password/confirmation `400`. |
+| `POST` | `/api/v1/auth/refresh` | Refresh cookie; optional `X-Client-Session-Id` UUID; no token in body | `200 OK` with a new access token | Rotates the selected tab's cookie. Invalid, expired, revoked, or reused tokens return generic `401`. |
+| `POST` | `/api/v1/auth/logout` | Refresh cookie; optional `X-Client-Session-Id` UUID | `204 No Content` | Revokes the selected session and clears only its cookie; idempotent where practical. |
 | `GET` | `/api/v1/auth/me` | Bearer access token | `200 OK` with the current user view | Never returns password hashes, token material, or session data. |
 
 Successful access-token responses use `tokenType: "Bearer"` and `expiresIn: 1800` by default. Login additionally returns `user` with `id`, `username`, `email`, `status`, `roles`, and `permissions`. For web endpoints (`/api/v1/auth/*`), refresh tokens are transported exclusively via `HttpOnly` cookies and never appear in JSON responses.
+
+When `requiresPasswordChange` is true, the login response has no access token, normal refresh token, or cookie. The frontend must keep the short-lived `passwordChangeToken` only long enough to submit the initial password change, then replace it with the normal access token returned by that endpoint.
+
+For independent accounts in multiple tabs of one browser, the frontend creates a UUID in each tab's `sessionStorage`, sends it as `X-Client-Session-Id` on web login, refresh, and logout, and keeps the access token in that tab's `sessionStorage`. The API names each refresh cookie from that UUID, so the browser can hold multiple HttpOnly refresh cookies without one tab rotating or clearing another tab's session. Omitting the header preserves the legacy single-cookie behavior.
 
 ### Mobile authentication endpoints
 
@@ -480,6 +485,74 @@ An appointment request is not a confirmed appointment. Once accepted, the backen
 `Appointment` and exposes its id as `appointmentId`; clients then use the existing appointment endpoints as the
 source of truth.
 
+### Public first-appointment request
+
+`POST /api/v1/public/appointment-requests` is an anonymous intake endpoint separate from contact inquiries and
+from the authenticated patient endpoint. It accepts `Idempotency-Key` as a UUID header and a JSON body with
+required `fullName` (1–150 characters), `phone` (7–30 allowed phone characters; 7–15 digits after normalization),
+and `requestedAt` (future ISO-8601 instant). Optional fields are `cui` (13 digits; only used to associate an
+already-existing patient), `email` (valid address, at most 255 characters), `professionalId` (active dentist), and
+`reason` (at most 300 characters; scheduling context only, no symptoms or clinical data). No account or patient
+record is created. A matching CUI links the existing patient internally; otherwise the request stays unlinked
+until clinic staff verifies identity and uses the administrative link action. The response never confirms whether
+the CUI matched a patient.
+
+Example request:
+
+```http
+POST /api/v1/public/appointment-requests
+Idempotency-Key: 447cf365-823d-4f06-a22e-04d9e6a91393
+Content-Type: application/json
+```
+
+```json
+{
+  "fullName": "María López",
+  "cui": "1234567890123",
+  "phone": "+502 5555-0101",
+  "email": "maria@example.com",
+  "requestedAt": "2027-03-15T16:00:00Z",
+  "professionalId": null,
+  "reason": "Primera consulta, horario de tarde"
+}
+```
+
+Success is `202 Accepted` with only `{ "requestId": "<opaque UUID>", "message": "..." }`. The requested time
+is a preference, not a reservation; no calendar slot is held. Clinic staff must link an unassociated requester to
+a patient, then propose a real available time/professional or accept an existing requested slot through the
+existing availability validation. Receptionists and administrators can assign or reassign an active dentist using
+`POST /api/v1/appointment-requests/{requestId}/assign-professional` with
+`{ "professionalId": "<uuid>" }`. It is available to `ADMINISTRATOR` and `SECRETARY` for public requests in
+`PENDING` or `PROPOSED`. Assignment is stored separately from `requestedProfessional`, so receptionist assignment
+does not overwrite the visitor's dentist preference. It does not reserve a slot, change request status, or confirm
+an appointment. Its response includes the refreshed administrative projection and `assignedProfessional`.
+Changing assignment does not silently alter an already-sent `proposedProfessional`/`proposedAt`; clinic staff can
+review and explicitly submit a replacement proposal through the existing proposal endpoint.
+Repeating an identical payload with the same key returns the same receipt;
+reusing a key with another payload or submitting an equivalent active request for the same CUI/time/preferred
+dentist returns generic `409 Conflict`. Missing/invalid fields or a past time return `400 Bad Request`, an
+unavailable/inactive professional returns generic `409 Conflict`, and excessive requests return `429 Too Many
+Requests` with `Retry-After`. Rate limiting is 5 requests per IP per 15 minutes (configurable); clients should
+generate one UUID per submission and retain it across network retries.
+
+Administrative `GET /api/v1/appointment-requests` and `GET /api/v1/appointment-requests/{requestId}` include
+public requests, including those linked to an existing patient by CUI and those with no patient link. They expose
+`source: "PUBLIC"` independent of the patient link, `contact` (`fullName`, `phone`, and available `cui`, `email`,
+`reason`), `requestedAt`, actual `status`, `requestedProfessional`, and `assignedProfessional` (or `null`). The
+existing `publicRequester` field is retained for compatibility. `contact` is non-clinical and staff-only; public
+intake never returns clinical data. Patient-origin requests identify as `PATIENT_PORTAL` in the administrative
+projection and otherwise retain their existing patient data and workflow. `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
+`{ "patientId": "<uuid>" }`; when the intake included CUI, it must match the selected patient's DPI. A proposed
+public request is confirmed by staff through `POST /api/v1/appointment-requests/{requestId}/confirm-public-proposal`
+after linking the patient, because an anonymous requester cannot use the authenticated patient's proposal
+acceptance route. Existing patient endpoints and their contracts are unchanged.
+
+Assignment errors use `409 Conflict` with a stable `code`: `APPOINTMENT_REQUEST_NOT_PUBLIC`,
+`APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE` (includes the actual and allowed states), or
+`PROFESSIONAL_NOT_AVAILABLE`. Appointment creation conflicts use `APPOINTMENT_TIME_UNAVAILABLE` and a message
+that identifies the occupied date/time. Assignment itself performs no availability reservation, so it cannot
+produce an appointment-slot conflict.
+
 | Method | Path | Authorization | Success | Notes |
 |---|---|---|---|---|
 | `GET` | `/api/v1/appointment-requests` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Filters: `from`, `to`, `patientId`, `professionalId`, `status`, `page`, `size`. |
@@ -487,6 +560,10 @@ source of truth.
 | `POST` | `/api/v1/appointment-requests/{requestId}/accept` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Accepts requested slot; a successful retry returns the same confirmation. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/proposal` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Body: future `proposedAt`, optional `professionalId`. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/reject` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Rejects an open request. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/link-patient` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Links a public request after identity verification; CUI must match when supplied. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/assign-professional` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Assigns/reassigns an active dentist to an open public request; does not confirm a slot. Body: `professionalId`. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/confirm-public-proposal` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Confirms a public request after staff has linked the patient; still validates real slot availability. |
+| `POST` | `/api/v1/public/appointment-requests` | Public | `202 Accepted` | First appointment intake; request time is not reserved. Requires UUID `Idempotency-Key`; see contract above. |
 | `POST` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `201 Created` | Body: `professionalId`, future `requestedAt`; patient comes from JWT. |
 | `GET` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `200 OK` | Lists only owned requests. |
 | `GET` | `/api/v1/patients/me/appointment-requests/{requestId}` | `PATIENT` | `200 OK` | Foreign and unknown ids both return 404. |

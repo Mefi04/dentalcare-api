@@ -20,6 +20,7 @@ import java.util.UUID;
 
 @Service
 public class JjwtService implements JwtService {
+    private static final Duration INITIAL_PASSWORD_CHANGE_TOKEN_LIFETIME = Duration.ofMinutes(10);
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
     private final Duration accessExpiration;
@@ -49,6 +50,28 @@ public class JjwtService implements JwtService {
                 .expiration(Date.from(issuedAt.plus(accessExpiration)))
                 .signWith(privateKey, Jwts.SIG.RS256)
                 .compact();
+    }
+
+    @Override
+    public String createInitialPasswordChangeToken(UUID userId) {
+        Instant issuedAt = clock.instant();
+        return Jwts.builder()
+                .subject(userId.toString())
+                .claim("typ", "initial_password_change")
+                .id(UUID.randomUUID().toString())
+                .issuedAt(Date.from(issuedAt))
+                .expiration(Date.from(issuedAt.plus(INITIAL_PASSWORD_CHANGE_TOKEN_LIFETIME)))
+                .signWith(privateKey, Jwts.SIG.RS256)
+                .compact();
+    }
+
+    @Override
+    public UUID parseInitialPasswordChangeToken(String token) {
+        Claims claims = Jwts.parser().verifyWith(publicKey).build().parseSignedClaims(token).getPayload();
+        if (!"initial_password_change".equals(claims.get("typ", String.class))) {
+            throw new IllegalArgumentException("Token is not an initial password-change token");
+        }
+        return UUID.fromString(claims.getSubject());
     }
 
     @Override

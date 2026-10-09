@@ -14,13 +14,17 @@ public class AppointmentRequest {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "patient_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "patient_id")
     private Patient patient;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "requested_professional_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "requested_professional_id")
     private User requestedProfessional;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_professional_id")
+    private User assignedProfessional;
 
     @Column(name = "requested_at", nullable = false)
     private Instant requestedAt;
@@ -50,6 +54,27 @@ public class AppointmentRequest {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "requester_full_name", length = 150)
+    private String requesterFullName;
+
+    @Column(name = "requester_cui", length = 13)
+    private String requesterCui;
+
+    @Column(name = "requester_phone", length = 30)
+    private String requesterPhone;
+
+    @Column(name = "requester_email", length = 255)
+    private String requesterEmail;
+
+    @Column(name = "request_reason", length = 300)
+    private String requestReason;
+
+    @Column(name = "idempotency_key")
+    private UUID idempotencyKey;
+
+    @Column(name = "idempotency_payload_hash", length = 64)
+    private String idempotencyPayloadHash;
+
     protected AppointmentRequest() {}
 
     public AppointmentRequest(UUID id, Patient patient, User requestedProfessional, Instant requestedAt,
@@ -63,9 +88,25 @@ public class AppointmentRequest {
         this.updatedAt = updatedAt;
     }
 
+    public AppointmentRequest(UUID id, Patient patient, User requestedProfessional, Instant requestedAt,
+                              AppointmentRequestStatus status, Instant createdAt, Instant updatedAt,
+                              String requesterFullName, String requesterCui, String requesterPhone,
+                              String requesterEmail, String requestReason, UUID idempotencyKey,
+                              String idempotencyPayloadHash) {
+        this(id, patient, requestedProfessional, requestedAt, status, createdAt, updatedAt);
+        this.requesterFullName = requesterFullName;
+        this.requesterCui = requesterCui;
+        this.requesterPhone = requesterPhone;
+        this.requesterEmail = requesterEmail;
+        this.requestReason = requestReason;
+        this.idempotencyKey = idempotencyKey;
+        this.idempotencyPayloadHash = idempotencyPayloadHash;
+    }
+
     public UUID getId() { return id; }
     public Patient getPatient() { return patient; }
     public User getRequestedProfessional() { return requestedProfessional; }
+    public User getAssignedProfessional() { return assignedProfessional; }
     public Instant getRequestedAt() { return requestedAt; }
     public User getProposedProfessional() { return proposedProfessional; }
     public Instant getProposedAt() { return proposedAt; }
@@ -74,6 +115,22 @@ public class AppointmentRequest {
     public Appointment getAppointment() { return appointment; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public String getRequesterFullName() { return requesterFullName; }
+    public String getRequesterCui() { return requesterCui; }
+    public String getRequesterPhone() { return requesterPhone; }
+    public String getRequesterEmail() { return requesterEmail; }
+    public String getRequestReason() { return requestReason; }
+    public UUID getIdempotencyKey() { return idempotencyKey; }
+    public String getIdempotencyPayloadHash() { return idempotencyPayloadHash; }
+
+    public void linkPatient(Patient patient) {
+        this.patient = patient;
+    }
+
+    public void assignProfessional(User professional, Instant now) {
+        this.assignedProfessional = professional;
+        this.updatedAt = now;
+    }
 
     public void propose(User professional, Instant scheduledAt, User actor, Instant now) {
         proposedProfessional = professional;
