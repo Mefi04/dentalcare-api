@@ -1,13 +1,16 @@
 package com.dentalcare.api.modules.clinicalrecords.service;
 
 import com.dentalcare.api.exception.BadRequestException;
+import com.dentalcare.api.exception.PayloadTooLargeException;
+import com.dentalcare.api.exception.UnsupportedMediaTypeException;
+import com.dentalcare.api.exception.UnprocessableEntityException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
+import java.text.Normalizer;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -25,6 +28,7 @@ public class ClinicalDocumentFileValidator {
             "image/jpeg", Set.of("jpg", "jpeg"),
             "image/png", Set.of("png")
     );
+    private static final int MAX_FILE_NAME_LENGTH = 180;
 
     private final long maxFileSizeBytes;
     private final String maxFileSizeConfig;
@@ -35,7 +39,7 @@ public class ClinicalDocumentFileValidator {
         this.maxFileSizeBytes = DataSize.parse(maxFileSizeConfig).toBytes();
     }
 
-    public void validate(MultipartFile file) {
+    public ValidatedClinicalDocumentFile validate(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("File is required and cannot be empty");
         }
@@ -45,78 +49,50 @@ public class ClinicalDocumentFileValidator {
         }
 
         if (file.getSize() > maxFileSizeBytes) {
-            throw new BadRequestException(
+            throw new PayloadTooLargeException(
                     "File size exceeds maximum allowed limit of " + maxFileSizeConfig);
         }
 
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || originalFilename.trim().isEmpty()) {
-            throw new BadRequestException("File original name is required");
-        }
+        String originalFilename = normalizeFileName(file.getOriginalFilename());
 
         String rawContentType = file.getContentType();
         if (rawContentType == null || rawContentType.trim().isEmpty()) {
-            throw new BadRequestException("File content type is required");
+            throw new UnsupportedMediaTypeException("File content type is required");
         }
 
         String normalizedContentType = rawContentType.split(";")[0].trim().toLowerCase();
         if (!ALLOWED_MIME_TYPES.contains(normalizedContentType)) {
-            throw new BadRequestException(
-                    "Unsupported file type: " + rawContentType + ". Allowed types: application/pdf, image/jpeg, image/png");
+            throw new UnsupportedMediaTypeException("Unsupported file type");
         }
 
         String extension = extractExtension(originalFilename);
         Set<String> validExtensions = ALLOWED_EXTENSIONS_BY_MIME.get(normalizedContentType);
         if (validExtensions == null || !validExtensions.contains(extension)) {
-            throw new BadRequestException(
-                    "File extension '." + extension + "' does not match content type '" + rawContentType + "'");
+            throw new UnsupportedMediaTypeException("File extension does not match content type");
         }
 
-        validateMagicBytes(file, normalizedContentType);
+        long actualSize = ClinicalDocumentStructureValidator.validate(
+                file, normalizedContentType, maxFileSizeBytes, maxFileSizeConfig);
+        if (actualSize != file.getSize()) {
+            throw new UnprocessableEntityException("Uploaded file size does not match the received content");
+        }
+        return new ValidatedClinicalDocumentFile(originalFilename, normalizedContentType, actualSize);
     }
 
-    private void validateMagicBytes(MultipartFile file, String normalizedContentType) {
-        byte[] header = new byte[8];
-        int bytesRead;
-        try (InputStream is = file.getInputStream()) {
-            bytesRead = is.read(header);
-        } catch (IOException e) {
-            throw new BadRequestException("Failed to inspect file content");
+    private String normalizeFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) throw new BadRequestException("File original name is required");
+        int lastSlash = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
+        String cleanName = Normalizer.normalize(fileName.substring(lastSlash + 1), Normalizer.Form.NFKC)
+                .replaceAll("[\\p{Cntrl}]", "").trim();
+        if (cleanName.isBlank() || cleanName.equals(".") || cleanName.equals(".."))
+            throw new BadRequestException("File original name is invalid");
+        if (cleanName.length() > MAX_FILE_NAME_LENGTH) {
+            String extension = extractExtension(cleanName);
+            int suffixLength = extension.isEmpty() ? 0 : extension.length() + 1;
+            cleanName = cleanName.substring(0, MAX_FILE_NAME_LENGTH - suffixLength)
+                    + (suffixLength == 0 ? "" : "." + extension);
         }
-
-        if (bytesRead < 2) {
-            throw new BadRequestException("File content is too short to determine file type");
-        }
-
-        switch (normalizedContentType) {
-            case "application/pdf" -> {
-                // PDF magic bytes: %PDF (0x25, 0x50, 0x44, 0x46)
-                if (bytesRead < 4
-                        || header[0] != 0x25
-                        || header[1] != 0x50
-                        || header[2] != 0x44
-                        || header[3] != 0x46) {
-                    throw new BadRequestException("File content does not match PDF format");
-                }
-            }
-            case "image/jpeg" -> {
-                // JPEG magic bytes: 0xFF, 0xD8
-                if ((header[0] & 0xFF) != 0xFF || (header[1] & 0xFF) != 0xD8) {
-                    throw new BadRequestException("File content does not match JPEG format");
-                }
-            }
-            case "image/png" -> {
-                // PNG magic bytes: 0x89, 0x50, 0x4E, 0x47
-                if (bytesRead < 4
-                        || (header[0] & 0xFF) != 0x89
-                        || header[1] != 0x50
-                        || header[2] != 0x4E
-                        || header[3] != 0x47) {
-                    throw new BadRequestException("File content does not match PNG format");
-                }
-            }
-            default -> throw new BadRequestException("Unsupported content type for file validation");
-        }
+        return cleanName;
     }
 
     private String extractExtension(String fileName) {
@@ -126,6 +102,6 @@ public class ClinicalDocumentFileValidator {
         if (lastDot < 0 || lastDot == cleanName.length() - 1) {
             return "";
         }
-        return cleanName.substring(lastDot + 1).toLowerCase().trim();
+        return cleanName.substring(lastDot + 1).toLowerCase(Locale.ROOT).trim();
     }
 }

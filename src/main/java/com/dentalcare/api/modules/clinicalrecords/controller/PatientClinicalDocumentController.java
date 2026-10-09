@@ -4,6 +4,7 @@ import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentD
 import com.dentalcare.api.modules.clinicalrecords.dto.response.PatientClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocumentType;
 import com.dentalcare.api.modules.clinicalrecords.service.ClinicalDocumentService;
+import com.dentalcare.api.modules.clinicalrecords.service.ClinicalDocumentFileValidator;
 import com.dentalcare.api.security.service.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,6 +15,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -64,18 +66,22 @@ public class PatientClinicalDocumentController {
             @PathVariable UUID documentId) {
         ClinicalDocumentDownload download = clinicalDocumentService.downloadVisibleDocumentForPatient(
                 principal.userId(), documentId);
-        String cleanFileName = download.fileName().replaceAll("[\\r\\n]", "").trim();
+        String cleanFileName = download.fileName() != null && !download.fileName().isBlank()
+                ? download.fileName().replaceAll("[\\r\\n]", "").trim() : "document";
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(cleanFileName, StandardCharsets.UTF_8)
                 .build();
         MediaType mediaType;
         try {
-            mediaType = MediaType.parseMediaType(download.contentType());
+            mediaType = ClinicalDocumentFileValidator.ALLOWED_MIME_TYPES.contains(download.contentType())
+                    ? MediaType.parseMediaType(download.contentType()) : MediaType.APPLICATION_OCTET_STREAM;
         } catch (Exception ignored) {
             mediaType = MediaType.APPLICATION_OCTET_STREAM;
         }
         ResponseEntity.BodyBuilder response = ResponseEntity.ok()
                 .contentType(mediaType)
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .header("X-Content-Type-Options", "nosniff")
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString());
         if (download.contentLength() > 0) {
             response.contentLength(download.contentLength());

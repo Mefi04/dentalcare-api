@@ -7,6 +7,7 @@ import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentD
 import com.dentalcare.api.modules.clinicalrecords.dto.response.ClinicalDocumentResponse;
 import com.dentalcare.api.modules.clinicalrecords.model.ClinicalDocumentType;
 import com.dentalcare.api.modules.clinicalrecords.service.ClinicalDocumentService;
+import com.dentalcare.api.modules.clinicalrecords.service.ClinicalDocumentFileValidator;
 import com.dentalcare.api.security.service.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +19,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -96,13 +98,16 @@ public class ClinicalDocumentController {
 
         MediaType mediaType;
         try {
-            mediaType = MediaType.parseMediaType(download.contentType());
+            mediaType = ClinicalDocumentFileValidator.ALLOWED_MIME_TYPES.contains(download.contentType())
+                    ? MediaType.parseMediaType(download.contentType()) : MediaType.APPLICATION_OCTET_STREAM;
         } catch (Exception e) {
             mediaType = MediaType.APPLICATION_OCTET_STREAM;
         }
 
         ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.ok()
                 .contentType(mediaType)
+                .cacheControl(CacheControl.noStore().cachePrivate())
+                .header("X-Content-Type-Options", "nosniff")
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString());
 
         if (download.contentLength() > 0) {

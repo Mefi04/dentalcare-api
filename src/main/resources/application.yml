@@ -5,6 +5,7 @@ spring:
     multipart:
       max-file-size: ${DOCUMENT_MAX_FILE_SIZE:10MB}
       max-request-size: ${DOCUMENT_MAX_REQUEST_SIZE:12MB}
+      file-size-threshold: 0B
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -35,6 +36,8 @@ server:
   tomcat:
     connection-timeout: 10000
     max-threads: ${SERVER_MAX_THREADS:200}
+    max-part-count: ${DOCUMENT_MAX_PART_COUNT:8}
+    max-swallow-size: ${DOCUMENT_MAX_SWALLOW_SIZE:12MB}
 
 management:
   endpoints:
@@ -66,6 +69,14 @@ dentalcare:
         window: ${RATE_LIMIT_CONTACT_WINDOW:15m}
         ip-limit: ${RATE_LIMIT_CONTACT_IP:10}
         identity-limit: 0
+      clinical-document-upload:
+        window: ${RATE_LIMIT_DOCUMENT_UPLOAD_WINDOW:1m}
+        ip-limit: ${RATE_LIMIT_DOCUMENT_UPLOAD_IP:40}
+        identity-limit: ${RATE_LIMIT_DOCUMENT_UPLOAD_IDENTITY:20}
+      clinical-document-download:
+        window: ${RATE_LIMIT_DOCUMENT_DOWNLOAD_WINDOW:1m}
+        ip-limit: ${RATE_LIMIT_DOCUMENT_DOWNLOAD_IP:240}
+        identity-limit: ${RATE_LIMIT_DOCUMENT_DOWNLOAD_IDENTITY:120}
   initial-admin:
     enabled: ${INITIAL_ADMIN_ENABLED:false}
     full-name: ${INITIAL_ADMIN_FULL_NAME:}
@@ -94,5 +105,9 @@ dentalcare:
     endpoint: ${R2_ENDPOINT:}
     access-key-id: ${R2_ACCESS_KEY_ID:}
     secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+    api-call-timeout: ${R2_API_CALL_TIMEOUT:30s}
+    api-call-attempt-timeout: ${R2_API_CALL_ATTEMPT_TIMEOUT:15s}
   clinical-documents:
     max-file-size: ${DOCUMENT_MAX_FILE_SIZE:10MB}
+    max-concurrent-uploads: ${DOCUMENT_MAX_CONCURRENT_UPLOADS:4}
+    max-concurrent-downloads: ${DOCUMENT_MAX_CONCURRENT_DOWNLOADS:20}

@@ -153,6 +153,8 @@ class ClinicalDocumentControllerSecurityTests {
                 .header("Authorization", "Bearer reader-token"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("Content-Length", "18"))
                 .andExpect(header().exists("Content-Disposition"))
                 .andExpect(content().string("PDF_STREAM_CONTENT"));
@@ -412,6 +414,8 @@ class ClinicalDocumentControllerSecurityTests {
                 .header("Authorization", "Bearer patient-token"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(content().string("shared"));
 
         verify(clinicalDocumentService).findVisibleDocumentsForPatient(eq(userId), any(), eq(0), eq(20));

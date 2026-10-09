@@ -39,6 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,6 +64,14 @@ class R2ClinicalDocumentStorageTests {
         properties.setSecretAccessKey("test-secret-key");
 
         storage = new R2ClinicalDocumentStorage(s3Client, properties);
+        lenient().when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenAnswer(invocation -> {
+                    RequestBody body = invocation.getArgument(1);
+                    try (InputStream stream = body.contentStreamProvider().newStream()) {
+                        stream.transferTo(java.io.OutputStream.nullOutputStream());
+                    }
+                    return PutObjectResponse.builder().build();
+                });
     }
 
     @Test
@@ -76,9 +86,6 @@ class R2ClinicalDocumentStorageTests {
                 bytes.length,
                 new ByteArrayInputStream(bytes)
         );
-
-        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
-                .thenReturn(PutObjectResponse.builder().build());
 
         StoredDocument result = storage.store(command);
 
@@ -112,9 +119,6 @@ class R2ClinicalDocumentStorageTests {
                 new ByteArrayInputStream(bytes)
         );
 
-        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
-                .thenReturn(PutObjectResponse.builder().build());
-
         StoredDocument result = storage.store(command);
 
         assertThat(result.fileName()).isEqualTo("scan.png");
@@ -134,9 +138,6 @@ class R2ClinicalDocumentStorageTests {
                 bytes.length,
                 new ByteArrayInputStream(bytes)
         );
-
-        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
-                .thenReturn(PutObjectResponse.builder().build());
 
         StoredDocument result = storage.store(command);
 
@@ -220,9 +221,6 @@ class R2ClinicalDocumentStorageTests {
                 nonMarkStream
         );
 
-        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
-                .thenReturn(PutObjectResponse.builder().build());
-
         StoredDocument result = storage.store(command);
 
         assertThat(result).isNotNull();
@@ -231,8 +229,8 @@ class R2ClinicalDocumentStorageTests {
     }
 
     @Test
-    @DisplayName("store translates IOException on reading stream to DocumentStorageException")
-    void store_ioExceptionOnReadStream_throwsDocumentStorageException() {
+    @DisplayName("store detects IOException while the client consumes the stream and cleans up")
+    void store_faultyStream_isConsumedAndCleanedUp() {
         UUID patientId = UUID.randomUUID();
         InputStream faultyStream = new InputStream() {
             @Override
@@ -249,8 +247,32 @@ class R2ClinicalDocumentStorageTests {
         );
 
         assertThatThrownBy(() -> storage.store(command))
+                .isInstanceOf(DocumentStorageException.class);
+        verify(s3Client, atLeastOnce()).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    void store_rejectsShortTransferAndCleansUp() {
+        byte[] bytes = "short".getBytes(StandardCharsets.UTF_8);
+        UploadDocumentCommand command = new UploadDocumentCommand(UUID.randomUUID(), "short.pdf",
+                "application/pdf", bytes.length + 1L, new ByteArrayInputStream(bytes));
+
+        assertThatThrownBy(() -> storage.store(command))
                 .isInstanceOf(DocumentStorageException.class)
-                .hasMessage("Failed to read document content");
+                .hasMessage("Failed to store document in storage");
+        verify(s3Client, atLeastOnce()).deleteObject(any(DeleteObjectRequest.class));
+    }
+
+    @Test
+    void store_rejectsExcessTransferAndCleansUp() {
+        byte[] bytes = "too-long".getBytes(StandardCharsets.UTF_8);
+        UploadDocumentCommand command = new UploadDocumentCommand(UUID.randomUUID(), "long.pdf",
+                "application/pdf", bytes.length - 1L, new ByteArrayInputStream(bytes));
+
+        assertThatThrownBy(() -> storage.store(command))
+                .isInstanceOf(DocumentStorageException.class)
+                .hasMessage("Failed to store document in storage");
+        verify(s3Client, atLeastOnce()).deleteObject(any(DeleteObjectRequest.class));
     }
 
     @Test

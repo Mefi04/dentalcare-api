@@ -6,5 +6,7 @@ public enum RateLimitPolicy {
     PUBLIC_CONTACT,
     API_READ,
     API_WRITE,
+    CLINICAL_DOCUMENT_UPLOAD,
+    CLINICAL_DOCUMENT_DOWNLOAD,
     REPORTS
 }

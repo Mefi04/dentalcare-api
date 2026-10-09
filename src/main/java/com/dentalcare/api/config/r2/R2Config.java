@@ -9,6 +9,7 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "dentalcare.r2", name = "enabled", havingValue = "true")
@@ -28,11 +29,17 @@ public class R2Config {
                 .chunkedEncodingEnabled(false)
                 .build();
 
+        ClientOverrideConfiguration timeoutConfiguration = ClientOverrideConfiguration.builder()
+                .apiCallTimeout(properties.getApiCallTimeout())
+                .apiCallAttemptTimeout(properties.getApiCallAttemptTimeout())
+                .build();
+
         return S3Client.builder()
                 .endpointOverride(URI.create(properties.getEndpoint()))
                 .credentialsProvider(StaticCredentialsProvider.create(credentials))
                 .region(Region.of("auto"))
                 .serviceConfiguration(serviceConfiguration)
+                .overrideConfiguration(timeoutConfiguration)
                 .build();
     }
 }
