@@ -16,18 +16,18 @@ public interface AppointmentRequestRepository extends JpaRepository<AppointmentR
         JpaSpecificationExecutor<AppointmentRequest> {
 
     @Override
-    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment"})
+    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment", "requesterIdentityVerifiedBy"})
     Page<AppointmentRequest> findAll(org.springframework.data.jpa.domain.Specification<AppointmentRequest> spec,
                                      Pageable pageable);
 
-    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment"})
+    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment", "requesterIdentityVerifiedBy"})
     Page<AppointmentRequest> findByPatient_Id(UUID patientId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment"})
+    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment", "requesterIdentityVerifiedBy"})
     Optional<AppointmentRequest> findByIdAndPatient_Id(UUID id, UUID patientId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment"})
+    @EntityGraph(attributePaths = {"patient", "requestedProfessional", "assignedProfessional", "proposedProfessional", "appointment", "requesterIdentityVerifiedBy"})
     @Query("select r from AppointmentRequest r where r.id = :id")
     Optional<AppointmentRequest> findDetailedByIdForUpdate(@Param("id") UUID id);
 
@@ -40,10 +40,6 @@ public interface AppointmentRequestRepository extends JpaRepository<AppointmentR
     List<AppointmentRequest> findByStatusAndProposedExpiresAtLessThanEqual(
             com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus status, Instant now);
 
-    boolean existsByRequesterCuiAndRequestedAtAndRequestedProfessionalIsNullAndStatusIn(
-            String requesterCui, java.time.Instant requestedAt, List<com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus> statuses);
-
-    boolean existsByRequesterCuiAndRequestedAtAndRequestedProfessional_IdAndStatusIn(
-            String requesterCui, java.time.Instant requestedAt, UUID professionalId,
+    boolean existsByIdempotencyPayloadHashAndStatusIn(String idempotencyPayloadHash,
             List<com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus> statuses);
 }

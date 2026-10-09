@@ -483,9 +483,9 @@ required `fullName` (1–150 characters), `phone` (7–30 allowed phone characte
 and `requestedAt` (future ISO-8601 instant). Optional fields are `cui` (13 digits; only used to associate an
 already-existing patient), `email` (valid address, at most 255 characters), `professionalId` (active dentist), and
 `reason` (at most 300 characters; scheduling context only, no symptoms or clinical data). No account or patient
-record is created. A matching CUI links the existing patient internally; otherwise the request stays unlinked
-until clinic staff verifies identity and uses the administrative link action. The response never confirms whether
-the CUI matched a patient.
+record is created and the endpoint never searches patients by CUI. A supplied CUI is stored as an unverified
+claim for reception's later identity-verification workflow; it never authenticates the visitor or associates an
+expediente. The anonymous response never confirms whether a CUI exists in DentalCare.
 
 Example request:
 
@@ -519,20 +519,34 @@ an appointment. Its response includes the refreshed administrative projection an
 Changing assignment does not silently alter an already-sent `proposedProfessional`/`proposedAt`; clinic staff can
 review and explicitly submit a replacement proposal through the existing proposal endpoint.
 Repeating an identical payload with the same key returns the same receipt;
-reusing a key with another payload or submitting an equivalent active request for the same CUI/time/preferred
-dentist returns generic `409 Conflict`. Missing/invalid fields or a past time return `400 Bad Request`, an
+reusing a key with another payload or submitting the exact same normalized payload while it is still active
+returns generic `409 Conflict`. The duplicate key is a hash of the full normalized request, not a CUI lookup.
+Missing/invalid fields or a past time return `400 Bad Request`, an
 unavailable/inactive professional returns generic `409 Conflict`, and excessive requests return `429 Too Many
 Requests` with `Retry-After`. Rate limiting is 5 requests per IP per 15 minutes (configurable); clients should
 generate one UUID per submission and retain it across network retries.
 
 Administrative `GET /api/v1/appointment-requests` and `GET /api/v1/appointment-requests/{requestId}` include
-public requests, including those linked to an existing patient by CUI and those with no patient link. They expose
+public requests, initially unlinked regardless of submitted CUI. They expose
 `source: "PUBLIC"` independent of the patient link, `contact` (`fullName`, `phone`, and available `cui`, `email`,
 `reason`), `requestedAt`, actual `status`, `requestedProfessional`, and `assignedProfessional` (or `null`). The
 existing `publicRequester` field is retained for compatibility. `contact` is non-clinical and staff-only; public
 intake never returns clinical data. Patient-origin requests identify as `PATIENT_PORTAL` in the administrative
-projection and otherwise retain their existing patient data and workflow. `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
-`{ "patientId": "<uuid>" }`; when the intake included CUI, it must match the selected patient's DPI. Linking an
+projection and otherwise retain their existing patient data and workflow. Before linking or registering a
+patient, reception records an identity-verification method using
+`POST /api/v1/appointment-requests/{requestId}/verify-requester-identity` with
+`{"method":"IN_PERSON|CALLBACK_TO_REGISTERED_CONTACT|DOCUMENT_REVIEW"}`. The actor, method and timestamp are
+audited and returned in administrative `identityVerification`. OTP ownership of the submitted contact is not
+proof of legal identity, and CUI alone is not proof either.
+
+For an existing patient, `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
+`{ "patientId": "<uuid>" }`; after staff identity verification, a submitted CUI, when present, must match the
+selected patient's DPI. For a new patient, reception uses
+`POST /api/v1/appointment-requests/{requestId}/register-patient` with the existing `CreatePatientRequest` DTO.
+It requires `PATIENT_CREATE`, all required patient-administration fields (including real DPI, birth date and
+gender), calls the official `PatientService`, creates no user/account, and atomically links the new record. A
+repeated request matching the already-linked DPI returns the linked appointment request rather than creating a
+duplicate patient. Patient creation and linking roll back together on failure. Linking or registering an
 existing patient record is required before public acceptance, but never confirms the proposal. The legacy
 `POST /api/v1/appointment-requests/{requestId}/confirm-public-proposal` is retained for compatibility and returns
 `409 PUBLIC_PATIENT_ACCEPTANCE_REQUIRED`; only the verified public conversation can accept. Existing patient
@@ -552,6 +566,8 @@ produce an appointment-slot conflict.
 | `POST` | `/api/v1/appointment-requests/{requestId}/proposal` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Body: future `proposedAt`, optional `professionalId`. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/reject` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Rejects an open request. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/link-patient` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Links a public request after identity verification; CUI must match when supplied. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/verify-requester-identity` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Audits reception's verification method before linking/registering. CUI and public OTP are not identity proof. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/register-patient` | `ADMINISTRATOR`, `SECRETARY` + `PATIENT_CREATE` | `200 OK` | Uses `CreatePatientRequest`/`PatientService`; requires verified identity, creates no portal account, links atomically. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/assign-professional` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Assigns/reassigns an active dentist to an open public request; does not confirm a slot. Body: `professionalId`. |
 | `GET` | `/api/v1/appointment-requests/{requestId}/availability?professionalId={uuid}&date=YYYY-MM-DD` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Returns only booked instants for that dentist on the Guatemala clinic date. Proposal submission validates availability again. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/messages` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Body is a predefined non-clinical template type; free-text/clinical messages are not accepted. |
@@ -594,9 +610,10 @@ required for decisions. Rejecting or expiring a proposal returns the request to 
 Acceptance rechecks availability and creates the appointment transactionally. A partial unique PostgreSQL index
 on active dentist/time reservations closes concurrent booking races; an occupied slot returns `409` with
 `APPOINTMENT_TIME_UNAVAILABLE` and creates no appointment. If no patient record exists, acceptance returns
-`409 PATIENT_RECORD_LINK_REQUIRED`; reception must link an existing record first. CUI is never used as chat
-authentication, no account/record is auto-created, and no arbitrary patient messages are accepted. Reception
-messages use predefined scheduling templates to avoid collecting clinical information.
+`409 PATIENT_RECORD_LINK_REQUIRED`; reception verifies identity, then either links an existing record or creates
+one through the patient module before another acceptance attempt. The CUI is never used as chat authentication or
+an automatic record match. No account is created automatically, and no arbitrary patient messages are accepted.
+Reception messages use predefined scheduling templates to avoid collecting clinical information.
 
 ## Waiting room endpoints
 

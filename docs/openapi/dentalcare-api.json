@@ -285,6 +285,10 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "identityVerification" : {
+            "$ref" : "#/components/schemas/PublicRequesterIdentityVerificationResponse",
+            "description" : "Administrative identity verification record for a public requester"
+          },
           "messages" : {
             "items" : {
               "$ref" : "#/components/schemas/AppointmentRequestMessageResponse"
@@ -1706,7 +1710,7 @@
         "description" : "Non-clinical information needed to request a first appointment",
         "properties" : {
           "cui" : {
-            "description" : "Optional Guatemalan DPI/CUI, used only to associate an existing patient record",
+            "description" : "Optional Guatemalan DPI/CUI; never authenticates the visitor or auto-links an expediente",
             "pattern" : "^[0-9]{13}$",
             "type" : "string"
           },
@@ -5405,6 +5409,22 @@
         },
         "type" : "object"
       },
+      "PublicRequesterIdentityVerificationResponse" : {
+        "properties" : {
+          "method" : {
+            "type" : "string"
+          },
+          "verifiedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "verifiedByUserId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "PublicServiceResponse" : {
         "properties" : {
           "category" : {
@@ -7065,6 +7085,16 @@
         "required" : [ "code" ],
         "type" : "object"
       },
+      "VerifyPublicRequesterIdentityRequest" : {
+        "properties" : {
+          "method" : {
+            "enum" : [ "IN_PERSON", "CALLBACK_TO_REGISTERED_CONTACT", "DOCUMENT_REVIEW" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "method" ],
+        "type" : "object"
+      },
       "VoidChargeRequest" : {
         "properties" : {
           "reason" : {
@@ -7897,6 +7927,7 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
+        "summary" : "Link an existing patient record after reception verifies requester identity",
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
@@ -8120,6 +8151,117 @@
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
+    "/api/v1/appointment-requests/{requestId}/register-patient" : {
+      "post" : {
+        "description" : "Requires a prior identity-verification record and PATIENT_CREATE. Body uses CreatePatientRequest; all required administrative fields (including DPI, birthDate and gender) must be supplied by reception. Does not create portal access.",
+        "operationId" : "registerPatient",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreatePatientRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Create a new patient through the official patient service and link it atomically",
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
     "/api/v1/appointment-requests/{requestId}/reject" : {
       "post" : {
         "operationId" : "reject_1",
@@ -8216,6 +8358,117 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-requests/{requestId}/verify-requester-identity" : {
+      "post" : {
+        "description" : "Administrative attestation only; CUI match or public-channel OTP alone does not establish the link. Methods: IN_PERSON, CALLBACK_TO_REGISTERED_CONTACT, DOCUMENT_REVIEW.",
+        "operationId" : "verifyRequesterIdentity",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/VerifyPublicRequesterIdentityRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Record reception's identity verification before linking or registering a patient",
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },

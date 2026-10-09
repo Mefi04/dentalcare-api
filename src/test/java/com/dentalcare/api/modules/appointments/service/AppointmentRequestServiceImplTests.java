@@ -6,9 +6,15 @@ import com.dentalcare.api.modules.appointments.dto.request.CreatePublicAppointme
 import com.dentalcare.api.modules.appointments.model.*;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRequestRepository;
 import com.dentalcare.api.modules.appointments.repository.AppointmentPublicConversationRepository;
+import com.dentalcare.api.modules.appointments.repository.AppointmentPublicDecisionRepository;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRequestMessageRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
+import com.dentalcare.api.modules.patients.model.Gender;
+import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
+import com.dentalcare.api.modules.patients.dto.response.PatientResponse;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.patients.service.PatientService;
+import com.dentalcare.api.modules.audit.service.AuditService;
 import com.dentalcare.api.modules.users.model.*;
 import com.dentalcare.api.modules.users.repository.UserRepository;
 import org.junit.jupiter.api.*;
@@ -16,7 +22,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.*;
 import java.util.*;
@@ -35,10 +40,13 @@ class AppointmentRequestServiceImplTests {
     @Mock UserRepository users;
     @Mock AppointmentService appointments;
     @Mock AppointmentPublicConversationRepository conversations;
+    @Mock AppointmentPublicDecisionRepository decisions;
     @Mock AppointmentRequestMessageRepository messages;
     @Mock PublicAppointmentCodeDelivery codeDelivery;
     @Mock PasswordEncoder passwordEncoder;
     @Mock com.dentalcare.api.modules.appointments.repository.AppointmentRepository appointmentRepository;
+    @Mock PatientService patientService;
+    @Mock AuditService auditService;
 
     private AppointmentRequestServiceImpl service;
     private UUID patientUserId;
@@ -49,12 +57,8 @@ class AppointmentRequestServiceImplTests {
     @BeforeEach
     void setUp() {
         service = new AppointmentRequestServiceImpl(requests, patients, users, appointments,
-                new AppointmentRequestMapper(), Clock.fixed(NOW, ZoneOffset.UTC));
-        ReflectionTestUtils.setField(service, "conversations", conversations);
-        ReflectionTestUtils.setField(service, "messages", messages);
-        ReflectionTestUtils.setField(service, "codeDelivery", codeDelivery);
-        ReflectionTestUtils.setField(service, "passwordEncoder", passwordEncoder);
-        ReflectionTestUtils.setField(service, "appointmentRepository", appointmentRepository);
+                new AppointmentRequestMapper(), Clock.fixed(NOW, ZoneOffset.UTC), patientService, auditService,
+                conversations, decisions, messages, codeDelivery, passwordEncoder, appointmentRepository);
         patientUserId = UUID.randomUUID();
         patient = patient();
         dentist = user("DENTIST");
@@ -76,11 +80,10 @@ class AppointmentRequestServiceImplTests {
     }
 
     @Test
-    void publicRequestLinksExistingPatientButOnlyAcknowledgesPublicly() {
+    void publicRequestNeverLooksUpOrLinksPatientByCuiAndOnlyAcknowledgesPublicly() {
         UUID idempotencyKey = UUID.randomUUID();
         var request = publicRequest(dentist.getId());
         when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(dentist));
-        when(patients.findByDpi("1234567890123")).thenReturn(Optional.of(patient));
         when(requests.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         var receipt = service.createPublic(request, idempotencyKey);
@@ -88,13 +91,14 @@ class AppointmentRequestServiceImplTests {
         ArgumentCaptor<AppointmentRequest> captor = ArgumentCaptor.forClass(AppointmentRequest.class);
         verify(requests).saveAndFlush(captor.capture());
         AppointmentRequest persisted = captor.getValue();
-        assertThat(persisted.getPatient()).isSameAs(patient);
+        assertThat(persisted.getPatient()).isNull();
         assertThat(persisted.getStatus()).isEqualTo(AppointmentRequestStatus.PENDING_CLINIC);
         assertThat(persisted.getRequesterCui()).isEqualTo("1234567890123");
         assertThat(persisted.getIdempotencyKey()).isEqualTo(idempotencyKey);
         assertThat(receipt.requestId()).isEqualTo(persisted.getId());
         assertThat(receipt.message()).doesNotContain("1234567890123", "maria@example.test", "5555-0101");
         verifyNoInteractions(appointments);
+        verify(patients, never()).findByDpi(anyString());
 
         when(requests.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(persisted));
         var retry = service.createPublic(request, idempotencyKey);
@@ -103,8 +107,7 @@ class AppointmentRequestServiceImplTests {
     }
 
     @Test
-    void publicRequestWithoutMatchingPatientRemainsUnlinkedAndDoesNotCreateUserOrPatient() {
-        when(patients.findByDpi("9999999999999")).thenReturn(Optional.empty());
+    void publicRequestWithCuiRemainsUnlinkedAndDoesNotQueryPatientOrCreateUser() {
         when(requests.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.createPublic(publicRequest(null, "9999999999999"), UUID.randomUUID());
@@ -113,8 +116,50 @@ class AppointmentRequestServiceImplTests {
         verify(requests).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getPatient()).isNull();
         assertThat(captor.getValue().getRequestedProfessional()).isNull();
-        verify(patients).findByDpi("9999999999999");
+        verify(patients, never()).findByDpi(anyString());
         verifyNoInteractions(users, appointments);
+    }
+
+    @Test
+    void receptionMustVerifyIdentityBeforeCreatingAndLinkingNewPatientAtomically() {
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), null, null, FUTURE,
+                AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Maria Lopez", "1234567890123",
+                "5555-0101", null, null, UUID.randomUUID(), "payload-hash");
+        request.verifyRequesterIdentity(secretary, "DOCUMENT_REVIEW", NOW);
+        when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
+        when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
+        patient.setDpi("1234567890123");
+        CreatePatientRequest input = new CreatePatientRequest("Maria Lopez", "1234567890123",
+                LocalDate.of(1990, 1, 1), Gender.FEMALE, "5555-0101", null,
+                null, null, null, null, null, null, null, null, null, null);
+        PatientResponse response = new PatientResponse(patient.getId(), patient.getCode(), patient.getName(),
+                patient.getDpi(), patient.getBirthDate(), patient.getGender(), patient.getPhone(), null,
+                null, null, null, null, null, null, null, null, null, null, null, NOW, NOW);
+        when(patientService.create(input)).thenReturn(response);
+        when(patients.findById(patient.getId())).thenReturn(Optional.of(patient));
+        when(requests.saveAndFlush(request)).thenReturn(request);
+
+        var linked = service.registerAndLinkPublicRequester(secretary.getId(), request.getId(), input);
+
+        assertThat(linked.patient().id()).isEqualTo(patient.getId());
+        assertThat(linked.source()).isEqualTo("PUBLIC");
+        assertThat(linked.identityVerification().method()).isEqualTo("DOCUMENT_REVIEW");
+        verify(patientService).create(input);
+        verifyNoInteractions(appointments);
+    }
+
+    @Test
+    void receptionCannotLinkExistingPatientUntilIdentityIsVerified() {
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), null, null, FUTURE,
+                AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Maria Lopez", patient.getDpi(),
+                "5555-0101", null, null, UUID.randomUUID(), "payload-hash");
+        when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
+        when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
+
+        assertThatThrownBy(() -> service.linkPublicRequestPatient(secretary.getId(), request.getId(), patient.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "REQUESTER_IDENTITY_NOT_VERIFIED");
+        verifyNoInteractions(patientService);
     }
 
     @Test
@@ -216,9 +261,8 @@ class AppointmentRequestServiceImplTests {
     @Test
     void publicRequestRejectsEquivalentActiveRequestAndInactivePreferredProfessional() {
         when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(dentist));
-        when(requests.existsByRequesterCuiAndRequestedAtAndRequestedProfessional_IdAndStatusIn(
-                "1234567890123", FUTURE, dentist.getId(), List.of(
-                        AppointmentRequestStatus.PENDING_CLINIC, AppointmentRequestStatus.PENDING_PATIENT))).thenReturn(true);
+        when(requests.existsByIdempotencyPayloadHashAndStatusIn(anyString(), eq(List.of(
+                AppointmentRequestStatus.PENDING_CLINIC, AppointmentRequestStatus.PENDING_PATIENT)))).thenReturn(true);
         assertThatThrownBy(() -> service.createPublic(publicRequest(dentist.getId()), UUID.randomUUID()))
                 .isInstanceOf(ConflictException.class)
                 .hasMessage("An equivalent appointment request is already active");
@@ -322,6 +366,7 @@ class AppointmentRequestServiceImplTests {
                 "5555-0101", null, null, UUID.randomUUID(), "hash");
         request.assignProfessional(dentist, NOW);
         request.propose(dentist, FUTURE, NOW.plusSeconds(3600), secretary, NOW);
+        request.verifyRequesterIdentity(secretary, "DOCUMENT_REVIEW", NOW);
         String rawToken = "random-unpredictable-conversation-token";
         AppointmentPublicConversation conversation = verifiedConversation(request.getId(), rawToken);
         when(conversations.findByConversationTokenHash(anyString())).thenReturn(Optional.of(conversation));
@@ -378,6 +423,35 @@ class AppointmentRequestServiceImplTests {
                 UUID.randomUUID());
 
         assertThat(rejected.status()).isEqualTo(AppointmentRequestStatus.PENDING_CLINIC);
+        verifyNoInteractions(appointments);
+    }
+
+    @Test
+    void priorDecisionIdempotencyKeyCannotBeReplayedAgainstANewerProposal() {
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), patient, null, FUTURE,
+                AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Maria Lopez", patient.getDpi(),
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        request.propose(dentist, FUTURE, NOW.plusSeconds(3600), secretary, NOW);
+        String rawToken = "scoped-conversation-token";
+        UUID key = UUID.randomUUID();
+        AppointmentPublicConversation conversation = verifiedConversation(request.getId(), rawToken);
+        when(conversations.findByConversationTokenHash(anyString())).thenReturn(Optional.of(conversation));
+        when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
+        when(requests.saveAndFlush(request)).thenReturn(request);
+        when(messages.findByAppointmentRequestIdOrderByCreatedAtAscIdAsc(request.getId())).thenReturn(List.of());
+
+        service.decidePublicProposal(request.getId(), rawToken,
+                new com.dentalcare.api.modules.appointments.dto.request.PublicAppointmentDecisionRequest(
+                        com.dentalcare.api.modules.appointments.dto.request.PublicAppointmentDecisionRequest.Decision.REJECT), key);
+        when(decisions.findByAppointmentRequestIdAndIdempotencyKey(request.getId(), key))
+                .thenReturn(Optional.of(new AppointmentPublicDecision(request.getId(), key, "REJECT", NOW)));
+
+        request.propose(dentist, FUTURE.plusSeconds(3600), NOW.plusSeconds(7200), secretary, NOW.plusSeconds(1));
+        assertThatThrownBy(() -> service.decidePublicProposal(request.getId(), rawToken,
+                new com.dentalcare.api.modules.appointments.dto.request.PublicAppointmentDecisionRequest(
+                        com.dentalcare.api.modules.appointments.dto.request.PublicAppointmentDecisionRequest.Decision.ACCEPT), key))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "IDEMPOTENCY_KEY_REUSED");
         verifyNoInteractions(appointments);
     }
 
@@ -453,6 +527,7 @@ class AppointmentRequestServiceImplTests {
                 AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Maria Lopez", patient.getDpi(),
                 "5555-0101", null, null, UUID.randomUUID(), "hash");
         request.propose(dentist, FUTURE, NOW.plusSeconds(3600), secretary, NOW);
+        request.verifyRequesterIdentity(secretary, "DOCUMENT_REVIEW", NOW);
         String rawToken = "scoped-conversation-token";
         when(conversations.findByConversationTokenHash(anyString()))
                 .thenReturn(Optional.of(verifiedConversation(request.getId(), rawToken)));
@@ -513,6 +588,9 @@ class AppointmentRequestServiceImplTests {
         value.setCode("PAC-001");
         value.setName("Ana Pérez");
         value.setPhone("5555-0101");
+        value.setDpi("1234567890123");
+        value.setBirthDate(LocalDate.of(1990, 1, 1));
+        value.setGender(Gender.FEMALE);
         return value;
     }
 

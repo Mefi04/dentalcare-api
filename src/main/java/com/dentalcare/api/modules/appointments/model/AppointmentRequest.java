@@ -78,6 +78,16 @@ public class AppointmentRequest {
     @Column(name = "idempotency_payload_hash", length = 64)
     private String idempotencyPayloadHash;
 
+    @Column(name = "requester_identity_verified_at")
+    private Instant requesterIdentityVerifiedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "requester_identity_verified_by")
+    private User requesterIdentityVerifiedBy;
+
+    @Column(name = "requester_identity_verification_method", length = 32)
+    private String requesterIdentityVerificationMethod;
+
     protected AppointmentRequest() {}
 
     public AppointmentRequest(UUID id, Patient patient, User requestedProfessional, Instant requestedAt,
@@ -126,9 +136,20 @@ public class AppointmentRequest {
     public String getRequestReason() { return requestReason; }
     public UUID getIdempotencyKey() { return idempotencyKey; }
     public String getIdempotencyPayloadHash() { return idempotencyPayloadHash; }
+    public Instant getRequesterIdentityVerifiedAt() { return requesterIdentityVerifiedAt; }
+    public User getRequesterIdentityVerifiedBy() { return requesterIdentityVerifiedBy; }
+    public String getRequesterIdentityVerificationMethod() { return requesterIdentityVerificationMethod; }
 
-    public void linkPatient(Patient patient) {
+    public void linkPatient(Patient patient, Instant now) {
         this.patient = patient;
+        this.updatedAt = now;
+    }
+
+    public void verifyRequesterIdentity(User actor, String method, Instant now) {
+        this.requesterIdentityVerifiedBy = actor;
+        this.requesterIdentityVerificationMethod = method;
+        this.requesterIdentityVerifiedAt = now;
+        this.updatedAt = now;
     }
 
     public void assignProfessional(User professional, Instant now) {

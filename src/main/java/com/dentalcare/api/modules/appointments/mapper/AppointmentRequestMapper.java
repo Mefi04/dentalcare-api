@@ -40,7 +40,14 @@ public class AppointmentRequestMapper {
                 administrative ? contact : null,
                 administrative && publicRequest ? professional(request.getAssignedProfessional()) : null,
                 administrative && publicRequest ? request.getProposedExpiresAt() : null,
-                administrative && publicRequest ? java.util.List.of() : null);
+                administrative && publicRequest ? java.util.List.of() : null,
+                administrative && publicRequest && request.getRequesterIdentityVerifiedAt() != null
+                        ? new PublicRequesterIdentityVerificationResponse(
+                                request.getRequesterIdentityVerifiedAt(),
+                                request.getRequesterIdentityVerifiedBy() == null ? null
+                                        : request.getRequesterIdentityVerifiedBy().getId(),
+                                request.getRequesterIdentityVerificationMethod())
+                        : null);
     }
 
     private AppointmentProfessionalResponse professional(com.dentalcare.api.modules.users.model.User user) {

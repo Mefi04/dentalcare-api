@@ -29,5 +29,8 @@ public record AppointmentRequestResponse(
         @Schema(description = "Reception assignment; null when no dentist has been assigned")
         AppointmentProfessionalResponse assignedProfessional,
         @JsonInclude(JsonInclude.Include.NON_NULL) Instant proposalExpiresAt,
-        @JsonInclude(JsonInclude.Include.NON_NULL) List<AppointmentRequestMessageResponse> messages) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) List<AppointmentRequestMessageResponse> messages,
+        @JsonInclude(JsonInclude.Include.NON_NULL)
+        @Schema(description = "Administrative identity verification record for a public requester")
+        PublicRequesterIdentityVerificationResponse identityVerification) {
 }

@@ -83,3 +83,7 @@ databaseChangeLog:
       file: db/changelog/changes/041-add-assigned-professional-to-appointment-requests.sql
   - include:
       file: db/changelog/changes/042-public-appointment-conversations.sql
+  - include:
+      file: db/changelog/changes/043-public-request-identity-and-safe-deduplication.sql
+  - include:
+      file: db/changelog/changes/044-public-appointment-decision-idempotency.sql

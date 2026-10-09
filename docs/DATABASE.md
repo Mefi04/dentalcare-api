@@ -356,7 +356,7 @@ persisted appointment. Confirmation locks the request and creates the appointmen
 Changeset `040-public-appointment-requests` extends this workflow for anonymous first-appointment intake without
 creating users or patient records. Public contact snapshots, idempotency key/hash, and nullable patient/preferred
 dentist links support unassociated pending requests. Partial unique indexes enforce idempotency keys and equivalent
-active requests for an existing CUI and preferred slot. A preferred public time is not reserved; only the existing
+active requests. A preferred public time is not reserved; only the existing
 appointment creation/availability path creates a confirmed slot.
 
 Changeset `041-add-assigned-professional-to-appointment-requests` separates reception's assigned dentist from
@@ -365,9 +365,21 @@ does not create or reserve an appointment.
 
 Changeset `042-public-appointment-conversations` migrates public request states to `PENDING_CLINIC` and
 `PENDING_PATIENT` while preserving the authenticated patient-request states. It stores only BCrypt OTP hashes,
-SHA-256 conversation-token hashes, bounded attempts/expirations, decision idempotency, and predefined scheduling
-messages. Proposal expiry is persisted on the request. A partial unique index on `(professional_id, scheduled_at)`
+SHA-256 conversation-token hashes, bounded attempts/expirations, and predefined scheduling messages. Proposal
+expiry is persisted on the request. A partial unique index on `(professional_id, scheduled_at)`
 for `SCHEDULED` appointments enforces exact-slot exclusivity under concurrent confirmations.
+
+Changeset `043-public-request-identity-and-safe-deduplication` stores the reception identity-verification
+attestation (`verified_at`, staff user, and a controlled verification method) required before linking or creating a
+patient from an anonymous request. Public intake never queries or auto-links a patient by submitted DPI/CUI. The
+active-request uniqueness index now uses the normalized full-payload hash, avoiding CUI-based existence probes.
+The same changeset expands sender labels to `BOT` and `RECEPTION`; legacy `CLINIC` messages remain readable.
+Reception patient registration calls the existing `PatientService` and links within the same transaction; it does
+not create portal access. No existing request, patient, appointment, or applied migration is deleted or rewritten.
+
+Changeset `044-public-appointment-decision-idempotency` stores each successful public accept/reject key per
+request, rather than relying only on the conversation's last key. Previously recorded keys are migrated, so a
+replayed decision cannot be applied to a later proposal cycle.
 
 `appointment_waiting_room_entries` has a unique one-to-one foreign key to `appointments` and stores
 `ARRIVED -> WAITING -> READY -> CLOSED`, transition timestamps, check-in staff and latest responsible staff.

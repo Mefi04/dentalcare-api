@@ -29,12 +29,6 @@ public class AppointmentPublicConversation {
     @Column(name = "conversation_expires_at")
     private Instant conversationExpiresAt;
 
-    @Column(name = "decision_idempotency_key")
-    private UUID decisionIdempotencyKey;
-
-    @Column(name = "decision_idempotency_result", length = 20)
-    private String decisionIdempotencyResult;
-
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -55,8 +49,6 @@ public class AppointmentPublicConversation {
     public int getVerificationAttempts() { return verificationAttempts; }
     public String getConversationTokenHash() { return conversationTokenHash; }
     public Instant getConversationExpiresAt() { return conversationExpiresAt; }
-    public UUID getDecisionIdempotencyKey() { return decisionIdempotencyKey; }
-    public String getDecisionIdempotencyResult() { return decisionIdempotencyResult; }
 
     public void replaceCode(String channel, String hash, Instant expiresAt, Instant now) {
         this.channel = channel;
@@ -74,11 +66,6 @@ public class AppointmentPublicConversation {
         verificationExpiresAt = null;
         conversationTokenHash = tokenHash;
         conversationExpiresAt = expiresAt;
-        updatedAt = now;
-    }
-    public void recordDecision(UUID key, String result, Instant now) {
-        decisionIdempotencyKey = key;
-        decisionIdempotencyResult = result;
         updatedAt = now;
     }
 }

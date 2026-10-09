@@ -18,7 +18,7 @@ public record CreatePublicAppointmentRequest(
         String fullName,
 
         @Pattern(regexp = "^[0-9]{13}$", message = "CUI must contain exactly 13 digits")
-        @Schema(description = "Optional Guatemalan DPI/CUI, used only to associate an existing patient record")
+        @Schema(description = "Optional Guatemalan DPI/CUI; never authenticates the visitor or auto-links an expediente")
         String cui,
 
         @NotBlank @Size(max = 30)

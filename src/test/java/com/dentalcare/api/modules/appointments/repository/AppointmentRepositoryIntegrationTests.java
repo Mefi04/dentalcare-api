@@ -41,6 +41,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,6 +50,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers(disabledWithoutDocker = true)
 class AppointmentRepositoryIntegrationTests {
+    private static final AtomicLong USER_CUI_SEQUENCE = new AtomicLong(2_100_000_000_100L);
+    private static final AtomicLong PATIENT_DPI_SEQUENCE = new AtomicLong(2_200_000_000_100L);
     private static final Instant NOW = Instant.parse("2026-09-27T12:00:00Z");
     private static final Instant SCHEDULED_AT = Instant.parse("2026-09-28T15:00:00Z");
 
@@ -141,6 +144,24 @@ class AppointmentRepositoryIntegrationTests {
                     Integer.class, dentist.getId(), Timestamp.from(SCHEDULED_AT))).isEqualTo(1);
         } finally {
             pool.shutdownNow();
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                jdbc.update("delete from appointment_request_messages where appointment_request_id in " +
+                        "(select id from appointment_requests where patient_id = ? or professional_id = ?)",
+                        patient.getId(), dentist.getId());
+                jdbc.update("delete from appointment_public_conversations where appointment_request_id in " +
+                        "(select id from appointment_requests where patient_id = ? or professional_id = ?)",
+                        patient.getId(), dentist.getId());
+                jdbc.update("delete from appointment_requests where patient_id = ? or professional_id = ?",
+                        patient.getId(), dentist.getId());
+                jdbc.update("delete from appointment_waiting_room_entries where appointment_id in " +
+                        "(select id from appointments where patient_id = ? and professional_id = ? and scheduled_at = ?)",
+                        patient.getId(), dentist.getId(), Timestamp.from(SCHEDULED_AT));
+                jdbc.update("delete from appointments where patient_id = ? and professional_id = ? and scheduled_at = ?",
+                        patient.getId(), dentist.getId(), Timestamp.from(SCHEDULED_AT));
+                jdbc.update("delete from patients where id = ?", patient.getId());
+                jdbc.update("delete from user_roles where user_id = ?", dentist.getId());
+                jdbc.update("delete from users where id = ?", dentist.getId());
+            });
         }
     }
 
@@ -206,11 +227,12 @@ class AppointmentRepositoryIntegrationTests {
     }
 
     @Test
-    void publicRequestLinkedByCuiStillHasPublicSourceInAdministrativeListAndDetail() {
+    void publicRequestManuallyLinkedAfterVerificationStillHasPublicSourceInAdministrativeListAndDetail() {
         AppointmentRequest linkedPublic = new AppointmentRequest(UUID.randomUUID(), patient, dentist,
                 SCHEDULED_AT, AppointmentRequestStatus.PENDING_PATIENT, NOW, NOW, "Public name", patient.getDpi(),
                 "+502 5555-0101", "public@example.test", "Afternoon", UUID.randomUUID(), "d".repeat(64));
         linkedPublic.propose(dentist, SCHEDULED_AT.plusSeconds(3600), dentist, NOW.plusSeconds(30));
+        linkedPublic.verifyRequesterIdentity(dentist, "DOCUMENT_REVIEW", NOW.plusSeconds(15));
         appointmentRequests.saveAndFlush(linkedPublic);
         AppointmentRequestMapper mapper = new AppointmentRequestMapper();
 
@@ -230,17 +252,19 @@ class AppointmentRepositoryIntegrationTests {
         assertThat(fromDetail.source()).isEqualTo("PUBLIC");
         assertThat(fromDetail.contact().cui()).isEqualTo(patient.getDpi());
         assertThat(fromDetail.status()).isEqualTo(AppointmentRequestStatus.PENDING_PATIENT);
+        assertThat(fromDetail.identityVerification().verifiedByUserId()).isEqualTo(dentist.getId());
+        assertThat(fromDetail.identityVerification().method()).isEqualTo("DOCUMENT_REVIEW");
     }
 
     @Test
-    void postgresPreventsDuplicateActivePublicRequestForSameCuiAndPreferredSlot() {
-        appointmentRequests.saveAndFlush(new AppointmentRequest(UUID.randomUUID(), patient, dentist,
-                SCHEDULED_AT, AppointmentRequestStatus.PENDING, NOW, NOW, "Appointment Patient",
+    void postgresPreventsDuplicateActivePublicRequestForSamePayloadWithoutUsingCuiAsIdentity() {
+        appointmentRequests.saveAndFlush(new AppointmentRequest(UUID.randomUUID(), null, dentist,
+                SCHEDULED_AT, AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Appointment Patient",
                 patient.getDpi(), "55550000", null, null, UUID.randomUUID(), "b".repeat(64)));
 
-        AppointmentRequest duplicate = new AppointmentRequest(UUID.randomUUID(), patient, dentist,
-                SCHEDULED_AT, AppointmentRequestStatus.PENDING, NOW, NOW, "Another submitted name",
-                patient.getDpi(), "55551234", null, null, UUID.randomUUID(), "c".repeat(64));
+        AppointmentRequest duplicate = new AppointmentRequest(UUID.randomUUID(), null, dentist,
+                SCHEDULED_AT, AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Appointment Patient",
+                patient.getDpi(), "55550000", null, null, UUID.randomUUID(), "b".repeat(64));
 
         assertThatThrownBy(() -> appointmentRequests.saveAndFlush(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
@@ -396,7 +420,7 @@ class AppointmentRepositoryIntegrationTests {
     }
 
     private Patient patient() {
-        return patient("2000000000001");
+        return patient(String.format("%013d", PATIENT_DPI_SEQUENCE.getAndIncrement()));
     }
 
     private Patient patient(String dpi) {
@@ -419,7 +443,7 @@ class AppointmentRepositoryIntegrationTests {
     }
 
     private User user(Role role) {
-        return user(role, "2000000000002");
+        return user(role, String.format("%013d", USER_CUI_SEQUENCE.getAndIncrement()));
     }
 
     private User user(Role role, String cui) {

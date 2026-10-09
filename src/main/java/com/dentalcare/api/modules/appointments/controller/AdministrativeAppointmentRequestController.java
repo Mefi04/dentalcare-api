@@ -22,6 +22,8 @@ import java.util.UUID;
 import java.time.LocalDate;
 import com.dentalcare.api.modules.appointments.dto.response.AppointmentAvailabilityResponse;
 import com.dentalcare.api.modules.appointments.dto.request.ClinicSchedulingMessageRequest;
+import com.dentalcare.api.modules.appointments.dto.request.VerifyPublicRequesterIdentityRequest;
+import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 
 @RestController
 @RequestMapping("/api/v1/appointment-requests")
@@ -90,11 +92,33 @@ public class AdministrativeAppointmentRequestController {
     }
 
     @PostMapping("/{requestId}/link-patient")
+    @Operation(summary = "Link an existing patient record after reception verifies requester identity")
     public ResponseEntity<AppointmentRequestResponse> linkPatient(
             @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
             @Valid @RequestBody LinkAppointmentRequestPatientRequest request) {
         return ResponseEntity.ok(service.linkPublicRequestPatient(
                 principal.userId(), requestId, request.patientId()));
+    }
+
+    @PostMapping("/{requestId}/verify-requester-identity")
+    @Operation(summary = "Record reception's identity verification before linking or registering a patient",
+            description = "Administrative attestation only; CUI match or public-channel OTP alone does not establish the link. Methods: IN_PERSON, CALLBACK_TO_REGISTERED_CONTACT, DOCUMENT_REVIEW.")
+    public ResponseEntity<AppointmentRequestResponse> verifyRequesterIdentity(
+            @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
+            @Valid @RequestBody VerifyPublicRequesterIdentityRequest request) {
+        return ResponseEntity.ok(service.verifyPublicRequesterIdentity(
+                principal.userId(), requestId, request));
+    }
+
+    @PostMapping("/{requestId}/register-patient")
+    @PreAuthorize("hasAnyRole('ADMINISTRATOR', 'SECRETARY') and hasAuthority('PATIENT_CREATE')")
+    @Operation(summary = "Create a new patient through the official patient service and link it atomically",
+            description = "Requires a prior identity-verification record and PATIENT_CREATE. Body uses CreatePatientRequest; all required administrative fields (including DPI, birthDate and gender) must be supplied by reception. Does not create portal access.")
+    public ResponseEntity<AppointmentRequestResponse> registerPatient(
+            @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
+            @Valid @RequestBody CreatePatientRequest request) {
+        return ResponseEntity.ok(service.registerAndLinkPublicRequester(
+                principal.userId(), requestId, request));
     }
 
     @PostMapping("/{requestId}/assign-professional")

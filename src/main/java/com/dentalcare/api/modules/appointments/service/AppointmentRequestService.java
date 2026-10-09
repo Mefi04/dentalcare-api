@@ -17,11 +17,17 @@ import com.dentalcare.api.modules.appointments.dto.response.PublicConversationTo
 import com.dentalcare.api.modules.appointments.dto.response.PublicVerificationAcknowledgement;
 import com.dentalcare.api.modules.appointments.dto.response.AppointmentAvailabilityResponse;
 import com.dentalcare.api.modules.appointments.dto.request.ClinicSchedulingMessageRequest;
+import com.dentalcare.api.modules.appointments.dto.request.VerifyPublicRequesterIdentityRequest;
+import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
 import java.time.LocalDate;
 
 public interface AppointmentRequestService {
     PublicAppointmentRequestReceipt createPublic(CreatePublicAppointmentRequest request, UUID idempotencyKey);
     AppointmentRequestResponse linkPublicRequestPatient(UUID actorId, UUID requestId, UUID patientId);
+    AppointmentRequestResponse verifyPublicRequesterIdentity(UUID actorId, UUID requestId,
+                                                              VerifyPublicRequesterIdentityRequest request);
+    AppointmentRequestResponse registerAndLinkPublicRequester(UUID actorId, UUID requestId,
+                                                               CreatePatientRequest request);
     AppointmentRequestResponse assignPublicRequestProfessional(UUID actorId, UUID requestId, UUID professionalId);
     AppointmentRequestResponse confirmPublicProposal(UUID actorId, UUID requestId);
     AppointmentRequestResponse createForPatient(UUID userId, UUID professionalId, Instant requestedAt);

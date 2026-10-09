@@ -11,8 +11,12 @@ import com.dentalcare.api.modules.appointments.model.*;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRequestRepository;
 import com.dentalcare.api.modules.appointments.repository.AppointmentPublicConversationRepository;
 import com.dentalcare.api.modules.appointments.repository.AppointmentRequestMessageRepository;
+import com.dentalcare.api.modules.appointments.repository.AppointmentPublicDecisionRepository;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
+import com.dentalcare.api.modules.patients.service.PatientService;
+import com.dentalcare.api.modules.patients.dto.request.CreatePatientRequest;
+import com.dentalcare.api.modules.appointments.dto.request.VerifyPublicRequesterIdentityRequest;
 import com.dentalcare.api.modules.users.model.*;
 import com.dentalcare.api.modules.users.repository.UserRepository;
 import org.springframework.data.domain.*;
@@ -41,7 +45,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Service
 public class AppointmentRequestServiceImpl implements AppointmentRequestService {
-    @org.springframework.beans.factory.annotation.Autowired(required = false) private AuditService auditService;
+    private final AuditService auditService;
+    private final PatientService patientService;
     private static final int MAX_PAGE_SIZE = 100;
     private static final Sort ORDER = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
     private static final List<AppointmentRequestStatus> ACTIVE_PUBLIC_STATUSES =
@@ -57,11 +62,12 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     private final AppointmentService appointments;
     private final AppointmentRequestMapper mapper;
     private final Clock clock;
-    @org.springframework.beans.factory.annotation.Autowired private AppointmentPublicConversationRepository conversations;
-    @org.springframework.beans.factory.annotation.Autowired private AppointmentRequestMessageRepository messages;
-    @org.springframework.beans.factory.annotation.Autowired private PublicAppointmentCodeDelivery codeDelivery;
-    @org.springframework.beans.factory.annotation.Autowired private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
-    @org.springframework.beans.factory.annotation.Autowired private com.dentalcare.api.modules.appointments.repository.AppointmentRepository appointmentRepository;
+    private final AppointmentPublicConversationRepository conversations;
+    private final AppointmentPublicDecisionRepository decisions;
+    private final AppointmentRequestMessageRepository messages;
+    private final PublicAppointmentCodeDelivery codeDelivery;
+    private final PasswordEncoder passwordEncoder;
+    private final com.dentalcare.api.modules.appointments.repository.AppointmentRepository appointmentRepository;
     private static final java.security.SecureRandom RANDOM = new java.security.SecureRandom();
     private static final java.time.Duration OTP_TTL = java.time.Duration.ofMinutes(10);
     private static final java.time.Duration CONVERSATION_TTL = java.time.Duration.ofHours(24);
@@ -70,13 +76,28 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
 
     public AppointmentRequestServiceImpl(AppointmentRequestRepository requests, PatientRepository patients,
                                          UserRepository users, AppointmentService appointments,
-                                         AppointmentRequestMapper mapper, Clock clock) {
+                                         AppointmentRequestMapper mapper, Clock clock,
+                                         PatientService patientService, AuditService auditService,
+                                         AppointmentPublicConversationRepository conversations,
+                                         AppointmentPublicDecisionRepository decisions,
+                                         AppointmentRequestMessageRepository messages,
+                                         PublicAppointmentCodeDelivery codeDelivery,
+                                         PasswordEncoder passwordEncoder,
+                                         com.dentalcare.api.modules.appointments.repository.AppointmentRepository appointmentRepository) {
         this.requests = requests;
         this.patients = patients;
         this.users = users;
         this.appointments = appointments;
         this.mapper = mapper;
         this.clock = clock;
+        this.patientService = patientService;
+        this.auditService = auditService;
+        this.conversations = conversations;
+        this.decisions = decisions;
+        this.messages = messages;
+        this.codeDelivery = codeDelivery;
+        this.passwordEncoder = passwordEncoder;
+        this.appointmentRepository = appointmentRepository;
     }
 
     @Override
@@ -109,20 +130,19 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         }
 
         User professional = request.professionalId() == null ? null : publicDentist(request.professionalId());
-        if (cui != null && hasActiveEquivalent(cui, request.requestedAt(), request.professionalId())) {
+        if (hasActiveEquivalent(payloadHash)) {
             throw new ConflictException("An equivalent appointment request is already active");
         }
 
-        Patient patient = cui == null ? null : patients.findByDpi(cui).orElse(null);
         Instant now = clock.instant();
-        AppointmentRequest created = new AppointmentRequest(UUID.randomUUID(), patient, professional,
+        AppointmentRequest created = new AppointmentRequest(UUID.randomUUID(), null, professional,
                 request.requestedAt(), AppointmentRequestStatus.PENDING_CLINIC, now, now,
                 fullName, cui, phone, email, reason, idempotencyKey, payloadHash);
         AppointmentRequest saved = requests.saveAndFlush(created);
-        if (auditService != null) {
-            auditService.success(AuditActions.APPOINTMENT_REQUEST_CREATED, "APPOINTMENTS",
-                    "PublicAppointmentRequest", saved.getId(), null);
-        }
+        messages.save(new AppointmentRequestMessage(UUID.randomUUID(), saved.getId(), "BOT", "SCHEDULING_UPDATE",
+                "Recibimos tu solicitud. El horario solicitado es una preferencia y aún no está confirmado.", now));
+        auditService.success(AuditActions.APPOINTMENT_REQUEST_CREATED, "APPOINTMENTS",
+                "PublicAppointmentRequest", saved.getId(), null);
         return publicReceipt(saved.getId());
     }
 
@@ -131,14 +151,12 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     public AppointmentRequestResponse linkPublicRequestPatient(UUID actorId, UUID requestId, UUID patientId) {
         actor(actorId);
         AppointmentRequest request = locked(requestId);
-        if (request.getRequesterFullName() == null) {
-            throw new ConflictException("Only a public appointment request can be linked this way");
-        }
-        if (!isOpen(request)) {
-            throw new ConflictException("Closed appointment requests cannot be linked to a patient");
-        }
+        requirePublicOpenRequest(request);
+        requireIdentityVerified(request);
         if (request.getPatient() != null) {
-            if (request.getPatient().getId().equals(patientId)) return mapper.toAdministrativeResponse(request);
+            if (request.getPatient().getId().equals(patientId)) {
+                return administrativeResponse(request, historyFor(request.getId()));
+            }
             throw new ConflictException("Appointment request is already linked to a patient");
         }
         Patient patient = patients.findById(patientId)
@@ -146,13 +164,89 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         if (request.getRequesterCui() != null && !request.getRequesterCui().equals(patient.getDpi())) {
             throw new ConflictException("Patient DPI does not match the public request");
         }
-        request.linkPatient(patient);
-        if (auditService != null) {
-            auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED, "APPOINTMENTS",
+        request.linkPatient(patient, clock.instant());
+        auditService.success(AuditActions.APPOINTMENT_REQUEST_PATIENT_LINKED, "APPOINTMENTS",
+                "AppointmentRequest", request.getId(), actorId);
+        AppointmentRequest saved = requests.saveAndFlush(request);
+        return administrativeResponse(saved, historyFor(saved.getId()));
+    }
+
+    @Override
+    @Transactional
+    public AppointmentRequestResponse verifyPublicRequesterIdentity(UUID actorId, UUID requestId,
+            VerifyPublicRequesterIdentityRequest input) {
+        User verifyingActor = actor(actorId);
+        AppointmentRequest request = locked(requestId);
+        requirePublicOpenRequest(request);
+        if (request.getRequesterIdentityVerifiedAt() == null) {
+            request.verifyRequesterIdentity(verifyingActor, input.method().name(), clock.instant());
+            auditService.success(AuditActions.APPOINTMENT_REQUEST_IDENTITY_VERIFIED, "APPOINTMENTS",
                     "AppointmentRequest", request.getId(), actorId);
         }
         AppointmentRequest saved = requests.saveAndFlush(request);
         return administrativeResponse(saved, historyFor(saved.getId()));
+    }
+
+    @Override
+    @Transactional
+    public AppointmentRequestResponse registerAndLinkPublicRequester(UUID actorId, UUID requestId,
+            CreatePatientRequest input) {
+        User registeringActor = actor(actorId);
+        AppointmentRequest request = locked(requestId);
+        requirePublicOpenRequest(request);
+        requireIdentityVerified(request);
+
+        String dpi = normalizeDpi(input.dpi());
+        if (request.getRequesterCui() != null && !request.getRequesterCui().equals(dpi)) {
+            throw new ConflictException("PATIENT_DPI_MISMATCH",
+                    "The registered patient DPI does not match the verified public request");
+        }
+        if (request.getPatient() != null) {
+            if (request.getPatient().getDpi().equals(dpi)) {
+                return administrativeResponse(request, historyFor(requestId));
+            }
+            throw new ConflictException("APPOINTMENT_REQUEST_ALREADY_LINKED",
+                    "This appointment request is already linked to another patient record");
+        }
+
+        var patientResponse = patientService.create(input);
+        Patient createdPatient = patients.findById(patientResponse.id())
+                .orElseThrow(() -> new IllegalStateException("Created patient could not be reloaded"));
+        request.linkPatient(createdPatient, clock.instant());
+        auditService.success(AuditActions.PATIENT_CREATED_FROM_PUBLIC_APPOINTMENT_REQUEST, "PATIENTS",
+                "Patient", createdPatient.getId(), actorId);
+        auditService.success(AuditActions.APPOINTMENT_REQUEST_PATIENT_LINKED, "APPOINTMENTS",
+                "AppointmentRequest", request.getId(), actorId);
+        AppointmentRequest saved = requests.saveAndFlush(request);
+        return administrativeResponse(saved, historyFor(saved.getId()));
+    }
+
+    private void requirePublicOpenRequest(AppointmentRequest request) {
+        if (request.getRequesterFullName() == null) {
+            throw new ConflictException(REQUEST_NOT_PUBLIC, "This action is only available for public requests");
+        }
+        if (!isOpen(request)) {
+            throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE,
+                    "This action is unavailable while request status is " + request.getStatus());
+        }
+    }
+
+    private void requireIdentityVerified(AppointmentRequest request) {
+        if (request.getRequesterIdentityVerifiedAt() == null) {
+            throw new ConflictException("REQUESTER_IDENTITY_NOT_VERIFIED",
+                    "Reception must verify the requester's identity before linking a patient record");
+        }
+    }
+
+    private String normalizeDpi(String value) {
+        if (value == null || !value.trim().matches("[0-9 ]+")) {
+            throw new BadRequestException("DPI must contain exactly 13 digits");
+        }
+        String normalized = value.replace(" ", "").trim();
+        if (!normalized.matches("[0-9]{13}")) {
+            throw new BadRequestException("DPI must contain exactly 13 digits");
+        }
+        return normalized;
     }
 
     @Override
@@ -177,10 +271,8 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
                     "Cannot assign dentist: selected professional must exist and be an active dentist");
         }
         request.assignProfessional(professional, clock.instant());
-        if (auditService != null) {
-            auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED, "APPOINTMENTS",
-                    "AppointmentRequest", request.getId(), actorId);
-        }
+        auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED, "APPOINTMENTS",
+                "AppointmentRequest", request.getId(), actorId);
         AppointmentRequest saved = requests.saveAndFlush(request);
         return administrativeResponse(saved, historyFor(saved.getId()));
     }
@@ -201,13 +293,8 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
                 "Public proposals must be accepted by the requester through the verified conversation");
     }
 
-    private boolean hasActiveEquivalent(String cui, Instant requestedAt, UUID professionalId) {
-        if (professionalId == null) {
-            return requests.existsByRequesterCuiAndRequestedAtAndRequestedProfessionalIsNullAndStatusIn(
-                    cui, requestedAt, ACTIVE_PUBLIC_STATUSES);
-        }
-        return requests.existsByRequesterCuiAndRequestedAtAndRequestedProfessional_IdAndStatusIn(
-                cui, requestedAt, professionalId, ACTIVE_PUBLIC_STATUSES);
+    private boolean hasActiveEquivalent(String payloadHash) {
+        return requests.existsByIdempotencyPayloadHashAndStatusIn(payloadHash, ACTIVE_PUBLIC_STATUSES);
     }
 
     private User publicDentist(UUID professionalId) {
@@ -334,7 +421,6 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         Page<AppointmentRequest> result = requests.findAll(spec, page(page, size));
         List<AppointmentRequest> content = result.getContent();
         if (content.isEmpty()) return result.map(mapper::toAdministrativeResponse);
-        if (messages == null) return result.map(mapper::toAdministrativeResponse);
         List<UUID> publicIds = content.stream().filter(value -> value.getRequesterFullName() != null)
                 .map(AppointmentRequest::getId).toList();
         if (publicIds.isEmpty()) return result.map(mapper::toAdministrativeResponse);
@@ -413,14 +499,14 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             throw new ConflictException("APPOINTMENT_REQUEST_PROFESSIONAL_ASSIGNMENT_REQUIRED",
                     "Select or assign an active dentist before proposing an appointment time");
         }
-        if (appointmentRepository != null && appointmentRepository.existsByProfessional_IdAndScheduledAtAndStatus(
+        if (appointmentRepository.existsByProfessional_IdAndScheduledAtAndStatus(
                 professional.getId(), proposedAt, AppointmentStatus.SCHEDULED)) {
             throw new ConflictException("APPOINTMENT_TIME_UNAVAILABLE", "The selected appointment time is already occupied");
         }
         Instant now = clock.instant();
         Instant expiresAt = now.plus(PROPOSAL_TTL);
         request.propose(professional, proposedAt, expiresAt, actor, now);
-        if (messages != null) messages.save(new AppointmentRequestMessage(UUID.randomUUID(), request.getId(), "CLINIC", "PROPOSAL",
+        messages.save(new AppointmentRequestMessage(UUID.randomUUID(), request.getId(), "RECEPTION", "PROPOSAL",
                 "Recepción propone " + proposedAt + " con " + professional.getFullName() + ". Puedes aceptar o rechazar esta propuesta.", now));
         if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED,"APPOINTMENTS","AppointmentRequest",request.getId(),actorId);
         AppointmentRequest saved = requests.saveAndFlush(request);
@@ -500,8 +586,9 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         if (idempotencyKey == null) throw new BadRequestException("Idempotency-Key header is required");
         AppointmentPublicConversation conversation = authorizedConversation(requestId, token);
         AppointmentRequest request = locked(requestId);
-        if (idempotencyKey.equals(conversation.getDecisionIdempotencyKey())) {
-            if (!input.decision().name().equals(conversation.getDecisionIdempotencyResult())) {
+        var previousDecision = decisions.findByAppointmentRequestIdAndIdempotencyKey(requestId, idempotencyKey);
+        if (previousDecision.isPresent()) {
+            if (!input.decision().name().equals(previousDecision.get().getDecision())) {
                 throw new ConflictException("IDEMPOTENCY_KEY_REUSED", "Idempotency-Key was used for another decision");
             }
             return conversationResponse(request);
@@ -516,7 +603,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         }
         if (input.decision() == PublicAppointmentDecisionRequest.Decision.REJECT) {
             request.returnToClinic(now);
-            conversation.recordDecision(idempotencyKey, "REJECT", now);
+            decisions.save(new AppointmentPublicDecision(requestId, idempotencyKey, "REJECT", now));
             messages.save(new AppointmentRequestMessage(UUID.randomUUID(), requestId, "PATIENT", "DECISION",
                     "La persona rechazó la propuesta. Recepción puede enviar otra alternativa.", now));
             requests.saveAndFlush(request);
@@ -526,6 +613,10 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         if (request.getPatient() == null) {
             throw new ConflictException("PATIENT_RECORD_LINK_REQUIRED",
                     "Reception must link this request to an existing patient record before it can be accepted");
+        }
+        if (request.getRequesterIdentityVerifiedAt() == null) {
+            throw new ConflictException("REQUESTER_IDENTITY_NOT_VERIFIED",
+                    "Reception must verify requester identity before accepting a public appointment");
         }
         Appointment appointment;
         try {
@@ -539,7 +630,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             throw exception;
         }
         request.confirm(appointment, request.getProcessedBy(), now);
-        conversation.recordDecision(idempotencyKey, "ACCEPT", now);
+        decisions.save(new AppointmentPublicDecision(requestId, idempotencyKey, "ACCEPT", now));
         messages.save(new AppointmentRequestMessage(UUID.randomUUID(), requestId, "SYSTEM", "DECISION",
                 "La propuesta fue aceptada y la cita quedó confirmada.", now));
         requests.saveAndFlush(request);
@@ -579,7 +670,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             case REQUEST_RECEIVED -> "Recepción recibió tu solicitud. El horario preferido aún no está confirmado.";
         };
         Instant now = clock.instant();
-        messages.save(new AppointmentRequestMessage(UUID.randomUUID(), requestId, "CLINIC",
+        messages.save(new AppointmentRequestMessage(UUID.randomUUID(), requestId, "RECEPTION",
                 "SCHEDULING_UPDATE", text, now));
         return administrativeResponse(requests.saveAndFlush(request), historyFor(requestId));
     }
@@ -652,11 +743,11 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
                 value.publicRequester(), value.source(), value.contact(), value.assignedProfessional(),
                 value.proposalExpiresAt(), !"PUBLIC".equals(value.source()) ? null : history.stream().map(message -> new AppointmentRequestMessageResponse(
                         message.getId(), message.getSender(), message.getMessageType(), message.getText(),
-                        message.getCreatedAt())).toList());
+                        message.getCreatedAt())).toList(), value.identityVerification());
     }
 
     private List<AppointmentRequestMessage> historyFor(UUID requestId) {
-        return messages == null ? List.of() : messages.findByAppointmentRequestIdOrderByCreatedAtAscIdAsc(requestId);
+        return messages.findByAppointmentRequestIdOrderByCreatedAtAscIdAsc(requestId);
     }
 
     private String randomToken() {

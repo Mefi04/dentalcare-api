@@ -138,12 +138,12 @@ class AppointmentFlowControllerSecurityTests {
         Instant now = Instant.parse("2026-10-01T10:00:00Z");
         when(requestService.assignPublicRequestProfessional(any(), eq(requestId), eq(professionalId)))
                 .thenReturn(new AppointmentRequestResponse(requestId, null, null, now.plusSeconds(86400),
-                        null, null, AppointmentRequestStatus.PENDING, "CLINIC", null, now, now,
+                        null, null, AppointmentRequestStatus.PENDING_CLINIC, "CLINIC", null, now, now,
                         new PublicAppointmentRequesterResponse("Maria Lopez", null, "5555-0101",
                                 "maria@example.test", null), "PUBLIC",
                         new PublicAppointmentRequesterResponse("Maria Lopez", null, "5555-0101",
                                 "maria@example.test", null),
-                        new AppointmentProfessionalResponse(professionalId, "Dra. Example"), null, java.util.List.of()));
+                        new AppointmentProfessionalResponse(professionalId, "Dra. Example"), null, java.util.List.of(), null));
         mockMvc.perform(post("/api/v1/appointment-requests/{id}/assign-professional", requestId)
                         .header("Authorization", "Bearer secretary")
                         .contentType("application/json")
@@ -154,8 +154,60 @@ class AppointmentFlowControllerSecurityTests {
                 .andExpect(jsonPath("$.contact.phone").value("5555-0101"))
                 .andExpect(jsonPath("$.assignedProfessional.id").value(professionalId.toString()))
                 .andExpect(jsonPath("$.requestedProfessional").value(org.hamcrest.Matchers.nullValue()))
-                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.status").value("PENDING_CLINIC"))
                 .andExpect(jsonPath("$.appointmentId").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void registeringNewPublicRequesterRequiresPatientCreatePermissionAndUsesAdministrativeEndpoint() throws Exception {
+        UUID requestId = UUID.randomUUID();
+        mockMvc.perform(post("/api/v1/appointment-requests/{id}/register-patient", requestId)
+                        .contentType("application/json")
+                        .content(patientRegistrationBody()))
+                .andExpect(status().isUnauthorized());
+
+        token("secretary", "ROLE_SECRETARY");
+        mockMvc.perform(post("/api/v1/appointment-requests/{id}/register-patient", requestId)
+                        .header("Authorization", "Bearer secretary")
+                        .contentType("application/json")
+                        .content(patientRegistrationBody()))
+                .andExpect(status().isForbidden());
+
+        token("secretary-create-patient", "ROLE_SECRETARY", "PATIENT_CREATE");
+        var response = new AppointmentRequestResponse(requestId, null, null,
+                Instant.parse("2099-10-02T15:00:00Z"), null, null,
+                AppointmentRequestStatus.PENDING_CLINIC, "CLINIC", null,
+                Instant.parse("2026-10-01T10:00:00Z"), Instant.parse("2026-10-01T10:00:00Z"),
+                new PublicAppointmentRequesterResponse("Maria Lopez", "1234567890123", "5555-0101", null, null),
+                "PUBLIC", new PublicAppointmentRequesterResponse("Maria Lopez", "1234567890123", "5555-0101", null, null),
+                null, null, java.util.List.of(), null);
+        when(requestService.registerAndLinkPublicRequester(any(), eq(requestId), any())).thenReturn(response);
+        mockMvc.perform(post("/api/v1/appointment-requests/{id}/register-patient", requestId)
+                        .header("Authorization", "Bearer secretary-create-patient")
+                        .contentType("application/json")
+                        .content(patientRegistrationBody()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.source").value("PUBLIC"));
+    }
+
+    @Test
+    void identityVerificationEndpointIsRestrictedToReceptionAndAdministrators() throws Exception {
+        UUID requestId = UUID.randomUUID();
+        mockMvc.perform(post("/api/v1/appointment-requests/{id}/verify-requester-identity", requestId)
+                        .contentType("application/json").content("{\"method\":\"IN_PERSON\"}"))
+                .andExpect(status().isUnauthorized());
+        token("patient", "ROLE_PATIENT");
+        mockMvc.perform(post("/api/v1/appointment-requests/{id}/verify-requester-identity", requestId)
+                        .header("Authorization", "Bearer patient")
+                        .contentType("application/json").content("{\"method\":\"IN_PERSON\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    private String patientRegistrationBody() {
+        return """
+                {"name":"Maria Lopez","dpi":"1234567890123","birthDate":"1990-01-01",
+                 "gender":"FEMALE","phone":"5555-0101"}
+                """;
     }
 
     @Test
