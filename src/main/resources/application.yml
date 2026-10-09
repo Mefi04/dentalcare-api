@@ -91,6 +91,10 @@ dentalcare:
     expiration: ${PASSWORD_RECOVERY_EXPIRATION:15m}
     max-attempts: ${PASSWORD_RECOVERY_MAX_ATTEMPTS:5}
     mail-from: ${PASSWORD_RECOVERY_MAIL_FROM:no-reply@dentalcare.local}
+  public-appointment-verification:
+    twilio-account-sid: ${TWILIO_ACCOUNT_SID:}
+    twilio-auth-token: ${TWILIO_AUTH_TOKEN:}
+    twilio-from-number: ${TWILIO_FROM_NUMBER:}
   r2:
     enabled: ${R2_ENABLED:false}
     account-id: ${R2_ACCOUNT_ID:}

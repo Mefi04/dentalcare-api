@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.List;
+import java.time.Instant;
 
 public interface AppointmentRequestRepository extends JpaRepository<AppointmentRequest, UUID>,
         JpaSpecificationExecutor<AppointmentRequest> {
@@ -35,6 +36,9 @@ public interface AppointmentRequestRepository extends JpaRepository<AppointmentR
     Optional<AppointmentRequest> findDetailedById(@Param("id") UUID id);
 
     Optional<AppointmentRequest> findByIdempotencyKey(UUID idempotencyKey);
+
+    List<AppointmentRequest> findByStatusAndProposedExpiresAtLessThanEqual(
+            com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus status, Instant now);
 
     boolean existsByRequesterCuiAndRequestedAtAndRequestedProfessionalIsNullAndStatusIn(
             String requesterCui, java.time.Instant requestedAt, List<com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus> statuses);

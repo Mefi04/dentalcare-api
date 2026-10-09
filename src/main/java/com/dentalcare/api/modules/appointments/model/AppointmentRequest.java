@@ -36,6 +36,9 @@ public class AppointmentRequest {
     @Column(name = "proposed_at")
     private Instant proposedAt;
 
+    @Column(name = "proposed_expires_at")
+    private Instant proposedExpiresAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private AppointmentRequestStatus status;
@@ -110,6 +113,7 @@ public class AppointmentRequest {
     public Instant getRequestedAt() { return requestedAt; }
     public User getProposedProfessional() { return proposedProfessional; }
     public Instant getProposedAt() { return proposedAt; }
+    public Instant getProposedExpiresAt() { return proposedExpiresAt; }
     public AppointmentRequestStatus getStatus() { return status; }
     public User getProcessedBy() { return processedBy; }
     public Appointment getAppointment() { return appointment; }
@@ -133,10 +137,23 @@ public class AppointmentRequest {
     }
 
     public void propose(User professional, Instant scheduledAt, User actor, Instant now) {
+        propose(professional, scheduledAt, null, actor, now);
+    }
+
+    public void propose(User professional, Instant scheduledAt, Instant expiresAt, User actor, Instant now) {
         proposedProfessional = professional;
         proposedAt = scheduledAt;
+        proposedExpiresAt = expiresAt;
         processedBy = actor;
-        status = AppointmentRequestStatus.PROPOSED;
+        status = requesterFullName == null ? AppointmentRequestStatus.PROPOSED : AppointmentRequestStatus.PENDING_PATIENT;
+        updatedAt = now;
+    }
+
+    public void returnToClinic(Instant now) {
+        status = requesterFullName == null ? AppointmentRequestStatus.PENDING : AppointmentRequestStatus.PENDING_CLINIC;
+        proposedProfessional = null;
+        proposedAt = null;
+        proposedExpiresAt = null;
         updatedAt = now;
     }
 

@@ -19,6 +19,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.time.LocalDate;
+import com.dentalcare.api.modules.appointments.dto.response.AppointmentAvailabilityResponse;
+import com.dentalcare.api.modules.appointments.dto.request.ClinicSchedulingMessageRequest;
 
 @RestController
 @RequestMapping("/api/v1/appointment-requests")
@@ -56,11 +59,28 @@ public class AdministrativeAppointmentRequestController {
     }
 
     @PostMapping("/{requestId}/proposal")
+    @Operation(summary = "Propose a real available appointment time to a public requester")
     public ResponseEntity<AppointmentRequestResponse> propose(
             @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
             @Valid @RequestBody ProposeAppointmentRequest request) {
         return ResponseEntity.ok(service.propose(
                 principal.userId(), requestId, request.professionalId(), request.proposedAt()));
+    }
+
+    @GetMapping("/{requestId}/availability")
+    @Operation(summary = "Read a dentist's scheduled times for one clinic date; proposal validates again")
+    public ResponseEntity<AppointmentAvailabilityResponse> availability(@PathVariable UUID requestId,
+            @RequestParam UUID professionalId, @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        service.findById(requestId);
+        return ResponseEntity.ok(service.getAvailability(professionalId, date));
+    }
+
+    @PostMapping("/{requestId}/messages")
+    @Operation(summary = "Send a predefined non-clinical scheduling message into a public conversation")
+    public ResponseEntity<AppointmentRequestResponse> addMessage(
+            @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
+            @Valid @RequestBody ClinicSchedulingMessageRequest request) {
+        return ResponseEntity.ok(service.addSchedulingMessage(principal.userId(), requestId, request));
     }
 
     @PostMapping("/{requestId}/reject")

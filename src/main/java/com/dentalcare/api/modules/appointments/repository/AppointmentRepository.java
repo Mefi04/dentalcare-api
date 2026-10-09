@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 @Repository
 public interface AppointmentRepository extends JpaRepository<Appointment, UUID> {
@@ -24,6 +25,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
 
     boolean existsByProfessional_IdAndScheduledAtAndStatusAndIdNot(
             UUID professionalId, Instant scheduledAt, AppointmentStatus status, UUID id);
+
+    List<Appointment> findByProfessional_IdAndScheduledAtGreaterThanEqualAndScheduledAtLessThanAndStatusOrderByScheduledAtAsc(
+            UUID professionalId, Instant from, Instant to, AppointmentStatus status);
 
     @EntityGraph(attributePaths = "professional")
     Page<Appointment> findByPatient_Id(UUID patientId, Pageable pageable);

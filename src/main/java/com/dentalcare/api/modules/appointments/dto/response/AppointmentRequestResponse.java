@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record AppointmentRequestResponse(
@@ -26,5 +27,7 @@ public record AppointmentRequestResponse(
         @Schema(description = "Non-clinical contact details for public submissions") PublicAppointmentRequesterResponse contact,
         @JsonInclude(JsonInclude.Include.ALWAYS)
         @Schema(description = "Reception assignment; null when no dentist has been assigned")
-        AppointmentProfessionalResponse assignedProfessional) {
+        AppointmentProfessionalResponse assignedProfessional,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Instant proposalExpiresAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) List<AppointmentRequestMessageResponse> messages) {
 }

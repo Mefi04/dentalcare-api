@@ -3,6 +3,7 @@ package com.dentalcare.api.modules.appointments.mapper;
 import com.dentalcare.api.modules.appointments.dto.response.*;
 import com.dentalcare.api.modules.appointments.model.AppointmentRequest;
 import com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus;
+import com.dentalcare.api.modules.appointments.service.NonClinicalSchedulingText;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -19,7 +20,8 @@ public class AppointmentRequestMapper {
         boolean publicRequest = request.getRequesterFullName() != null;
         PublicAppointmentRequesterResponse contact = publicRequest ? new PublicAppointmentRequesterResponse(
                 request.getRequesterFullName(), request.getRequesterCui(), request.getRequesterPhone(),
-                request.getRequesterEmail(), request.getRequestReason()) : null;
+                request.getRequesterEmail(), NonClinicalSchedulingText.isSafe(request.getRequestReason())
+                        ? request.getRequestReason() : null) : null;
         return new AppointmentRequestResponse(
                 request.getId(),
                 request.getPatient() == null ? null : new AdministrativeAppointmentPatientResponse(
@@ -36,7 +38,9 @@ public class AppointmentRequestMapper {
                 contact,
                 administrative ? (publicRequest ? "PUBLIC" : "PATIENT_PORTAL") : null,
                 administrative ? contact : null,
-                administrative && publicRequest ? professional(request.getAssignedProfessional()) : null);
+                administrative && publicRequest ? professional(request.getAssignedProfessional()) : null,
+                administrative && publicRequest ? request.getProposedExpiresAt() : null,
+                administrative && publicRequest ? java.util.List.of() : null);
     }
 
     private AppointmentProfessionalResponse professional(com.dentalcare.api.modules.users.model.User user) {
@@ -45,8 +49,8 @@ public class AppointmentRequestMapper {
 
     private String actionRequiredBy(AppointmentRequestStatus status) {
         return switch (status) {
-            case PENDING -> "CLINIC";
-            case PROPOSED -> "PATIENT";
+            case PENDING, PENDING_CLINIC -> "CLINIC";
+            case PROPOSED, PENDING_PATIENT -> "PATIENT";
             case CONFIRMED, REJECTED, CANCELLED -> "NONE";
         };
     }

@@ -35,6 +35,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(GoneException.class)
+    ResponseEntity<ApiErrorResponse> handleGone(GoneException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.GONE, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentNotFoundInStorageException.class)
     ResponseEntity<ApiErrorResponse> handleDocumentNotFoundInStorage(
             com.dentalcare.api.modules.clinicalrecords.storage.exception.DocumentNotFoundInStorageException exception, HttpServletRequest request) {

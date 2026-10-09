@@ -26,6 +26,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.transaction.TestTransaction;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -36,6 +39,8 @@ import java.sql.Timestamp;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Callable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -64,6 +69,7 @@ class AppointmentRepositoryIntegrationTests {
     @Autowired UserRepository users;
     @Autowired RoleRepository roles;
     @Autowired JdbcTemplate jdbc;
+    @Autowired PlatformTransactionManager transactionManager;
 
     private Patient patient;
     private User dentist;
@@ -102,6 +108,43 @@ class AppointmentRepositoryIntegrationTests {
     }
 
     @Test
+    void postgresUniqueIndexPreventsTwoScheduledAppointmentsForSameDentistAndInstant() {
+        appointments.saveAndFlush(new Appointment(UUID.randomUUID(), patient, dentist, SCHEDULED_AT,
+                AppointmentStatus.SCHEDULED, NOW, NOW));
+
+        assertThatThrownBy(() -> appointments.saveAndFlush(new Appointment(UUID.randomUUID(), patient, dentist,
+                SCHEDULED_AT, AppointmentStatus.SCHEDULED, NOW, NOW)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void concurrentPostgresReservationsForSameDentistAndInstantHaveOnlyOneWinner() throws Exception {
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            Callable<Boolean> reserve = () -> {
+                try {
+                    return Boolean.TRUE.equals(new TransactionTemplate(transactionManager).execute(status -> {
+                        appointments.saveAndFlush(new Appointment(UUID.randomUUID(), patient, dentist, SCHEDULED_AT,
+                                AppointmentStatus.SCHEDULED, NOW, NOW));
+                        return true;
+                    }));
+                } catch (DataIntegrityViolationException conflict) {
+                    return false;
+                }
+            };
+            var first = pool.submit(reserve);
+            var second = pool.submit(reserve);
+            assertThat((first.get() ? 1 : 0) + (second.get() ? 1 : 0)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("select count(*) from appointments where professional_id = ? and scheduled_at = ? and status = 'SCHEDULED'",
+                    Integer.class, dentist.getId(), Timestamp.from(SCHEDULED_AT))).isEqualTo(1);
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
     void persistsOwnedRequestAndLinksExactlyOneConfirmedAppointment() {
         Appointment appointment = appointments.saveAndFlush(appointment(patient, SCHEDULED_AT));
         AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), patient, dentist,
@@ -137,7 +180,7 @@ class AppointmentRepositoryIntegrationTests {
         AppointmentRequestResponse visible = inbox.map(mapper::toAdministrativeResponse)
                 .getContent().stream().filter(value -> value.id().equals(id)).findFirst().orElseThrow();
 
-        assertThat(visible.status()).isEqualTo(AppointmentRequestStatus.PENDING);
+        assertThat(visible.status()).isEqualTo(AppointmentRequestStatus.PENDING_CLINIC);
         assertThat(visible.patient()).isNull();
         assertThat(visible.source()).isEqualTo("PUBLIC");
         assertThat(visible.contact().fullName()).isEqualTo("First-time visitor");
@@ -158,14 +201,14 @@ class AppointmentRepositoryIntegrationTests {
         assertThat(detail.source()).isEqualTo("PUBLIC");
         assertThat(detail.contact().cui()).isNull();
         assertThat(detail.assignedProfessional().id()).isEqualTo(dentist.getId());
-        assertThat(detail.status()).isEqualTo(AppointmentRequestStatus.PENDING);
+        assertThat(detail.status()).isEqualTo(AppointmentRequestStatus.PENDING_CLINIC);
         assertThat(detail.appointmentId()).isNull();
     }
 
     @Test
     void publicRequestLinkedByCuiStillHasPublicSourceInAdministrativeListAndDetail() {
         AppointmentRequest linkedPublic = new AppointmentRequest(UUID.randomUUID(), patient, dentist,
-                SCHEDULED_AT, AppointmentRequestStatus.PROPOSED, NOW, NOW, "Public name", patient.getDpi(),
+                SCHEDULED_AT, AppointmentRequestStatus.PENDING_PATIENT, NOW, NOW, "Public name", patient.getDpi(),
                 "+502 5555-0101", "public@example.test", "Afternoon", UUID.randomUUID(), "d".repeat(64));
         linkedPublic.propose(dentist, SCHEDULED_AT.plusSeconds(3600), dentist, NOW.plusSeconds(30));
         appointmentRequests.saveAndFlush(linkedPublic);
@@ -183,10 +226,10 @@ class AppointmentRepositoryIntegrationTests {
         assertThat(fromList.contact().fullName()).isEqualTo("Public name");
         assertThat(fromList.requestedProfessional().id()).isEqualTo(dentist.getId());
         assertThat(fromList.assignedProfessional()).isNull();
-        assertThat(fromList.status()).isEqualTo(AppointmentRequestStatus.PROPOSED);
+        assertThat(fromList.status()).isEqualTo(AppointmentRequestStatus.PENDING_PATIENT);
         assertThat(fromDetail.source()).isEqualTo("PUBLIC");
         assertThat(fromDetail.contact().cui()).isEqualTo(patient.getDpi());
-        assertThat(fromDetail.status()).isEqualTo(AppointmentRequestStatus.PROPOSED);
+        assertThat(fromDetail.status()).isEqualTo(AppointmentRequestStatus.PENDING_PATIENT);
     }
 
     @Test

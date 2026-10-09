@@ -363,6 +363,12 @@ Changeset `041-add-assigned-professional-to-appointment-requests` separates rece
 the original requested dentist. Assignment is persisted independently, leaves request status unchanged, and
 does not create or reserve an appointment.
 
+Changeset `042-public-appointment-conversations` migrates public request states to `PENDING_CLINIC` and
+`PENDING_PATIENT` while preserving the authenticated patient-request states. It stores only BCrypt OTP hashes,
+SHA-256 conversation-token hashes, bounded attempts/expirations, decision idempotency, and predefined scheduling
+messages. Proposal expiry is persisted on the request. A partial unique index on `(professional_id, scheduled_at)`
+for `SCHEDULED` appointments enforces exact-slot exclusivity under concurrent confirmations.
+
 `appointment_waiting_room_entries` has a unique one-to-one foreign key to `appointments` and stores
 `ARRIVED -> WAITING -> READY -> CLOSED`, transition timestamps, check-in staff and latest responsible staff.
 Check-in is limited to a `SCHEDULED` appointment on the current `America/Guatemala` clinic day. Cancelling or

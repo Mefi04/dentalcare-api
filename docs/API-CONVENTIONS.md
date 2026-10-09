@@ -532,10 +532,11 @@ public requests, including those linked to an existing patient by CUI and those 
 existing `publicRequester` field is retained for compatibility. `contact` is non-clinical and staff-only; public
 intake never returns clinical data. Patient-origin requests identify as `PATIENT_PORTAL` in the administrative
 projection and otherwise retain their existing patient data and workflow. `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
-`{ "patientId": "<uuid>" }`; when the intake included CUI, it must match the selected patient's DPI. A proposed
-public request is confirmed by staff through `POST /api/v1/appointment-requests/{requestId}/confirm-public-proposal`
-after linking the patient, because an anonymous requester cannot use the authenticated patient's proposal
-acceptance route. Existing patient endpoints and their contracts are unchanged.
+`{ "patientId": "<uuid>" }`; when the intake included CUI, it must match the selected patient's DPI. Linking an
+existing patient record is required before public acceptance, but never confirms the proposal. The legacy
+`POST /api/v1/appointment-requests/{requestId}/confirm-public-proposal` is retained for compatibility and returns
+`409 PUBLIC_PATIENT_ACCEPTANCE_REQUIRED`; only the verified public conversation can accept. Existing patient
+endpoints and their contracts are unchanged.
 
 Assignment errors use `409 Conflict` with a stable `code`: `APPOINTMENT_REQUEST_NOT_PUBLIC`,
 `APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE` (includes the actual and allowed states), or
@@ -552,8 +553,14 @@ produce an appointment-slot conflict.
 | `POST` | `/api/v1/appointment-requests/{requestId}/reject` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Rejects an open request. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/link-patient` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Links a public request after identity verification; CUI must match when supplied. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/assign-professional` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Assigns/reassigns an active dentist to an open public request; does not confirm a slot. Body: `professionalId`. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/confirm-public-proposal` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Confirms a public request after staff has linked the patient; still validates real slot availability. |
+| `GET` | `/api/v1/appointment-requests/{requestId}/availability?professionalId={uuid}&date=YYYY-MM-DD` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Returns only booked instants for that dentist on the Guatemala clinic date. Proposal submission validates availability again. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/messages` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Body is a predefined non-clinical template type; free-text/clinical messages are not accepted. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/confirm-public-proposal` | `ADMINISTRATOR`, `SECRETARY` | `409 Conflict` | Legacy compatibility route; public proposal acceptance is restricted to the verified conversation. |
 | `POST` | `/api/v1/public/appointment-requests` | Public | `202 Accepted` | First appointment intake; request time is not reserved. Requires UUID `Idempotency-Key`; see contract above. |
+| `POST` | `/api/v1/public/appointment-requests/{requestId}/verification-codes` | Public | `202 Accepted` | Body `channel: SMS|EMAIL`; always returns a generic acknowledgment. OTP expires in 10 minutes, max five attempts. |
+| `POST` | `/api/v1/public/appointment-requests/{requestId}/verification` | Public | `200 OK` | Body `code`; success returns a scoped 24-hour `conversationToken`. Invalid code is 401, expired/consumed code is 410. |
+| `GET` | `/api/v1/public/appointment-requests/{requestId}/conversation` | Conversation bearer token | `200 OK` | Returns only that request's state, proposal and messages. |
+| `POST` | `/api/v1/public/appointment-requests/{requestId}/decision` | Conversation bearer token | `200 OK` | Body `decision: ACCEPT|REJECT`; UUID `Idempotency-Key` required. Accept creates a cita only if an existing patient record is linked and slot still free. |
 | `POST` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `201 Created` | Body: `professionalId`, future `requestedAt`; patient comes from JWT. |
 | `GET` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `200 OK` | Lists only owned requests. |
 | `GET` | `/api/v1/patients/me/appointment-requests/{requestId}` | `PATIENT` | `200 OK` | Foreign and unknown ids both return 404. |
@@ -563,6 +570,33 @@ produce an appointment-slot conflict.
 
 `actionRequiredBy` is derived as `CLINIC`, `PATIENT`, or `NONE`. Existing direct appointment endpoints remain
 compatible.
+
+### Verified public first-appointment conversation
+
+Public intake creates `PENDING_CLINIC`; patient-portal requests keep their existing `PENDING`/`PROPOSED` lifecycle.
+Reception retains `ADMINISTRATOR`/`SECRETARY` access to list/detail, dentist assignment and proposal actions. A
+public proposal moves to `PENDING_PATIENT`, includes `proposedExpiresAt` (24-hour default), and adds a fixed,
+non-clinical clinic message to the conversation. Reception can inspect one dentist's already-booked instants for a
+Guatemala clinic date with `GET /api/v1/appointment-requests/{requestId}/availability?professionalId={uuid}&date=YYYY-MM-DD`;
+this response contains no patient details, and proposal submission checks the slot again.
+
+The anonymous conversation routes are `POST /api/v1/public/appointment-requests/{requestId}/verification-codes`
+(`{"channel":"SMS"|"EMAIL"}`), `POST .../{requestId}/verification` (`{"code":"123456"}`),
+`GET .../{requestId}/conversation`, and `POST .../{requestId}/decision` (`{"decision":"ACCEPT"|"REJECT"}`).
+The OTP lasts 10 minutes, has five attempts, and is sent only to the phone/email captured on that request; the
+request-code response is generic to prevent request enumeration. SMS uses Twilio credentials from environment;
+email uses configured SMTP. Successful verification returns a random 256-bit bearer token stored only as SHA-256,
+scoped to exactly one request and valid for 24 hours. Invalid token is 401, expired token/code/proposal is 410, and
+per-IP throttling returns 429 with `Retry-After`. OTPs are BCrypt hashes and never returned.
+
+Conversation reads and decisions require `Authorization: Bearer <conversationToken>`. `Idempotency-Key` (UUID) is
+required for decisions. Rejecting or expiring a proposal returns the request to `PENDING_CLINIC`; it remains open.
+Acceptance rechecks availability and creates the appointment transactionally. A partial unique PostgreSQL index
+on active dentist/time reservations closes concurrent booking races; an occupied slot returns `409` with
+`APPOINTMENT_TIME_UNAVAILABLE` and creates no appointment. If no patient record exists, acceptance returns
+`409 PATIENT_RECORD_LINK_REQUIRED`; reception must link an existing record first. CUI is never used as chat
+authentication, no account/record is auto-created, and no arbitrary patient messages are accepted. Reception
+messages use predefined scheduling templates to avoid collecting clinical information.
 
 ## Waiting room endpoints
 

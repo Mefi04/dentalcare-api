@@ -47,6 +47,10 @@ public class SecurityConfig {
                     authorize.requestMatchers(org.springframework.http.HttpMethod.POST,
                             "/api/v1/public/contact-inquiries",
                             "/api/v1/public/appointment-requests").permitAll();
+                    authorize.requestMatchers("/api/v1/public/appointment-requests/*/verification-codes",
+                            "/api/v1/public/appointment-requests/*/verification",
+                            "/api/v1/public/appointment-requests/*/conversation",
+                            "/api/v1/public/appointment-requests/*/decision").permitAll();
                     authorize.requestMatchers(org.springframework.http.HttpMethod.POST,
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",

@@ -34,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = {AdministrativeAppointmentRequestController.class,
         PatientAppointmentRequestController.class, WaitingRoomController.class,
-        PublicAppointmentRequestController.class},
+        PublicAppointmentRequestController.class, PublicAppointmentConversationController.class},
         properties = "FRONTEND_URL=http://localhost:3000")
 @Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class,
         RestAuthenticationEntryPoint.class, RestAccessDeniedHandler.class, GlobalExceptionHandler.class})
@@ -83,6 +83,32 @@ class AppointmentFlowControllerSecurityTests {
     }
 
     @Test
+    void publicConversationOtpAndReadRoutesUseScopedTokenWithoutLogin() throws Exception {
+        UUID requestId = UUID.randomUUID();
+        when(requestService.requestConversationCode(eq(requestId), any()))
+                .thenReturn(new com.dentalcare.api.modules.appointments.dto.response.PublicVerificationAcknowledgement(
+                        "If valid, a code will be sent."));
+        mockMvc.perform(post("/api/v1/public/appointment-requests/{id}/verification-codes", requestId)
+                        .contentType("application/json").content("{\"channel\":\"SMS\"}"))
+                .andExpect(status().isAccepted());
+
+        when(requestService.verifyConversationCode(eq(requestId), any()))
+                .thenReturn(new com.dentalcare.api.modules.appointments.dto.response.PublicConversationTokenResponse(
+                        "scoped-token", "Bearer", Instant.parse("2099-10-02T15:00:00Z")));
+        mockMvc.perform(post("/api/v1/public/appointment-requests/{id}/verification", requestId)
+                        .contentType("application/json").content("{\"code\":\"123456\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.conversationToken").value("scoped-token"));
+
+        when(requestService.getPublicConversation(requestId, "scoped-token"))
+                .thenReturn(new com.dentalcare.api.modules.appointments.dto.response.PublicAppointmentConversationResponse(
+                        requestId, AppointmentRequestStatus.PENDING_CLINIC, null, null, null, null, java.util.List.of()));
+        mockMvc.perform(get("/api/v1/public/appointment-requests/{id}/conversation", requestId)
+                        .header("Authorization", "Bearer scoped-token"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.requestId").value(requestId.toString()))
+                .andExpect(jsonPath("$.contact").doesNotExist());
+    }
+
+    @Test
     void administrativeRequestsRequireSecretaryOrAdministrator() throws Exception {
         mockMvc.perform(get("/api/v1/appointment-requests")).andExpect(status().isUnauthorized());
 
@@ -117,7 +143,7 @@ class AppointmentFlowControllerSecurityTests {
                                 "maria@example.test", null), "PUBLIC",
                         new PublicAppointmentRequesterResponse("Maria Lopez", null, "5555-0101",
                                 "maria@example.test", null),
-                        new AppointmentProfessionalResponse(professionalId, "Dra. Example")));
+                        new AppointmentProfessionalResponse(professionalId, "Dra. Example"), null, java.util.List.of()));
         mockMvc.perform(post("/api/v1/appointment-requests/{id}/assign-professional", requestId)
                         .header("Authorization", "Bearer secretary")
                         .contentType("application/json")

@@ -6,6 +6,7 @@ import com.dentalcare.api.modules.auth.controller.AuthController;
 import com.dentalcare.api.modules.auth.dto.response.RefreshResponse;
 import com.dentalcare.api.modules.auth.service.AuthService;
 import com.dentalcare.api.modules.appointments.controller.PublicAppointmentRequestController;
+import com.dentalcare.api.modules.appointments.controller.PublicAppointmentConversationController;
 import com.dentalcare.api.modules.appointments.dto.request.CreatePublicAppointmentRequest;
 import com.dentalcare.api.modules.appointments.dto.response.PublicAppointmentRequestReceipt;
 import com.dentalcare.api.modules.appointments.service.AppointmentRequestService;
@@ -44,7 +45,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.dentalcare.api.modules.auth.controller.MobileAuthController;
 
 @WebMvcTest(controllers = {AuthController.class, TestSecurityController.class, MobileAuthController.class,
-        PublicAppointmentRequestController.class}, properties = "dentalcare.cors.allowed-origin=http://localhost:3000")
+        PublicAppointmentRequestController.class, PublicAppointmentConversationController.class},
+        properties = "dentalcare.cors.allowed-origin=http://localhost:3000")
 @Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class, AuthCookieManager.class})
 class CorsSecurityIntegrationTests {
@@ -123,6 +125,23 @@ class CorsSecurityIntegrationTests {
                 .andExpect(status().isAccepted())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
+    }
+
+    @Test
+    @DisplayName("Public verified conversation preflight allows credentials, bearer token and decision idempotency")
+    void publicAppointmentConversationPreflightAllowsExpectedHeaders() throws Exception {
+        UUID requestId = UUID.randomUUID();
+        mockMvc.perform(options("/api/v1/public/appointment-requests/{id}/decision", requestId)
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name())
+                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
+                                "Authorization,Content-Type,Idempotency-Key"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Authorization")))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Content-Type")))
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Idempotency-Key")));
     }
 
     @ParameterizedTest
