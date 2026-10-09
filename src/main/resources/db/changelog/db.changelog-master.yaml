@@ -79,3 +79,5 @@ databaseChangeLog:
       file: db/changelog/changes/039-create-medical-history-questionnaire-workflow.sql
   - include:
       file: db/changelog/changes/040-public-appointment-requests.sql
+  - include:
+      file: db/changelog/changes/041-add-assigned-professional-to-appointment-requests.sql

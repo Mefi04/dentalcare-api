@@ -79,7 +79,7 @@ public class AdministrativeAppointmentRequestController {
 
     @PostMapping("/{requestId}/assign-professional")
     @Operation(summary = "Assign an active dentist to a public appointment request",
-            description = "Reception may assign or reassign a dentist on an open public request. This does not confirm or reserve an appointment.")
+            description = "Reception may assign or reassign a dentist on an open public request. This does not confirm or reserve an appointment. 409 codes distinguish an ineligible request state (APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE), a non-public request (APPOINTMENT_REQUEST_NOT_PUBLIC), and an unavailable dentist (PROFESSIONAL_NOT_AVAILABLE).")
     public ResponseEntity<AppointmentRequestResponse> assignProfessional(
             @AuthenticationPrincipal AuthenticatedUser principal, @PathVariable UUID requestId,
             @Valid @RequestBody AssignAppointmentRequestProfessionalRequest request) {

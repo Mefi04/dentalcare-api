@@ -8,6 +8,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class AppointmentRequestMapper {
     public AppointmentRequestResponse toResponse(AppointmentRequest request) {
+        return toResponse(request, false);
+    }
+
+    public AppointmentRequestResponse toAdministrativeResponse(AppointmentRequest request) {
+        return toResponse(request, true);
+    }
+
+    private AppointmentRequestResponse toResponse(AppointmentRequest request, boolean administrative) {
+        boolean publicRequest = request.getRequesterFullName() != null;
+        PublicAppointmentRequesterResponse contact = publicRequest ? new PublicAppointmentRequesterResponse(
+                request.getRequesterFullName(), request.getRequesterCui(), request.getRequesterPhone(),
+                request.getRequesterEmail(), request.getRequestReason()) : null;
         return new AppointmentRequestResponse(
                 request.getId(),
                 request.getPatient() == null ? null : new AdministrativeAppointmentPatientResponse(
@@ -21,9 +33,10 @@ public class AppointmentRequestMapper {
                 actionRequiredBy(request.getStatus()),
                 request.getAppointment() == null ? null : request.getAppointment().getId(),
                 request.getCreatedAt(), request.getUpdatedAt(),
-                request.getRequesterFullName() == null ? null : new PublicAppointmentRequesterResponse(
-                        request.getRequesterFullName(), request.getRequesterCui(), request.getRequesterPhone(),
-                        request.getRequesterEmail(), request.getRequestReason()));
+                contact,
+                administrative ? (publicRequest ? "PUBLIC" : "PATIENT_PORTAL") : null,
+                administrative ? contact : null,
+                administrative && publicRequest ? professional(request.getAssignedProfessional()) : null);
     }
 
     private AppointmentProfessionalResponse professional(com.dentalcare.api.modules.users.model.User user) {

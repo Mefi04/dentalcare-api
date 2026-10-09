@@ -116,10 +116,95 @@ class AppointmentRequestServiceImplTests {
         var assigned = service.assignPublicRequestProfessional(secretary.getId(), request.getId(), dentist.getId());
 
         assertThat(assigned.status()).isEqualTo(AppointmentRequestStatus.PENDING);
-        assertThat(assigned.requestedProfessional().id()).isEqualTo(dentist.getId());
+        assertThat(assigned.source()).isEqualTo("PUBLIC");
+        assertThat(assigned.contact().fullName()).isEqualTo("Maria Lopez");
+        assertThat(assigned.contact().phone()).isEqualTo("5555-0101");
+        assertThat(assigned.contact().cui()).isNull();
+        assertThat(assigned.requestedProfessional()).isNull();
+        assertThat(assigned.assignedProfessional().id()).isEqualTo(dentist.getId());
         assertThat(assigned.appointmentId()).isNull();
-        assertThat(request.getRequestedProfessional()).isSameAs(dentist);
+        assertThat(request.getAssignedProfessional()).isSameAs(dentist);
+        assertThat(request.getRequestedProfessional()).isNull();
         verifyNoInteractions(appointments);
+    }
+
+    @Test
+    void receptionistCanChangeAssignmentOnProposedPublicRequestWithoutConfirmingIt() {
+        User reassignedDentist = user("DENTIST");
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), patient, dentist, FUTURE,
+                AppointmentRequestStatus.PENDING, NOW, NOW, "Maria Lopez", patient.getDpi(),
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        request.assignProfessional(dentist, NOW);
+        request.propose(dentist, FUTURE.plusSeconds(3600), secretary, NOW.plusSeconds(1));
+        when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
+        when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
+        when(users.findWithRolesById(reassignedDentist.getId())).thenReturn(Optional.of(reassignedDentist));
+        when(requests.saveAndFlush(request)).thenReturn(request);
+
+        var reassigned = service.assignPublicRequestProfessional(
+                secretary.getId(), request.getId(), reassignedDentist.getId());
+
+        assertThat(reassigned.status()).isEqualTo(AppointmentRequestStatus.PROPOSED);
+        assertThat(reassigned.assignedProfessional().id()).isEqualTo(reassignedDentist.getId());
+        assertThat(reassigned.requestedProfessional().id()).isEqualTo(dentist.getId());
+        assertThat(reassigned.proposedProfessional().id()).isEqualTo(dentist.getId());
+        assertThat(reassigned.appointmentId()).isNull();
+        verifyNoInteractions(appointments);
+    }
+
+    @Test
+    void assignmentConflictsExplainNonPublicStateAndUnavailableDentist() {
+        AppointmentRequest patientRequest = request(AppointmentRequestStatus.PENDING);
+        when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
+        when(requests.findDetailedByIdForUpdate(patientRequest.getId())).thenReturn(Optional.of(patientRequest));
+        assertThatThrownBy(() -> service.assignPublicRequestProfessional(
+                secretary.getId(), patientRequest.getId(), dentist.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "APPOINTMENT_REQUEST_NOT_PUBLIC");
+
+        AppointmentRequest closedPublic = new AppointmentRequest(UUID.randomUUID(), null, null, FUTURE,
+                AppointmentRequestStatus.CONFIRMED, NOW, NOW, "Maria Lopez", null,
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        when(requests.findDetailedByIdForUpdate(closedPublic.getId())).thenReturn(Optional.of(closedPublic));
+        assertThatThrownBy(() -> service.assignPublicRequestProfessional(
+                secretary.getId(), closedPublic.getId(), dentist.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE")
+                .hasMessageContaining("CONFIRMED")
+                .hasMessageContaining("PENDING and PROPOSED");
+
+        AppointmentRequest pendingPublic = new AppointmentRequest(UUID.randomUUID(), null, null, FUTURE,
+                AppointmentRequestStatus.PENDING, NOW, NOW, "Maria Lopez", null,
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        when(requests.findDetailedByIdForUpdate(pendingPublic.getId())).thenReturn(Optional.of(pendingPublic));
+        when(users.findWithRolesById(dentist.getId())).thenReturn(Optional.of(user("ASSISTANT")));
+        assertThatThrownBy(() -> service.assignPublicRequestProfessional(
+                secretary.getId(), pendingPublic.getId(), dentist.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "PROFESSIONAL_NOT_AVAILABLE");
+    }
+
+    @Test
+    void publicConfirmationDistinguishesOccupiedTimeFromIneligibleState() {
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), patient, dentist, FUTURE,
+                AppointmentRequestStatus.PENDING, NOW, NOW, "Maria Lopez", patient.getDpi(),
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        request.propose(dentist, FUTURE.plusSeconds(3600), secretary, NOW);
+        when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
+        when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
+        when(appointments.create(patient.getId(), dentist.getId(), FUTURE.plusSeconds(3600)))
+                .thenThrow(new ConflictException("Appointment time is not available"));
+
+        assertThatThrownBy(() -> service.confirmPublicProposal(secretary.getId(), request.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "APPOINTMENT_TIME_UNAVAILABLE")
+                .hasMessageContaining("already occupied");
+
+        request.reject(secretary, NOW);
+        assertThatThrownBy(() -> service.confirmPublicProposal(secretary.getId(), request.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("code", "APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE")
+                .hasMessageContaining("REJECTED");
     }
 
     @Test

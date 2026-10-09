@@ -133,14 +133,60 @@ class AppointmentRepositoryIntegrationTests {
 
         var inbox = appointmentRequests.findAll(org.springframework.data.jpa.domain.Specification.unrestricted(),
                 PageRequest.of(0, 100, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
-        AppointmentRequestResponse visible = inbox.map(new AppointmentRequestMapper()::toResponse)
+        AppointmentRequestMapper mapper = new AppointmentRequestMapper();
+        AppointmentRequestResponse visible = inbox.map(mapper::toAdministrativeResponse)
                 .getContent().stream().filter(value -> value.id().equals(id)).findFirst().orElseThrow();
 
         assertThat(visible.status()).isEqualTo(AppointmentRequestStatus.PENDING);
         assertThat(visible.patient()).isNull();
+        assertThat(visible.source()).isEqualTo("PUBLIC");
+        assertThat(visible.contact().fullName()).isEqualTo("First-time visitor");
+        assertThat(visible.contact().phone()).isEqualTo("+502 5555-0101");
+        assertThat(visible.contact().email()).isEqualTo("visitor@example.test");
+        assertThat(visible.contact().reason()).isEqualTo("Afternoon preferred");
+        assertThat(visible.requestedAt()).isEqualTo(SCHEDULED_AT);
+        assertThat(visible.requestedProfessional()).isNull();
+        assertThat(visible.assignedProfessional()).isNull();
         assertThat(visible.publicRequester().fullName()).isEqualTo("First-time visitor");
         assertThat(visible.publicRequester().phone()).isEqualTo("+502 5555-0101");
         assertThat(visible.appointmentId()).isNull();
+
+        publicRequest.assignProfessional(dentist, NOW.plusSeconds(1));
+        appointmentRequests.saveAndFlush(publicRequest);
+        AppointmentRequestResponse detail = mapper.toAdministrativeResponse(
+                appointmentRequests.findDetailedById(id).orElseThrow());
+        assertThat(detail.source()).isEqualTo("PUBLIC");
+        assertThat(detail.contact().cui()).isNull();
+        assertThat(detail.assignedProfessional().id()).isEqualTo(dentist.getId());
+        assertThat(detail.status()).isEqualTo(AppointmentRequestStatus.PENDING);
+        assertThat(detail.appointmentId()).isNull();
+    }
+
+    @Test
+    void publicRequestLinkedByCuiStillHasPublicSourceInAdministrativeListAndDetail() {
+        AppointmentRequest linkedPublic = new AppointmentRequest(UUID.randomUUID(), patient, dentist,
+                SCHEDULED_AT, AppointmentRequestStatus.PROPOSED, NOW, NOW, "Public name", patient.getDpi(),
+                "+502 5555-0101", "public@example.test", "Afternoon", UUID.randomUUID(), "d".repeat(64));
+        linkedPublic.propose(dentist, SCHEDULED_AT.plusSeconds(3600), dentist, NOW.plusSeconds(30));
+        appointmentRequests.saveAndFlush(linkedPublic);
+        AppointmentRequestMapper mapper = new AppointmentRequestMapper();
+
+        var page = appointmentRequests.findAll(org.springframework.data.jpa.domain.Specification.unrestricted(),
+                PageRequest.of(0, 100, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"))));
+        AppointmentRequestResponse fromList = page.map(mapper::toAdministrativeResponse).getContent().stream()
+                .filter(value -> value.id().equals(linkedPublic.getId())).findFirst().orElseThrow();
+        AppointmentRequestResponse fromDetail = mapper.toAdministrativeResponse(
+                appointmentRequests.findDetailedById(linkedPublic.getId()).orElseThrow());
+
+        assertThat(fromList.patient().id()).isEqualTo(patient.getId());
+        assertThat(fromList.source()).isEqualTo("PUBLIC");
+        assertThat(fromList.contact().fullName()).isEqualTo("Public name");
+        assertThat(fromList.requestedProfessional().id()).isEqualTo(dentist.getId());
+        assertThat(fromList.assignedProfessional()).isNull();
+        assertThat(fromList.status()).isEqualTo(AppointmentRequestStatus.PROPOSED);
+        assertThat(fromDetail.source()).isEqualTo("PUBLIC");
+        assertThat(fromDetail.contact().cui()).isEqualTo(patient.getDpi());
+        assertThat(fromDetail.status()).isEqualTo(AppointmentRequestStatus.PROPOSED);
     }
 
     @Test

@@ -34,6 +34,10 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     private static final Sort ORDER = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
     private static final List<AppointmentRequestStatus> ACTIVE_PUBLIC_STATUSES =
             List.of(AppointmentRequestStatus.PENDING, AppointmentRequestStatus.PROPOSED);
+    private static final String REQUEST_NOT_PUBLIC = "APPOINTMENT_REQUEST_NOT_PUBLIC";
+    private static final String REQUEST_STATE_NOT_ELIGIBLE = "APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE";
+    private static final String PROFESSIONAL_NOT_AVAILABLE = "PROFESSIONAL_NOT_AVAILABLE";
+    private static final String APPOINTMENT_TIME_UNAVAILABLE = "APPOINTMENT_TIME_UNAVAILABLE";
 
     private final AppointmentRequestRepository requests;
     private final PatientRepository patients;
@@ -112,7 +116,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             throw new ConflictException("Closed appointment requests cannot be linked to a patient");
         }
         if (request.getPatient() != null) {
-            if (request.getPatient().getId().equals(patientId)) return mapper.toResponse(request);
+            if (request.getPatient().getId().equals(patientId)) return mapper.toAdministrativeResponse(request);
             throw new ConflictException("Appointment request is already linked to a patient");
         }
         Patient patient = patients.findById(patientId)
@@ -125,7 +129,7 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED, "APPOINTMENTS",
                     "AppointmentRequest", request.getId(), actorId);
         }
-        return mapper.toResponse(requests.saveAndFlush(request));
+        return mapper.toAdministrativeResponse(requests.saveAndFlush(request));
     }
 
     @Override
@@ -134,19 +138,28 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         actor(actorId);
         AppointmentRequest request = locked(requestId);
         if (request.getRequesterFullName() == null) {
-            throw new ConflictException("Only a public appointment request can be assigned this way");
+            throw new ConflictException(REQUEST_NOT_PUBLIC,
+                    "Cannot assign a dentist: this is not a public appointment request");
         }
         if (request.getStatus() != AppointmentRequestStatus.PENDING
                 && request.getStatus() != AppointmentRequestStatus.PROPOSED) {
-            throw new ConflictException("Closed appointment requests cannot be reassigned");
+            throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE,
+                    "Cannot assign a dentist while request status is " + request.getStatus()
+                            + "; eligible statuses are PENDING and PROPOSED");
         }
-        User professional = dentist(professionalId);
+        User professional;
+        try {
+            professional = dentist(professionalId);
+        } catch (ResourceNotFoundException | ConflictException exception) {
+            throw new ConflictException(PROFESSIONAL_NOT_AVAILABLE,
+                    "Cannot assign dentist: selected professional must exist and be an active dentist");
+        }
         request.assignProfessional(professional, clock.instant());
         if (auditService != null) {
             auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED, "APPOINTMENTS",
                     "AppointmentRequest", request.getId(), actorId);
         }
-        return mapper.toResponse(requests.saveAndFlush(request));
+        return mapper.toAdministrativeResponse(requests.saveAndFlush(request));
     }
 
     @Override
@@ -158,19 +171,21 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             throw new ConflictException("This confirmation action is reserved for public requests");
         }
         if (request.getPatient() == null) {
-            throw new ConflictException("Link the public requester to a patient record before confirming");
+            throw new ConflictException("APPOINTMENT_REQUEST_PATIENT_LINK_REQUIRED",
+                    "Cannot confirm public proposal until the requester is linked to a patient record");
         }
         if (request.getStatus() != AppointmentRequestStatus.PROPOSED) {
-            throw new ConflictException("Only a proposed public appointment request can be confirmed");
+            throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE,
+                    "Cannot confirm public proposal while request status is " + request.getStatus()
+                            + "; required status is PROPOSED");
         }
-        Appointment appointment = appointments.create(request.getPatient().getId(),
-                request.getProposedProfessional().getId(), request.getProposedAt());
+        Appointment appointment = createAppointment(request, request.getProposedProfessional(), request.getProposedAt());
         request.confirm(appointment, actor, clock.instant());
         if (auditService != null) {
             auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED, "APPOINTMENTS",
                     "AppointmentRequest", request.getId(), actorId);
         }
-        return mapper.toResponse(requests.saveAndFlush(request));
+        return mapper.toAdministrativeResponse(requests.saveAndFlush(request));
     }
 
     private boolean hasActiveEquivalent(String cui, Instant requestedAt, UUID professionalId) {
@@ -293,17 +308,22 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         if (from != null) spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("requestedAt"), from));
         if (to != null) spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("requestedAt"), to));
         if (patientId != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("patient").get("id"), patientId));
-        if (professionalId != null) spec = spec.and((root, query, cb) -> cb.or(
-                cb.equal(root.get("requestedProfessional").get("id"), professionalId),
-                cb.equal(root.get("proposedProfessional").get("id"), professionalId)));
+        if (professionalId != null) spec = spec.and((root, query, cb) -> {
+            var requested = root.join("requestedProfessional", jakarta.persistence.criteria.JoinType.LEFT);
+            var assigned = root.join("assignedProfessional", jakarta.persistence.criteria.JoinType.LEFT);
+            var proposed = root.join("proposedProfessional", jakarta.persistence.criteria.JoinType.LEFT);
+            return cb.or(cb.equal(requested.get("id"), professionalId),
+                    cb.equal(assigned.get("id"), professionalId),
+                    cb.equal(proposed.get("id"), professionalId));
+        });
         if (status != null) spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status));
-        return requests.findAll(spec, page(page, size)).map(mapper::toResponse);
+        return requests.findAll(spec, page(page, size)).map(mapper::toAdministrativeResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
     public AppointmentRequestResponse findById(UUID requestId) {
-        return requests.findDetailedById(requireId(requestId)).map(mapper::toResponse)
+        return requests.findDetailedById(requireId(requestId)).map(mapper::toAdministrativeResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment request not found"));
     }
 
@@ -312,21 +332,26 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
     public AppointmentRequestResponse acceptRequestedTime(UUID actorId, UUID requestId) {
         User actor = actor(actorId);
         AppointmentRequest request = locked(requestId);
-        if (request.getStatus() == AppointmentRequestStatus.CONFIRMED) return mapper.toResponse(request);
+        if (request.getStatus() == AppointmentRequestStatus.CONFIRMED) return mapper.toAdministrativeResponse(request);
         if (request.getStatus() != AppointmentRequestStatus.PENDING) {
-            throw new ConflictException("Only a pending appointment request can be accepted by the clinic");
+            throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE,
+                    "Cannot accept requested time while request status is " + request.getStatus()
+                            + "; required status is PENDING");
         }
         if (request.getPatient() == null) {
-            throw new ConflictException("Link the requester to a patient record before confirming the appointment");
+            throw new ConflictException("APPOINTMENT_REQUEST_PATIENT_LINK_REQUIRED",
+                    "Cannot confirm requested time until the requester is linked to a patient record");
         }
-        if (request.getRequestedProfessional() == null) {
-            throw new ConflictException("No preferred professional was selected; the clinic must propose a time and professional");
+        User selectedProfessional = request.getRequesterFullName() != null && request.getAssignedProfessional() != null
+                ? request.getAssignedProfessional() : request.getRequestedProfessional();
+        if (selectedProfessional == null) {
+            throw new ConflictException("APPOINTMENT_REQUEST_PROFESSIONAL_ASSIGNMENT_REQUIRED",
+                    "Cannot accept requested time until a dentist is assigned or selected in the request");
         }
-        Appointment appointment = appointments.create(request.getPatient().getId(),
-                request.getRequestedProfessional().getId(), request.getRequestedAt());
+        Appointment appointment = createAppointment(request, selectedProfessional, request.getRequestedAt());
         request.confirm(appointment, actor, clock.instant());
         if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED,"APPOINTMENTS","AppointmentRequest",request.getId(),actorId);
-        return mapper.toResponse(requests.saveAndFlush(request));
+        return mapper.toAdministrativeResponse(requests.saveAndFlush(request));
     }
 
     @Override
@@ -336,16 +361,22 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         AppointmentRequest request = locked(requestId);
         if (request.getStatus() != AppointmentRequestStatus.PENDING
                 && request.getStatus() != AppointmentRequestStatus.PROPOSED) {
-            throw new ConflictException("Closed appointment requests cannot receive a proposal");
+            throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE,
+                    "Cannot propose a time while request status is " + request.getStatus()
+                            + "; eligible statuses are PENDING and PROPOSED");
         }
         requireFuture(proposedAt, "Proposed date and time");
-        User professional = professionalId == null ? request.getRequestedProfessional() : dentist(professionalId);
+        User professional = professionalId == null
+                ? (request.getRequesterFullName() != null && request.getAssignedProfessional() != null
+                    ? request.getAssignedProfessional() : request.getRequestedProfessional())
+                : dentist(professionalId);
         if (professional == null) {
-            throw new ConflictException("A professional must be selected for the clinic proposal");
+            throw new ConflictException("APPOINTMENT_REQUEST_PROFESSIONAL_ASSIGNMENT_REQUIRED",
+                    "Select or assign an active dentist before proposing an appointment time");
         }
         request.propose(professional, proposedAt, actor, clock.instant());
         if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED,"APPOINTMENTS","AppointmentRequest",request.getId(),actorId);
-        return mapper.toResponse(requests.saveAndFlush(request));
+        return mapper.toAdministrativeResponse(requests.saveAndFlush(request));
     }
 
     @Override
@@ -355,11 +386,25 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         AppointmentRequest request = locked(requestId);
         if (request.getStatus() != AppointmentRequestStatus.PENDING
                 && request.getStatus() != AppointmentRequestStatus.PROPOSED) {
-            throw new ConflictException("Closed appointment requests cannot be rejected");
+            throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE,
+                    "Cannot reject request while status is " + request.getStatus()
+                            + "; eligible statuses are PENDING and PROPOSED");
         }
         request.reject(actor, clock.instant());
         if(auditService!=null)auditService.success(AuditActions.APPOINTMENT_REQUEST_PROCESSED,"APPOINTMENTS","AppointmentRequest",request.getId(),actorId);
-        return mapper.toResponse(requests.saveAndFlush(request));
+        return mapper.toAdministrativeResponse(requests.saveAndFlush(request));
+    }
+
+    private Appointment createAppointment(AppointmentRequest request, User professional, Instant scheduledAt) {
+        try {
+            return appointments.create(request.getPatient().getId(), professional.getId(), scheduledAt);
+        } catch (ConflictException exception) {
+            if ("Appointment time is not available".equals(exception.getMessage())) {
+                throw new ConflictException(APPOINTMENT_TIME_UNAVAILABLE,
+                        "Cannot confirm appointment: the selected date and time is already occupied");
+            }
+            throw exception;
+        }
     }
 
     private Patient patientFor(UUID userId) {

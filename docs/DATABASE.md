@@ -359,6 +359,10 @@ dentist links support unassociated pending requests. Partial unique indexes enfo
 active requests for an existing CUI and preferred slot. A preferred public time is not reserved; only the existing
 appointment creation/availability path creates a confirmed slot.
 
+Changeset `041-add-assigned-professional-to-appointment-requests` separates reception's assigned dentist from
+the original requested dentist. Assignment is persisted independently, leaves request status unchanged, and
+does not create or reserve an appointment.
+
 `appointment_waiting_room_entries` has a unique one-to-one foreign key to `appointments` and stores
 `ARRIVED -> WAITING -> READY -> CLOSED`, transition timestamps, check-in staff and latest responsible staff.
 Check-in is limited to a `SCHEDULED` appointment on the current `America/Guatemala` clinic day. Cancelling or

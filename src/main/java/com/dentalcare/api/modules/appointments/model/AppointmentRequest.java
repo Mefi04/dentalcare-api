@@ -22,6 +22,10 @@ public class AppointmentRequest {
     @JoinColumn(name = "requested_professional_id")
     private User requestedProfessional;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_professional_id")
+    private User assignedProfessional;
+
     @Column(name = "requested_at", nullable = false)
     private Instant requestedAt;
 
@@ -102,6 +106,7 @@ public class AppointmentRequest {
     public UUID getId() { return id; }
     public Patient getPatient() { return patient; }
     public User getRequestedProfessional() { return requestedProfessional; }
+    public User getAssignedProfessional() { return assignedProfessional; }
     public Instant getRequestedAt() { return requestedAt; }
     public User getProposedProfessional() { return proposedProfessional; }
     public Instant getProposedAt() { return proposedAt; }
@@ -123,7 +128,7 @@ public class AppointmentRequest {
     }
 
     public void assignProfessional(User professional, Instant now) {
-        this.requestedProfessional = professional;
+        this.assignedProfessional = professional;
         this.updatedAt = now;
     }
 

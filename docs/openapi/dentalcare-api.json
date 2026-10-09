@@ -153,6 +153,10 @@
       },
       "ApiErrorResponse" : {
         "properties" : {
+          "code" : {
+            "description" : "Stable application error code when the client needs to distinguish conflict types.",
+            "type" : "string"
+          },
           "error" : {
             "type" : "string"
           },
@@ -220,6 +224,14 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "assignedProfessional" : {
+            "$ref" : "#/components/schemas/AppointmentProfessionalResponse",
+            "description" : "Reception assignment; null when no dentist has been assigned"
+          },
+          "contact" : {
+            "$ref" : "#/components/schemas/PublicAppointmentRequesterResponse",
+            "description" : "Non-clinical contact details for public submissions"
+          },
           "createdAt" : {
             "format" : "date-time",
             "type" : "string"
@@ -247,6 +259,10 @@
           },
           "requestedProfessional" : {
             "$ref" : "#/components/schemas/AppointmentProfessionalResponse"
+          },
+          "source" : {
+            "description" : "Administrative source classification: PUBLIC or PATIENT_PORTAL",
+            "type" : "string"
           },
           "status" : {
             "enum" : [ "PENDING", "PROPOSED", "CONFIRMED", "REJECTED", "CANCELLED" ],
@@ -7308,7 +7324,7 @@
     },
     "/api/v1/appointment-requests/{requestId}/assign-professional" : {
       "post" : {
-        "description" : "Reception may assign or reassign a dentist on an open public request. This does not confirm or reserve an appointment.",
+        "description" : "Reception may assign or reassign a dentist on an open public request. This does not confirm or reserve an appointment. 409 codes distinguish an ineligible request state (APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE), a non-public request (APPOINTMENT_REQUEST_NOT_PUBLIC), and an unavailable dentist (PROFESSIONAL_NOT_AVAILABLE).",
         "operationId" : "assignProfessional",
         "parameters" : [ {
           "in" : "path",
