@@ -66,6 +66,10 @@ dentalcare:
         window: ${RATE_LIMIT_CONTACT_WINDOW:15m}
         ip-limit: ${RATE_LIMIT_CONTACT_IP:10}
         identity-limit: 0
+      public-appointment-request:
+        window: ${RATE_LIMIT_PUBLIC_APPOINTMENT_WINDOW:15m}
+        ip-limit: ${RATE_LIMIT_PUBLIC_APPOINTMENT_IP:5}
+        identity-limit: 0
   initial-admin:
     enabled: ${INITIAL_ADMIN_ENABLED:false}
     full-name: ${INITIAL_ADMIN_FULL_NAME:}

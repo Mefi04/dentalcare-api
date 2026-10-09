@@ -475,6 +475,59 @@ An appointment request is not a confirmed appointment. Once accepted, the backen
 `Appointment` and exposes its id as `appointmentId`; clients then use the existing appointment endpoints as the
 source of truth.
 
+### Public first-appointment request
+
+`POST /api/v1/public/appointment-requests` is an anonymous intake endpoint separate from contact inquiries and
+from the authenticated patient endpoint. It accepts `Idempotency-Key` as a UUID header and a JSON body with
+required `fullName` (1–150 characters), `phone` (7–30 allowed phone characters; 7–15 digits after normalization),
+and `requestedAt` (future ISO-8601 instant). Optional fields are `cui` (13 digits; only used to associate an
+already-existing patient), `email` (valid address, at most 255 characters), `professionalId` (active dentist), and
+`reason` (at most 300 characters; scheduling context only, no symptoms or clinical data). No account or patient
+record is created. A matching CUI links the existing patient internally; otherwise the request stays unlinked
+until clinic staff verifies identity and uses the administrative link action. The response never confirms whether
+the CUI matched a patient.
+
+Example request:
+
+```http
+POST /api/v1/public/appointment-requests
+Idempotency-Key: 447cf365-823d-4f06-a22e-04d9e6a91393
+Content-Type: application/json
+```
+
+```json
+{
+  "fullName": "María López",
+  "cui": "1234567890123",
+  "phone": "+502 5555-0101",
+  "email": "maria@example.com",
+  "requestedAt": "2027-03-15T16:00:00Z",
+  "professionalId": null,
+  "reason": "Primera consulta, horario de tarde"
+}
+```
+
+Success is `202 Accepted` with only `{ "requestId": "<opaque UUID>", "message": "..." }`. The requested time
+is a preference, not a reservation; no calendar slot is held. Clinic staff must link an unassociated requester to
+a patient, then propose a real available time/professional or accept an existing requested slot through the
+existing availability validation. Receptionists and administrators can assign or reassign an active dentist using
+`POST /api/v1/appointment-requests/{requestId}/assign-professional` with
+`{ "professionalId": "<uuid>" }`. This assignment is recorded on the request while it remains `PENDING`; it does
+not reserve a slot or confirm an appointment. Repeating an identical payload with the same key returns the same receipt;
+reusing a key with another payload or submitting an equivalent active request for the same CUI/time/preferred
+dentist returns generic `409 Conflict`. Missing/invalid fields or a past time return `400 Bad Request`, an
+unavailable/inactive professional returns generic `409 Conflict`, and excessive requests return `429 Too Many
+Requests` with `Retry-After`. Rate limiting is 5 requests per IP per 15 minutes (configurable); clients should
+generate one UUID per submission and retain it across network retries.
+
+Administrative `GET /api/v1/appointment-requests` includes public requests, including rows with no patient link.
+The additive `publicRequester` field on administrative request responses contains intake contact data only for
+authorized staff. `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
+`{ "patientId": "<uuid>" }`; when the intake included CUI, it must match the selected patient's DPI. A proposed
+public request is confirmed by staff through `POST /api/v1/appointment-requests/{requestId}/confirm-public-proposal`
+after linking the patient, because an anonymous requester cannot use the authenticated patient's proposal
+acceptance route. Existing patient endpoints and their contracts are unchanged.
+
 | Method | Path | Authorization | Success | Notes |
 |---|---|---|---|---|
 | `GET` | `/api/v1/appointment-requests` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Filters: `from`, `to`, `patientId`, `professionalId`, `status`, `page`, `size`. |
@@ -482,6 +535,10 @@ source of truth.
 | `POST` | `/api/v1/appointment-requests/{requestId}/accept` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Accepts requested slot; a successful retry returns the same confirmation. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/proposal` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Body: future `proposedAt`, optional `professionalId`. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/reject` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Rejects an open request. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/link-patient` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Links a public request after identity verification; CUI must match when supplied. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/assign-professional` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Assigns/reassigns an active dentist to an open public request; does not confirm a slot. Body: `professionalId`. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/confirm-public-proposal` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Confirms a public request after staff has linked the patient; still validates real slot availability. |
+| `POST` | `/api/v1/public/appointment-requests` | Public | `202 Accepted` | First appointment intake; request time is not reserved. Requires UUID `Idempotency-Key`; see contract above. |
 | `POST` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `201 Created` | Body: `professionalId`, future `requestedAt`; patient comes from JWT. |
 | `GET` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `200 OK` | Lists only owned requests. |
 | `GET` | `/api/v1/patients/me/appointment-requests/{requestId}` | `PATIENT` | `200 OK` | Foreign and unknown ids both return 404. |

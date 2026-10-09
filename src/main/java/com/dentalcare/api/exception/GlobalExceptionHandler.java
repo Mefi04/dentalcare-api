@@ -62,6 +62,18 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+            org.springframework.dao.DataIntegrityViolationException exception, HttpServletRequest request) {
+        if ("/api/v1/public/appointment-requests".equals(request.getRequestURI())) {
+            return buildResponse(HttpStatus.CONFLICT,
+                    "An equivalent appointment request already exists or the idempotency key was already used",
+                    request, Map.of());
+        }
+        LOGGER.error("Database constraint rejected {} {}", request.getMethod(), request.getRequestURI(), exception);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, UNEXPECTED_ERROR_MESSAGE, request, Map.of());
+    }
+
     @ExceptionHandler(UnauthorizedException.class)
     ResponseEntity<ApiErrorResponse> handleUnauthorized(UnauthorizedException exception, HttpServletRequest request) {
         return buildResponse(HttpStatus.UNAUTHORIZED, exception.getMessage(), request, Map.of());

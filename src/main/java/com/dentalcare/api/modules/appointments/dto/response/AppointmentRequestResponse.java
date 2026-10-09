@@ -1,6 +1,7 @@
 package com.dentalcare.api.modules.appointments.dto.response;
 
 import com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -16,5 +17,6 @@ public record AppointmentRequestResponse(
         String actionRequiredBy,
         UUID appointmentId,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        @JsonInclude(JsonInclude.Include.NON_NULL) PublicAppointmentRequesterResponse publicRequester) {
 }

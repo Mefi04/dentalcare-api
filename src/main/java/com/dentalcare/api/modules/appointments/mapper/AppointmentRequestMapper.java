@@ -10,7 +10,7 @@ public class AppointmentRequestMapper {
     public AppointmentRequestResponse toResponse(AppointmentRequest request) {
         return new AppointmentRequestResponse(
                 request.getId(),
-                new AdministrativeAppointmentPatientResponse(
+                request.getPatient() == null ? null : new AdministrativeAppointmentPatientResponse(
                         request.getPatient().getId(), request.getPatient().getCode(),
                         request.getPatient().getName(), request.getPatient().getPhone()),
                 professional(request.getRequestedProfessional()),
@@ -20,7 +20,10 @@ public class AppointmentRequestMapper {
                 request.getStatus(),
                 actionRequiredBy(request.getStatus()),
                 request.getAppointment() == null ? null : request.getAppointment().getId(),
-                request.getCreatedAt(), request.getUpdatedAt());
+                request.getCreatedAt(), request.getUpdatedAt(),
+                request.getRequesterFullName() == null ? null : new PublicAppointmentRequesterResponse(
+                        request.getRequesterFullName(), request.getRequesterCui(), request.getRequesterPhone(),
+                        request.getRequesterEmail(), request.getRequestReason()));
     }
 
     private AppointmentProfessionalResponse professional(com.dentalcare.api.modules.users.model.User user) {
