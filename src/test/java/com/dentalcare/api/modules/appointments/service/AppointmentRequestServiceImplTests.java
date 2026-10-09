@@ -42,6 +42,8 @@ class AppointmentRequestServiceImplTests {
     @Mock AppointmentPublicConversationRepository conversations;
     @Mock AppointmentPublicDecisionRepository decisions;
     @Mock AppointmentRequestMessageRepository messages;
+    @Mock AppointmentNotificationOutboxService notificationOutbox;
+    @Mock AppointmentConversationMessageService conversationMessages;
     @Mock PublicAppointmentCodeDelivery codeDelivery;
     @Mock PasswordEncoder passwordEncoder;
     @Mock com.dentalcare.api.modules.appointments.repository.AppointmentRepository appointmentRepository;
@@ -58,7 +60,8 @@ class AppointmentRequestServiceImplTests {
     void setUp() {
         service = new AppointmentRequestServiceImpl(requests, patients, users, appointments,
                 new AppointmentRequestMapper(), Clock.fixed(NOW, ZoneOffset.UTC), patientService, auditService,
-                conversations, decisions, messages, codeDelivery, passwordEncoder, appointmentRepository);
+                conversations, decisions, messages, notificationOutbox, conversationMessages,
+                codeDelivery, passwordEncoder, appointmentRepository);
         patientUserId = UUID.randomUUID();
         patient = patient();
         dentist = user("DENTIST");
@@ -438,7 +441,7 @@ class AppointmentRequestServiceImplTests {
         when(conversations.findByConversationTokenHash(anyString())).thenReturn(Optional.of(conversation));
         when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
         when(requests.saveAndFlush(request)).thenReturn(request);
-        when(messages.findByAppointmentRequestIdOrderByCreatedAtAscIdAsc(request.getId())).thenReturn(List.of());
+        when(conversationMessages.latest(request.getId(), 20)).thenReturn(List.of());
 
         service.decidePublicProposal(request.getId(), rawToken,
                 new com.dentalcare.api.modules.appointments.dto.request.PublicAppointmentDecisionRequest(
@@ -542,6 +545,43 @@ class AppointmentRequestServiceImplTests {
                 .isInstanceOf(ConflictException.class)
                 .hasFieldOrPropertyWithValue("code", "APPOINTMENT_TIME_UNAVAILABLE");
         assertThat(request.getStatus()).isEqualTo(AppointmentRequestStatus.PENDING_PATIENT);
+    }
+
+    @Test
+    void publicConversationRejectsClinicalContentAndDerivesPatientSenderFromScopedToken() {
+        UUID requestId = UUID.randomUUID();
+        String token = "token-for-this-request";
+        when(conversationMessages.addPublic(eq(requestId), eq(token), any(), any()))
+                .thenThrow(new BadRequestException("Scheduling messages only"));
+
+        assertThatThrownBy(() -> service.addPublicMessage(requestId, token, UUID.randomUUID(),
+                new com.dentalcare.api.modules.appointments.dto.request.CreateAppointmentConversationMessageRequest(
+                        "Me duele una muela")))
+                .isInstanceOf(BadRequestException.class);
+        verifyNoInteractions(messages);
+    }
+
+    @Test
+    void publicMessageRetryWithSameIdempotencyKeyReturnsSameMessage() {
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), null, null, FUTURE,
+                AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Maria Lopez", null,
+                "5555-0101", null, null, UUID.randomUUID(), "hash");
+        String token = "token-for-this-request";
+        UUID key = UUID.randomUUID();
+        AppointmentRequestMessage message = new AppointmentRequestMessage(UUID.randomUUID(), request.getId(),
+                "PATIENT", "FREE_TEXT", "Please call after 3 pm", NOW, key,
+                tokenHash("Please call after 3 pm"));
+        when(conversationMessages.addPublic(eq(request.getId()), eq(token), eq(key), any()))
+                .thenReturn(new com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestMessageResponse(
+                        message.getId(), message.getSender(), message.getMessageType(), message.getText(), NOW));
+
+        var result = service.addPublicMessage(request.getId(), token, key,
+                new com.dentalcare.api.modules.appointments.dto.request.CreateAppointmentConversationMessageRequest(
+                        "Please call after 3 pm"));
+
+        assertThat(result.id()).isEqualTo(message.getId());
+        assertThat(result.sender()).isEqualTo("PATIENT");
+        verify(conversationMessages).addPublic(eq(request.getId()), eq(token), eq(key), any());
     }
 
     private AppointmentRequest request(AppointmentRequestStatus status) {

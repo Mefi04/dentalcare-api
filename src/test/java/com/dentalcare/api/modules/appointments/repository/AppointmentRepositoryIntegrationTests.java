@@ -7,6 +7,11 @@ import com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus;
 import com.dentalcare.api.modules.appointments.dto.response.AppointmentRequestResponse;
 import com.dentalcare.api.modules.appointments.mapper.AppointmentRequestMapper;
 import com.dentalcare.api.modules.appointments.model.WaitingRoomEntry;
+import com.dentalcare.api.modules.appointments.model.AppointmentRequestMessage;
+import com.dentalcare.api.modules.appointments.model.AppointmentNotificationOutboxEvent;
+import com.dentalcare.api.modules.appointments.model.AppointmentNotificationStatus;
+import com.dentalcare.api.modules.appointments.repository.AppointmentRequestMessageRepository;
+import com.dentalcare.api.modules.appointments.repository.AppointmentNotificationOutboxRepository;
 import com.dentalcare.api.modules.patients.model.Gender;
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.patients.repository.PatientRepository;
@@ -37,6 +42,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.sql.Timestamp;
 import java.util.Optional;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -67,6 +73,8 @@ class AppointmentRepositoryIntegrationTests {
 
     @Autowired AppointmentRepository appointments;
     @Autowired AppointmentRequestRepository appointmentRequests;
+    @Autowired AppointmentRequestMessageRepository messages;
+    @Autowired AppointmentNotificationOutboxRepository notificationOutbox;
     @Autowired WaitingRoomRepository waitingRoom;
     @Autowired PatientRepository patients;
     @Autowired UserRepository users;
@@ -145,14 +153,6 @@ class AppointmentRepositoryIntegrationTests {
         } finally {
             pool.shutdownNow();
             new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-                jdbc.update("delete from appointment_request_messages where appointment_request_id in " +
-                        "(select id from appointment_requests where patient_id = ? or professional_id = ?)",
-                        patient.getId(), dentist.getId());
-                jdbc.update("delete from appointment_public_conversations where appointment_request_id in " +
-                        "(select id from appointment_requests where patient_id = ? or professional_id = ?)",
-                        patient.getId(), dentist.getId());
-                jdbc.update("delete from appointment_requests where patient_id = ? or professional_id = ?",
-                        patient.getId(), dentist.getId());
                 jdbc.update("delete from appointment_waiting_room_entries where appointment_id in " +
                         "(select id from appointments where patient_id = ? and professional_id = ? and scheduled_at = ?)",
                         patient.getId(), dentist.getId(), Timestamp.from(SCHEDULED_AT));
@@ -190,7 +190,7 @@ class AppointmentRepositoryIntegrationTests {
     void publicUnlinkedRequestAppearsInTheUnfilteredAdministrativeInbox() {
         UUID id = UUID.randomUUID();
         AppointmentRequest publicRequest = new AppointmentRequest(id, null, null, SCHEDULED_AT,
-                AppointmentRequestStatus.PENDING, NOW, NOW, "First-time visitor", null,
+                AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "First-time visitor", null,
                 "+502 5555-0101", "visitor@example.test", "Afternoon preferred",
                 UUID.randomUUID(), "a".repeat(64));
         appointmentRequests.saveAndFlush(publicRequest);
@@ -224,6 +224,48 @@ class AppointmentRepositoryIntegrationTests {
         assertThat(detail.assignedProfessional().id()).isEqualTo(dentist.getId());
         assertThat(detail.status()).isEqualTo(AppointmentRequestStatus.PENDING_CLINIC);
         assertThat(detail.appointmentId()).isNull();
+    }
+
+    @Test
+    void postgresPersistsIdempotentPublicAndReceptionMessagesAndCursorOrderingFields() {
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), null, null, SCHEDULED_AT,
+                AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Public visitor", null,
+                "+502 5555-0101", null, null, UUID.randomUUID(), "a".repeat(64));
+        appointmentRequests.saveAndFlush(request);
+        UUID key = UUID.randomUUID();
+        var message = new AppointmentRequestMessage(UUID.randomUUID(), request.getId(), "PATIENT", "FREE_TEXT",
+                "Please call after 3 pm", NOW.plusSeconds(2), key, "b".repeat(64));
+        var older = new AppointmentRequestMessage(UUID.randomUUID(), request.getId(), "RECEPTION", "FREE_TEXT",
+                "We will call", NOW.plusSeconds(1), UUID.randomUUID(), "d".repeat(64));
+        messages.saveAllAndFlush(List.of(message, older));
+
+        assertThat(messages.findByAppointmentRequestIdAndSenderAndIdempotencyKey(request.getId(), "PATIENT", key))
+                .get().extracting(AppointmentRequestMessage::getIdempotencyPayloadHash).isEqualTo("b".repeat(64));
+        assertThat(messages.findLatest(request.getId(), PageRequest.of(0, 1)))
+                .extracting(AppointmentRequestMessage::getId).containsExactly(message.getId());
+        assertThat(messages.findOlderThan(request.getId(), message.getCreatedAt(), message.getId(),
+                PageRequest.of(0, 1))).extracting(AppointmentRequestMessage::getId).containsExactly(older.getId());
+    }
+
+    @Test
+    void postgresOutboxAllowsWipingEncryptedPayloadAfterProviderAcceptance() {
+        AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), null, null, SCHEDULED_AT,
+                AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Public visitor", null,
+                "+502 5555-0101", null, null, UUID.randomUUID(), "c".repeat(64));
+        appointmentRequests.saveAndFlush(request);
+        UUID eventId = UUID.randomUUID();
+        AppointmentNotificationOutboxEvent event = new AppointmentNotificationOutboxEvent(eventId,
+                request.getId(), "OTP", "SMS", "encrypted-recipient", "encrypted-payload", eventId,
+                eventId.toString(), NOW);
+        notificationOutbox.saveAndFlush(event);
+        event.claim(NOW);
+        event.markSent(NOW.plusSeconds(1));
+        notificationOutbox.saveAndFlush(event);
+
+        AppointmentNotificationOutboxEvent recovered = notificationOutbox.findById(eventId).orElseThrow();
+        assertThat(recovered.getStatus()).isEqualTo(AppointmentNotificationStatus.SENT);
+        assertThat(recovered.getRecipientCiphertext()).isNull();
+        assertThat(recovered.getPayloadCiphertext()).isNull();
     }
 
     @Test
