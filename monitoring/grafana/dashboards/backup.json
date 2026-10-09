@@ -1,0 +1,118 @@
+{
+  "uid": "dentalcare-backup",
+  "title": "DentalCare backup laboratory",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Age of last complete backup",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "time() - dentalcare_backup_last_complete_timestamp_seconds",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Last operation result",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "dentalcare_backup_last_result",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Last duration",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "dentalcare_backup_duration_seconds",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Age of verified restore",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "expr": "time() - dentalcare_backup_last_restore_timestamp_seconds",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Failures by stage",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "dentalcare-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "expr": "dentalcare_backup_failures_total",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
