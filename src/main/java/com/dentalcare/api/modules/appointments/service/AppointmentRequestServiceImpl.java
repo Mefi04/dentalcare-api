@@ -475,12 +475,8 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         }
         boolean isPublic = request.getRequesterFullName() != null;
         if (isPublic) {
-            if (request.getStatus() != AppointmentRequestStatus.PENDING_CLINIC
-                    && request.getStatus() != AppointmentRequestStatus.PENDING) {
-                throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE,
-                        "Cannot accept requested time while request status is " + request.getStatus()
-                                + "; required status is PENDING_CLINIC or PENDING");
-            }
+            throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE,
+                    "Public first appointments require telephone confirmation");
         } else {
             if (request.getStatus() != AppointmentRequestStatus.PENDING) {
                 throw new ConflictException(REQUEST_STATE_NOT_ELIGIBLE,
@@ -657,11 +653,16 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
         }
         if (input.decision() == PublicAppointmentDecisionRequest.Decision.REJECT) {
             request.returnToClinic(now);
-            decisions.save(new AppointmentPublicDecision(requestId, idempotencyKey, "REJECT", now));
-            messages.save(new AppointmentRequestMessage(UUID.randomUUID(), requestId, "PATIENT", "DECISION",
-                    "La persona rechazó la propuesta. Recepción puede enviar otra alternativa.", now));
-            requests.saveAndFlush(request);
-            conversations.saveAndFlush(conversation);
+            try {
+                decisions.save(new AppointmentPublicDecision(requestId, idempotencyKey, "REJECT", now));
+                messages.save(new AppointmentRequestMessage(UUID.randomUUID(), requestId, "PATIENT", "DECISION",
+                        "La persona rechazó la propuesta. Recepción puede enviar otra alternativa.", now));
+                requests.saveAndFlush(request);
+                conversations.saveAndFlush(conversation);
+            } catch (org.springframework.dao.DataIntegrityViolationException exception) {
+                throw new ConflictException("PROPOSAL_ALREADY_RESPONDED",
+                        "The appointment proposal has already been decided or updated; refreshing status");
+            }
             return conversationResponse(request, tokenExpiry(requestId, token, conversation));
         }
         Appointment appointment;
@@ -676,11 +677,16 @@ public class AppointmentRequestServiceImpl implements AppointmentRequestService 
             throw exception;
         }
         request.confirm(appointment, request.getProcessedBy(), now);
-        decisions.save(new AppointmentPublicDecision(requestId, idempotencyKey, "ACCEPT", now));
-        messages.save(new AppointmentRequestMessage(UUID.randomUUID(), requestId, "SYSTEM", "DECISION",
-                "La propuesta fue aceptada y la cita quedó confirmada.", now));
-        requests.saveAndFlush(request);
-        conversations.saveAndFlush(conversation);
+        try {
+            decisions.save(new AppointmentPublicDecision(requestId, idempotencyKey, "ACCEPT", now));
+            messages.save(new AppointmentRequestMessage(UUID.randomUUID(), requestId, "SYSTEM", "DECISION",
+                    "La propuesta fue aceptada y la cita quedó confirmada.", now));
+            requests.saveAndFlush(request);
+            conversations.saveAndFlush(conversation);
+        } catch (org.springframework.dao.DataIntegrityViolationException exception) {
+            throw new ConflictException("PROPOSAL_ALREADY_RESPONDED",
+                    "The appointment proposal has already been decided or updated; refreshing status");
+        }
         return conversationResponse(request, tokenExpiry(requestId, token, conversation));
     }
 

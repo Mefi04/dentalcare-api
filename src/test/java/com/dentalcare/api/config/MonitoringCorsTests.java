@@ -14,7 +14,7 @@ class MonitoringCorsTests {
         var filter = new CorsFilter(new CorsConfig().corsConfigurationSource("http://localhost:3000"));
         filter.doFilter(request, response, (req, res) -> response.setHeader("X-Request-ID", "synthetic-id"));
         assertEquals("http://localhost:3000", response.getHeader("Access-Control-Allow-Origin"));
-        assertEquals("X-Request-ID", response.getHeader("Access-Control-Expose-Headers"));
+        assertTrue(response.getHeader("Access-Control-Expose-Headers").contains("X-Request-ID"));
     }
     @Test void untrustedOriginRemainsRejected() throws Exception {
         var request = new MockHttpServletRequest("GET", "/api/v1/audit-events");

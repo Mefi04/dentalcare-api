@@ -85,3 +85,24 @@ Spring Boot Actuator may be used.
 Expected example:
 
 GET /actuator/health
+
+## Variables passed by Compose
+
+Compose forwards only what the backend uses in this deployment:
+
+- Required (Compose fails fast if missing): `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`,
+  `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`.
+- Optional: `SPRING_PROFILES_ACTIVE`, `FRONTEND_URL`, `DB_PREPARE_THRESHOLD`,
+  `JWT_ACCESS_EXPIRATION`, `JWT_REFRESH_EXPIRATION`, `INITIAL_ADMIN_*`, `R2_*`,
+  `GEMINI_API_KEY`, `GEMINI_MODEL`, `RATE_LIMIT_ENABLED`, `RATE_LIMIT_TRUSTED_PROXIES`.
+
+Per-endpoint rate limits, upload limits, SMTP (`MAIL_*`), Twilio and the appointment
+notification outbox are not wired in Compose; `application.yml` keeps safe defaults.
+Email-based password recovery needs `MAIL_*` added explicitly if it is enabled later.
+Frontend-only Supabase keys must never be forwarded to the backend container.
+
+## Optional Gemini assistant
+
+Set `GEMINI_API_KEY` in the local environment or uncommitted `.env` before starting Compose.
+`GEMINI_MODEL` defaults to `gemini-3.8-flash`. Compose passes both values to the backend
+container. Without a key, the API starts normally and the assistant endpoint returns 503.

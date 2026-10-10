@@ -40,6 +40,12 @@ public class Appointment {
     @Column(name = "scheduled_at", nullable = false)
     private Instant scheduledAt;
 
+    @Column(name = "ends_at", nullable = false)
+    private Instant endsAt;
+
+    @Column(name = "duration_minutes", nullable = false)
+    private int durationMinutes = 30;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private AppointmentStatus status;
@@ -58,6 +64,7 @@ public class Appointment {
         this.patient = patient;
         this.professional = professional;
         this.scheduledAt = scheduledAt;
+        this.endsAt = scheduledAt.plusSeconds(30 * 60);
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -78,10 +85,15 @@ public class Appointment {
     public String getPublicContactPhone() { return publicContactPhone; }
     public User getProfessional() { return professional; }
     public Instant getScheduledAt() { return scheduledAt; }
+    public Instant getEndsAt() { return endsAt; }
+    public int getDurationMinutes() { return durationMinutes; }
     public AppointmentStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
-    public void setScheduledAt(Instant scheduledAt) { this.scheduledAt = scheduledAt; }
+    public void setScheduledAt(Instant scheduledAt) {
+        this.scheduledAt = scheduledAt;
+        this.endsAt = scheduledAt.plusSeconds(durationMinutes * 60L);
+    }
     public void setStatus(AppointmentStatus status) { this.status = status; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
     public void linkPatient(Patient patient, Instant now) { this.patient = patient; this.updatedAt = now; }

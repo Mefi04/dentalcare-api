@@ -15,6 +15,15 @@ public interface ProfessionalPublicProfileRepository extends JpaRepository<Profe
 
     @Query("""
             SELECT p FROM ProfessionalPublicProfile p JOIN FETCH p.user u
+            WHERE p.serviceCode = com.dentalcare.api.modules.users.model.ProfessionalServiceCode.GENERAL_DENTISTRY
+              AND u.status = com.dentalcare.api.modules.users.model.UserStatus.ACTIVE
+              AND EXISTS (SELECT 1 FROM u.roles r WHERE r.code = 'DENTIST' AND r.active = true)
+            ORDER BY u.id
+            """)
+    List<ProfessionalPublicProfile> findActiveGeneralDentists();
+
+    @Query("""
+            SELECT p FROM ProfessionalPublicProfile p JOIN FETCH p.user u
             WHERE p.publicVisible = true AND u.status = com.dentalcare.api.modules.users.model.UserStatus.ACTIVE
               AND EXISTS (
                 SELECT 1 FROM u.roles r WHERE r.code = 'DENTIST' AND r.active = true

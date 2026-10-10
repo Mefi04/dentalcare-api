@@ -34,6 +34,7 @@ public class ProfessionalPublicProfileServiceImpl implements ProfessionalPublicP
         var existing=repository.findByUser_Id(userId);
         ProfessionalPublicProfile profile=existing.orElseGet(()->new ProfessionalPublicProfile(UUID.randomUUID(),user,required(request.professionalRegistration()),required(request.specialty()),required(request.summary()),request.yearsExperience(),optional(request.languages()),optional(request.photoUrl()),request.publicVisible(),actorId,actorId,now,now));
         if(existing.isPresent()) { profile.setProfessionalRegistration(required(request.professionalRegistration())); profile.setSpecialty(required(request.specialty())); profile.setSummary(required(request.summary())); profile.setYearsExperience(request.yearsExperience()); profile.setLanguages(optional(request.languages())); profile.setPhotoUrl(optional(request.photoUrl())); profile.setPublicVisible(request.publicVisible()); profile.setUpdatedBy(actorId); profile.setUpdatedAt(now); }
+        if (request.serviceCode() != null) profile.setServiceCode(request.serviceCode());
         return save(profile);
     }
     @Override @Transactional(readOnly=true) public List<ProfessionalPublicProfileResponse> findPubliclyVisible(){return repository.findAllPubliclyVisible().stream().map(mapper::toResponse).toList();}

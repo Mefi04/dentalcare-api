@@ -37,6 +37,14 @@ public interface AppointmentRequestRepository extends JpaRepository<AppointmentR
 
     Optional<AppointmentRequest> findByIdempotencyKey(UUID idempotencyKey);
 
+    @Query("""
+            select r from AppointmentRequest r
+            where r.requesterFullName is not null and r.status = 'PENDING_CLINIC'
+              and r.requestedAt >= :from and r.requestedAt < :to
+            """)
+    List<AppointmentRequest> findPendingPublicInWindow(@Param("from") Instant from,
+            @Param("to") Instant to);
+
     List<AppointmentRequest> findByStatusAndProposedExpiresAtLessThanEqual(
             com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus status, Instant now);
 

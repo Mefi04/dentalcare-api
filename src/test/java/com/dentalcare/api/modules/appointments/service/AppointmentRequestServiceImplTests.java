@@ -360,26 +360,16 @@ class AppointmentRequestServiceImplTests {
     }
 
     @Test
-    void clinicAcceptsPublicPendingClinicRequestWithoutRequiringPatientLink() {
+    void legacyAcceptanceCannotConfirmPublicPendingRequest() {
         AppointmentRequest request = new AppointmentRequest(UUID.randomUUID(), null, dentist, FUTURE,
                 AppointmentRequestStatus.PENDING_CLINIC, NOW, NOW, "Juan Publico", null,
                 "+502 5555-1234", null, "Limpieza", UUID.randomUUID(), "payload-hash");
-        Appointment publicAppointment = Appointment.forPublicRequest(UUID.randomUUID(), "Juan Publico",
-                "+502 5555-1234", dentist, FUTURE, NOW);
         when(users.findById(secretary.getId())).thenReturn(Optional.of(secretary));
         when(requests.findDetailedByIdForUpdate(request.getId())).thenReturn(Optional.of(request));
-        when(appointments.createPublic("Juan Publico", "+502 5555-1234", dentist.getId(), FUTURE))
-                .thenReturn(publicAppointment);
-        when(requests.saveAndFlush(request)).thenReturn(request);
-
-        var response = service.acceptRequestedTime(secretary.getId(), request.getId());
-
-        assertThat(response.status()).isEqualTo(AppointmentRequestStatus.CONFIRMED);
-        assertThat(response.appointmentId()).isEqualTo(publicAppointment.getId());
-        verify(appointments).createPublic("Juan Publico", "+502 5555-1234", dentist.getId(), FUTURE);
-        verify(messages).save(argThat(msg -> msg.getText().contains("Tu cita fue confirmada")
-                && "RECEPTION".equals(msg.getSender())));
-        verifyNoInteractions(patientService);
+        assertThatThrownBy(() -> service.acceptRequestedTime(secretary.getId(), request.getId()))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("telephone confirmation");
+        verifyNoInteractions(appointments, messages, patientService);
     }
 
     @Test

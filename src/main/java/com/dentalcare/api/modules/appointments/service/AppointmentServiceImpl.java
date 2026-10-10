@@ -59,7 +59,9 @@ public class AppointmentServiceImpl implements AppointmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Professional not found"));
         validateDentist(professional);
         if (appointmentRepository.existsByProfessional_IdAndScheduledAtAndStatus(
-                professionalId, scheduledAt, AppointmentStatus.SCHEDULED)) {
+                professionalId, scheduledAt, AppointmentStatus.SCHEDULED)
+                || appointmentRepository.existsByProfessional_IdAndStatusAndScheduledAtLessThanAndEndsAtGreaterThan(
+                professionalId, AppointmentStatus.SCHEDULED, scheduledAt.plusSeconds(1800), scheduledAt)) {
             throw new ConflictException("Appointment time is not available");
         }
 
@@ -90,7 +92,9 @@ public class AppointmentServiceImpl implements AppointmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Professional not found"));
         validateDentist(professional);
         if (appointmentRepository.existsByProfessional_IdAndScheduledAtAndStatus(
-                professionalId, scheduledAt, AppointmentStatus.SCHEDULED)) {
+                professionalId, scheduledAt, AppointmentStatus.SCHEDULED)
+                || appointmentRepository.existsByProfessional_IdAndStatusAndScheduledAtLessThanAndEndsAtGreaterThan(
+                professionalId, AppointmentStatus.SCHEDULED, scheduledAt.plusSeconds(1800), scheduledAt)) {
             throw new ConflictException("Appointment time is not available");
         }
         Appointment appointment = Appointment.forPublicRequest(UUID.randomUUID(), fullName, phone,
@@ -145,7 +149,10 @@ public class AppointmentServiceImpl implements AppointmentService {
         }
         if (appointmentRepository.existsByProfessional_IdAndScheduledAtAndStatusAndIdNot(
                 appointment.getProfessional().getId(), scheduledAt,
-                AppointmentStatus.SCHEDULED, appointment.getId())) {
+                AppointmentStatus.SCHEDULED, appointment.getId())
+                || appointmentRepository.existsByProfessional_IdAndStatusAndScheduledAtLessThanAndEndsAtGreaterThanAndIdNot(
+                appointment.getProfessional().getId(), AppointmentStatus.SCHEDULED,
+                scheduledAt.plusSeconds(appointment.getDurationMinutes() * 60L), scheduledAt, appointment.getId())) {
             throw new ConflictException("Appointment time is not available");
         }
 

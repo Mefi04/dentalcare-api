@@ -6,10 +6,12 @@ import com.dentalcare.api.modules.auth.controller.AuthController;
 import com.dentalcare.api.modules.auth.dto.response.RefreshResponse;
 import com.dentalcare.api.modules.auth.service.AuthService;
 import com.dentalcare.api.modules.appointments.controller.PublicAppointmentRequestController;
-import com.dentalcare.api.modules.appointments.controller.PublicAppointmentConversationController;
-import com.dentalcare.api.modules.appointments.dto.request.CreatePublicAppointmentRequest;
-import com.dentalcare.api.modules.appointments.dto.response.PublicAppointmentRequestReceipt;
-import com.dentalcare.api.modules.appointments.service.AppointmentRequestService;
+import com.dentalcare.api.modules.appointments.dto.request.FirstAppointmentIntakeRequest;
+import com.dentalcare.api.modules.appointments.dto.response.FirstAppointmentReceipt;
+import com.dentalcare.api.modules.appointments.service.PublicFirstAppointmentService;
+import com.dentalcare.api.modules.assistant.controller.PublicAssistantController;
+import com.dentalcare.api.modules.assistant.dto.response.PublicAssistantResponse;
+import com.dentalcare.api.modules.assistant.service.PublicAssistantService;
 import com.dentalcare.api.security.cookie.AuthCookieManager;
 import com.dentalcare.api.security.filter.JwtAuthenticationFilter;
 import com.dentalcare.api.security.handler.RestAccessDeniedHandler;
@@ -46,7 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.dentalcare.api.modules.auth.controller.MobileAuthController;
 
 @WebMvcTest(controllers = {AuthController.class, TestSecurityController.class, MobileAuthController.class,
-        PublicAppointmentRequestController.class, PublicAppointmentConversationController.class},
+        PublicAppointmentRequestController.class, PublicAssistantController.class},
         properties = "dentalcare.cors.allowed-origin=http://localhost:3000")
 @Import({SecurityConfig.class, CorsConfig.class, JwtAuthenticationFilter.class, RestAuthenticationEntryPoint.class,
         RestAccessDeniedHandler.class, AuthCookieManager.class})
@@ -62,7 +64,10 @@ class CorsSecurityIntegrationTests {
     private AuthService authService;
 
     @MockitoBean
-    private AppointmentRequestService appointmentRequestService;
+    private PublicFirstAppointmentService appointmentRequestService;
+
+    @MockitoBean
+    private PublicAssistantService publicAssistantService;
 
     @MockitoBean
     private JwtService jwtService;
@@ -76,6 +81,19 @@ class CorsSecurityIntegrationTests {
     @BeforeEach
     void setUp() {
         when(jwtProperties.cookieSecure()).thenReturn(false);
+    }
+
+    @Test
+    void publicAssistantIsAvailableWithoutAuthentication() throws Exception {
+        when(publicAssistantService.answer(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new PublicAssistantResponse("Puede solicitar una cita.", "Orientación general"));
+        mockMvc.perform(post("/api/v1/public/assistant/messages")
+                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                        .contentType("application/json")
+                        .content("{\"message\":\"¿Cómo solicito una cita?\",\"aiProcessingAccepted\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
+                .andExpect(jsonPath("$.answer").value("Puede solicitar una cita."));
     }
 
     @Test
@@ -111,23 +129,24 @@ class CorsSecurityIntegrationTests {
 
         UUID idempotencyKey = UUID.randomUUID();
         UUID requestId = UUID.randomUUID();
-        String conversationToken = "test-private-conversation-token";
-        when(appointmentRequestService.createPublic(
-                org.mockito.ArgumentMatchers.any(CreatePublicAppointmentRequest.class),
+        when(appointmentRequestService.submit(
+                org.mockito.ArgumentMatchers.any(FirstAppointmentIntakeRequest.class),
                 org.mockito.ArgumentMatchers.eq(idempotencyKey)))
-                .thenReturn(new PublicAppointmentRequestReceipt(requestId, "Request received",
-                        conversationToken, "Bearer", java.time.Instant.parse("2099-10-09T15:00:00Z")));
+                .thenReturn(new FirstAppointmentReceipt(requestId, false, "Request received"));
         mockMvc.perform(post("/api/v1/public/appointment-requests")
                         .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
                         .header("Idempotency-Key", idempotencyKey)
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("""
-                                {"fullName":"Maria Lopez","cui":"1234567890123","phone":"5555-0101",
-                                 "requestedAt":"2099-10-02T15:00:00Z"}
+                                {"fullName":"Maria Lopez","cui":"1234567890123","birthDate":"1990-01-01",
+                                 "gender":"FEMALE","phone":"5555-0101","department":"Guatemala",
+                                 "municipality":"Guatemala","address":"Zona 1","emergencyName":"Juan",
+                                 "emergencyPhone":"5555-0102","requestedAt":"2099-10-02T15:00:00Z",
+                                 "privacyAccepted":true,"privacyNoticeVersion":"2026-10"}
                                 """))
                 .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.conversationToken").value(conversationToken))
-                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.confirmed").value(false))
+                .andExpect(jsonPath("$.conversationToken").doesNotExist())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"));
     }
@@ -135,8 +154,8 @@ class CorsSecurityIntegrationTests {
     @Test
     @DisplayName("Public appointment 429 exposes Retry-After to the web frontend")
     void publicAppointmentRateLimitExposesRetryAfter() throws Exception {
-        when(appointmentRequestService.createPublic(
-                org.mockito.ArgumentMatchers.any(CreatePublicAppointmentRequest.class),
+        when(appointmentRequestService.submit(
+                org.mockito.ArgumentMatchers.any(FirstAppointmentIntakeRequest.class),
                 org.mockito.ArgumentMatchers.any(UUID.class)))
                 .thenThrow(new com.dentalcare.api.security.ratelimit.RateLimitExceededException(60));
 
@@ -145,8 +164,11 @@ class CorsSecurityIntegrationTests {
                         .header("Idempotency-Key", UUID.randomUUID())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("""
-                                {"fullName":"Maria Lopez","cui":"1234567890123","phone":"5555-0101",
-                                 "requestedAt":"2099-10-02T15:00:00Z"}
+                                {"fullName":"Maria Lopez","cui":"1234567890123","birthDate":"1990-01-01",
+                                 "gender":"FEMALE","phone":"5555-0101","department":"Guatemala",
+                                 "municipality":"Guatemala","address":"Zona 1","emergencyName":"Juan",
+                                 "emergencyPhone":"5555-0102","requestedAt":"2099-10-02T15:00:00Z",
+                                 "privacyAccepted":true,"privacyNoticeVersion":"2026-10"}
                                 """))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().string(HttpHeaders.RETRY_AFTER, "60"))
@@ -154,23 +176,6 @@ class CorsSecurityIntegrationTests {
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS,
                         containsString(HttpHeaders.RETRY_AFTER)));
-    }
-
-    @Test
-    @DisplayName("Public verified conversation preflight allows credentials, bearer token and decision idempotency")
-    void publicAppointmentConversationPreflightAllowsExpectedHeaders() throws Exception {
-        UUID requestId = UUID.randomUUID();
-        mockMvc.perform(options("/api/v1/public/appointment-requests/{id}/decision", requestId)
-                        .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
-                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, HttpMethod.POST.name())
-                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
-                                "Authorization,Content-Type,Idempotency-Key"))
-                .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Authorization")))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Content-Type")))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS, containsString("Idempotency-Key")));
     }
 
     @ParameterizedTest

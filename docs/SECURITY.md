@@ -1,5 +1,14 @@
 # Security
 
+Public first-appointment intake returns only a request ID and acknowledgement.
+It no longer issues a conversation bearer token or exposes public request detail.
+The API rate limit and UUID idempotency key apply at intake. Submitted DPI/CUI is
+an unverified claim, never an authentication factor or automatic patient-record
+match. Reception-only routes expose contact and administrative data; telephone
+confirmation rechecks actor role, general-dentistry eligibility, work hours,
+blocks, and appointment overlap. PostgreSQL also excludes overlapping scheduled
+appointments for the same professional under concurrent transactions.
+
 Operational monitoring, strict structured log fields, private management endpoints and incident response
 are documented in [MONITORING.md](MONITORING.md). Never publish management port 9091.
 
@@ -686,3 +695,17 @@ Treatment-budget clinic status and patient decision are independent concepts. `P
 are not published to patients. Clinic `APPROVED` is the publication gate; only afterward may the patient's decision
 move independently from `PENDING` to `ACCEPTED` or `REJECTED`. A patient decision never publishes a budget or
 overrides its clinic status.
+# Public assistant and Gemini
+
+The public assistant calls Gemini from Spring Boot using `GEMINI_API_KEY`; the browser
+never receives that key. `GEMINI_MODEL` selects the provider model. The key is optional:
+without it, assistant calls return 503. Public assistant requests are rate limited by IP.
+The API sends only the current visitor message and published clinic/service/availability
+context to Gemini; it stores no assistant transcript and never reads patient records.
+The endpoint rejects obvious identifiers, but this is not a guarantee that arbitrary
+free text contains no personal data. Frontend copy must instruct visitors not to submit
+identifying details or records. Clinical responses are general education; urgent phrases
+are answered locally without contacting Gemini.
+Review the provider's current data-use terms and use an appropriate paid configuration
+before permitting any identifiable health information. The assistant is deliberately not
+connected to clinical records.

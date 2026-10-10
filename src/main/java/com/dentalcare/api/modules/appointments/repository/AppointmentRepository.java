@@ -26,6 +26,15 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     boolean existsByProfessional_IdAndScheduledAtAndStatusAndIdNot(
             UUID professionalId, Instant scheduledAt, AppointmentStatus status, UUID id);
 
+    boolean existsByProfessional_IdAndStatusAndScheduledAtLessThanAndEndsAtGreaterThan(
+            UUID professionalId, AppointmentStatus status, Instant endExclusive, Instant startInclusive);
+
+    boolean existsByProfessional_IdAndStatusAndScheduledAtLessThanAndEndsAtGreaterThanAndIdNot(
+            UUID professionalId, AppointmentStatus status, Instant endExclusive, Instant startInclusive, UUID id);
+
+    List<Appointment> findByProfessional_IdInAndStatusAndScheduledAtLessThanAndEndsAtGreaterThan(
+            List<UUID> professionalIds, AppointmentStatus status, Instant endExclusive, Instant startInclusive);
+
     List<Appointment> findByProfessional_IdAndScheduledAtGreaterThanEqualAndScheduledAtLessThanAndStatusOrderByScheduledAtAsc(
             UUID professionalId, Instant from, Instant to, AppointmentStatus status);
 

@@ -2,9 +2,11 @@ package com.dentalcare.api.modules.appointments.model;
 
 import com.dentalcare.api.modules.patients.model.Patient;
 import com.dentalcare.api.modules.users.model.User;
+import com.dentalcare.api.modules.patients.model.Gender;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -72,6 +74,24 @@ public class AppointmentRequest {
     @Column(name = "request_reason", length = 300)
     private String requestReason;
 
+    @Column(name = "requester_birth_date") private LocalDate requesterBirthDate;
+    @Enumerated(EnumType.STRING) @Column(name = "requester_gender", length = 30)
+    private Gender requesterGender;
+    @Column(name = "requester_alternative_id", length = 100) private String requesterAlternativeId;
+    @Column(name = "requester_guardian_name", length = 150) private String requesterGuardianName;
+    @Column(name = "requester_guardian_relationship", length = 100) private String requesterGuardianRelationship;
+    @Column(name = "requester_guardian_phone", length = 30) private String requesterGuardianPhone;
+    @Column(name = "requester_department", length = 100) private String requesterDepartment;
+    @Column(name = "requester_municipality", length = 100) private String requesterMunicipality;
+    @Column(name = "requester_address", length = 255) private String requesterAddress;
+    @Column(name = "requester_emergency_name", length = 150) private String requesterEmergencyName;
+    @Column(name = "requester_emergency_phone", length = 30) private String requesterEmergencyPhone;
+    @Column(name = "requester_nit", length = 30) private String requesterNit;
+    @Column(name = "requester_billing_name", length = 150) private String requesterBillingName;
+    @Column(name = "requester_billing_address", length = 255) private String requesterBillingAddress;
+    @Column(name = "privacy_notice_version", length = 40) private String privacyNoticeVersion;
+    @Column(name = "privacy_accepted_at") private Instant privacyAcceptedAt;
+
     @Column(name = "idempotency_key")
     private UUID idempotencyKey;
 
@@ -134,6 +154,45 @@ public class AppointmentRequest {
     public String getRequesterPhone() { return requesterPhone; }
     public String getRequesterEmail() { return requesterEmail; }
     public String getRequestReason() { return requestReason; }
+    public LocalDate getRequesterBirthDate() { return requesterBirthDate; }
+    public Gender getRequesterGender() { return requesterGender; }
+    public String getRequesterAlternativeId() { return requesterAlternativeId; }
+    public String getRequesterGuardianName() { return requesterGuardianName; }
+    public String getRequesterGuardianRelationship() { return requesterGuardianRelationship; }
+    public String getRequesterGuardianPhone() { return requesterGuardianPhone; }
+    public String getRequesterDepartment() { return requesterDepartment; }
+    public String getRequesterMunicipality() { return requesterMunicipality; }
+    public String getRequesterAddress() { return requesterAddress; }
+    public String getRequesterEmergencyName() { return requesterEmergencyName; }
+    public String getRequesterEmergencyPhone() { return requesterEmergencyPhone; }
+    public String getRequesterNit() { return requesterNit; }
+    public String getRequesterBillingName() { return requesterBillingName; }
+    public String getRequesterBillingAddress() { return requesterBillingAddress; }
+    public String getPrivacyNoticeVersion() { return privacyNoticeVersion; }
+    public Instant getPrivacyAcceptedAt() { return privacyAcceptedAt; }
+
+    public void setAdministrativeIntake(LocalDate birthDate, Gender gender, String alternativeId,
+            String guardianName, String guardianRelationship, String guardianPhone,
+            String department, String municipality, String address, String emergencyName,
+            String emergencyPhone, String nit, String billingName, String billingAddress,
+            String privacyNoticeVersion, Instant privacyAcceptedAt) {
+        this.requesterBirthDate = birthDate;
+        this.requesterGender = gender;
+        this.requesterAlternativeId = alternativeId;
+        this.requesterGuardianName = guardianName;
+        this.requesterGuardianRelationship = guardianRelationship;
+        this.requesterGuardianPhone = guardianPhone;
+        this.requesterDepartment = department;
+        this.requesterMunicipality = municipality;
+        this.requesterAddress = address;
+        this.requesterEmergencyName = emergencyName;
+        this.requesterEmergencyPhone = emergencyPhone;
+        this.requesterNit = nit;
+        this.requesterBillingName = billingName;
+        this.requesterBillingAddress = billingAddress;
+        this.privacyNoticeVersion = privacyNoticeVersion;
+        this.privacyAcceptedAt = privacyAcceptedAt;
+    }
     public UUID getIdempotencyKey() { return idempotencyKey; }
     public String getIdempotencyPayloadHash() { return idempotencyPayloadHash; }
     public Instant getRequesterIdentityVerifiedAt() { return requesterIdentityVerifiedAt; }

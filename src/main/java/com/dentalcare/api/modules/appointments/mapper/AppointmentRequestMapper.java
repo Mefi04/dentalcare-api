@@ -21,7 +21,15 @@ public class AppointmentRequestMapper {
         PublicAppointmentRequesterResponse contact = publicRequest ? new PublicAppointmentRequesterResponse(
                 request.getRequesterFullName(), request.getRequesterCui(), request.getRequesterPhone(),
                 request.getRequesterEmail(), NonClinicalSchedulingText.isSafe(request.getRequestReason())
-                        ? request.getRequestReason() : null) : null;
+                        ? request.getRequestReason() : null,
+                request.getRequesterBirthDate(), request.getRequesterGender(),
+                request.getRequesterAlternativeId(), request.getRequesterGuardianName(),
+                request.getRequesterGuardianRelationship(), request.getRequesterGuardianPhone(),
+                request.getRequesterDepartment(), request.getRequesterMunicipality(),
+                request.getRequesterAddress(), request.getRequesterEmergencyName(),
+                request.getRequesterEmergencyPhone(), request.getRequesterNit(),
+                request.getRequesterBillingName(), request.getRequesterBillingAddress(),
+                request.getPrivacyNoticeVersion(), request.getPrivacyAcceptedAt()) : null;
         return new AppointmentRequestResponse(
                 request.getId(),
                 request.getPatient() == null ? null : new AdministrativeAppointmentPatientResponse(

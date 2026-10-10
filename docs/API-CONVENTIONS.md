@@ -481,176 +481,40 @@ Supported categories (`ClinicalDocumentType`):
 
 ## Appointment request endpoints
 
-An appointment request is not a confirmed appointment. Once accepted, the backend transactionally creates one
-`Appointment` and exposes its id as `appointmentId`; clients then use the existing appointment endpoints as the
-source of truth.
+Public first appointments use a single anonymous form followed by telephone handling by reception. The public interaction ends when the request is submitted. The preferred time is never a reservation. All clinic dates and times use `America/Guatemala`; API instants use ISO-8601 with an offset.
 
-### Public first-appointment request
+### Public availability
 
-`POST /api/v1/public/appointment-requests` is an anonymous intake endpoint separate from contact inquiries and
-from the authenticated patient endpoint. It accepts `Idempotency-Key` as a UUID header and a JSON body with
-required `cui` (exactly 13 digits), used by reception to verify and match or register the patient record. CUI is
-never authentication and is not used to look up or automatically link a patient.
-required `fullName` (1–150 characters), `phone` (7–30 allowed phone characters; 7–15 digits after normalization),
-and `requestedAt` (future ISO-8601 instant). Optional fields are `email` (valid address, at most 255 characters), `professionalId` (active dentist), and
-`reason` (at most 300 characters; scheduling context only, no symptoms or clinical data). No account or patient
-record is created and the endpoint never searches patients by CUI. The required CUI is stored as an unverified
-claim for reception's later identity-verification workflow; it never authenticates the visitor or auto-associates an
-expediente. After reception verifies identity, the CUI must match an existing patient record or the DPI entered
-when reception registers a new patient, so the request is linked to the correct record before confirmation. The
-anonymous response never confirms whether a CUI exists in DentalCare.
+`GET /api/v1/public/appointment-availability?date=YYYY-MM-DD` returns 30-minute general-dentistry slots for the next three months. It aggregates active dentists whose professional profile has `serviceCode: GENERAL_DENTISTRY` and whose configured work interval covers the slot. Blocks and overlapping scheduled appointments remove capacity. `AVAILABLE` means capacity with no pending request, `REQUESTED` means capacity with one or more pending requests, `BOOKED` means all eligible capacity is occupied, and `UNAVAILABLE` means no eligible capacity, an invalid time, or a past slot. The response contains counts, never dentist or patient identities. An administrator must classify dentists and configure work intervals before slots become available.
 
-Example request:
+### Public intake
 
-```http
-POST /api/v1/public/appointment-requests
-Idempotency-Key: 447cf365-823d-4f06-a22e-04d9e6a91393
-Content-Type: application/json
-```
+`POST /api/v1/public/appointment-requests` requires a UUID `Idempotency-Key` header and administrative data: full name, birth date, gender, phone, department, municipality, address, emergency contact and phone, preferred slot, privacy consent, and notice version. Adults provide a real DPI/CUI or alternative identification where they do not have one; minors provide a legal guardian and guardian phone. Email, NIT, billing details, and logistics note are optional. Clinical details are not accepted in the logistics note. No client-selected professional is accepted. Example:
 
 ```json
-{
-  "fullName": "María López",
-  "cui": "1234567890123",
-  "phone": "+502 5555-0101",
-  "email": "maria@example.com",
-  "requestedAt": "2027-03-15T16:00:00Z",
-  "professionalId": null,
-  "reason": "Primera consulta, horario de tarde"
-}
+{"fullName":"Maria Lopez","cui":"1234567890123","birthDate":"1990-01-01","gender":"FEMALE","phone":"+502 5555-0101","department":"Guatemala","municipality":"Guatemala","address":"Zona 1","emergencyName":"Juan Lopez","emergencyPhone":"+502 5555-0102","requestedAt":"2027-03-15T16:00:00Z","privacyAccepted":true,"privacyNoticeVersion":"2026-10"}
 ```
 
-Success is `202 Accepted` with `{ "requestId": "<opaque UUID>", "message": "...", "conversationToken": "<random bearer>", "tokenType": "Bearer", "conversationExpiresAt": "<ISO-8601 instant>" }`. The token is a random 256-bit secret scoped to this request, valid for seven days, stored only as SHA-256 and returned only in this response. Save it securely (prefer `sessionStorage`) and never place it in a URL. No email or SMS verification is required. The requested time
-is a preference, not a reservation; no calendar slot is held. Clinic staff must link an unassociated requester to
-a patient, then propose a real available time/professional or accept an existing requested slot through the
-existing availability validation. Receptionists and administrators can assign or reassign an active dentist using
-`POST /api/v1/appointment-requests/{requestId}/assign-professional` with
-`{ "professionalId": "<uuid>" }`. It is available to `ADMINISTRATOR` and `SECRETARY` for public requests in
-`PENDING` or `PROPOSED`. Assignment is stored separately from `requestedProfessional`, so receptionist assignment
-does not overwrite the visitor's dentist preference. It does not reserve a slot, change request status, or confirm
-an appointment. Its response includes the refreshed administrative projection and `assignedProfessional`.
-Changing assignment does not silently alter an already-sent `proposedProfessional`/`proposedAt`; clinic staff can
-review and explicitly submit a replacement proposal through the existing proposal endpoint.
-Repeating an identical payload with the same key returns the same receipt;
-reusing a key with another payload or submitting the exact same normalized payload while it is still active
-returns generic `409 Conflict`. The duplicate key is a hash of the full normalized request, not a CUI lookup.
-Missing/invalid fields or a past time return `400 Bad Request`, an
-unavailable/inactive professional returns generic `409 Conflict`, and excessive requests return `429 Too Many
-Requests` with `Retry-After`. Rate limiting is 5 requests per IP per 15 minutes (configurable); clients should
-generate one UUID per submission and retain it across network retries.
+The response is `202 Accepted`: `{ "requestId": "<uuid>", "confirmed": false, "message": "..." }`. It contains no token, patient record, dentist identity, or clinical data. The server stores consent time, creates `PENDING_CLINIC`, audits the action, and creates no appointment or portal account. The same key and payload return the same receipt; a changed payload with the same key returns `409`. The public endpoint is rate limited. Existing patient records are never linked from self-declared DPI.
 
-Administrative `GET /api/v1/appointment-requests` and `GET /api/v1/appointment-requests/{requestId}` include
-public requests, initially unlinked regardless of submitted CUI. They expose
-`source: "PUBLIC"` independent of the patient link, `contact` (`fullName`, `phone`, and available `cui`, `email`,
-`reason`), `requestedAt`, actual `status`, `requestedProfessional`, and `assignedProfessional` (or `null`). The
-existing `publicRequester` field is retained for compatibility. `contact` is non-clinical and staff-only; public
-intake never returns clinical data. Patient-origin requests identify as `PATIENT_PORTAL` in the administrative
-projection and otherwise retain their existing patient data and workflow. Before linking or registering a
-patient, reception records an identity-verification method using
-`POST /api/v1/appointment-requests/{requestId}/verify-requester-identity` with
-`{"method":"IN_PERSON|CALLBACK_TO_REGISTERED_CONTACT|DOCUMENT_REVIEW"}`. The actor, method and timestamp are
-audited and returned in administrative `identityVerification`. OTP ownership of the submitted contact is not
-proof of legal identity, and CUI alone is not proof either.
+### Reception
 
-For an existing patient, `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
-`{ "patientId": "<uuid>" }`; after staff identity verification, the required submitted CUI must match the
-selected patient's DPI. For a new patient, reception uses
-`POST /api/v1/appointment-requests/{requestId}/register-patient` with the existing `CreatePatientRequest` DTO.
-It requires `PATIENT_CREATE`, all required patient-administration fields (including real DPI, birth date and
-gender), calls the official `PatientService`, creates no user/account, and atomically links the new record. A
-repeated request matching the already-linked DPI returns the linked appointment request rather than creating a
-duplicate patient. Patient creation and linking roll back together on failure. Linking or registering an
-existing patient record is required before public acceptance, but never confirms the proposal. The legacy
-`POST /api/v1/appointment-requests/{requestId}/confirm-public-proposal` is retained for compatibility and returns
-`409 PUBLIC_PATIENT_ACCEPTANCE_REQUIRED`; only the verified public conversation can accept. Existing patient
-endpoints and their contracts are unchanged.
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/appointment-requests/public-inbox` | `ADMINISTRATOR`, `SECRETARY` | Paged public requests filtered by `from`, `to`, `status`, and `search` (name, phone, email); each pending row includes a conflict flag. |
+| `GET` | `/api/v1/appointment-requests/{requestId}` | `ADMINISTRATOR`, `SECRETARY` | Full administrative detail, including contact, emergency, billing, guardian, and consent data. |
+| `GET` | `/api/v1/appointment-requests/{requestId}/scheduling-options` | `ADMINISTRATOR`, `SECRETARY` | Preferred-slot status, conflict flag, and up to ten alternatives within configured work hours. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/contact-attempts` | `ADMINISTRATOR`, `SECRETARY` | Record a call result (`CONTACTED`, `NO_ANSWER`, `CALL_BACK_LATER`, `WRONG_NUMBER`, or `DECLINED`), optional observation and next attempt. Does not change request status. |
+| `GET` | `/api/v1/appointment-requests/{requestId}/contact-attempts` | `ADMINISTRATOR`, `SECRETARY` | Newest-first page of calls, size 1-100. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/telephone-confirmation` | `ADMINISTRATOR`, `SECRETARY` | `{ "professionalId":"<uuid>", "scheduledAt":"<instant>", "telephoneAgreementConfirmed":true }`. Revalidates general-dentistry eligibility, work hours, blocks, and booked intervals, then creates an appointment atomically. Same confirmation is idempotent. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/reject` | `ADMINISTRATOR`, `SECRETARY` | Reject a pending request. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/verify-requester-identity` | `ADMINISTRATOR`, `SECRETARY` | Record in-person identity verification on the appointment day. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/link-patient` | `ADMINISTRATOR`, `SECRETARY` | Link a verified existing patient after confirmation. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/register-patient` | `ADMINISTRATOR`, `SECRETARY` + `PATIENT_CREATE` | Register and link the patient through the official patient service after in-person verification. |
 
-Assignment errors use `409 Conflict` with a stable `code`: `APPOINTMENT_REQUEST_NOT_PUBLIC`,
-`APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE` (includes the actual and allowed states), or
-`PROFESSIONAL_NOT_AVAILABLE`. Appointment creation conflicts use `APPOINTMENT_TIME_UNAVAILABLE` and a message
-that identifies the occupied date/time. Assignment itself performs no availability reservation, so it cannot
-produce an appointment-slot conflict.
+`ADMINISTRATOR` configures work intervals and blocks through `POST` and `DELETE /api/v1/appointment-professionals/{professionalId}/schedule/work-intervals` and `/blocks`. Classification is managed on the professional profile using `serviceCode`. Unknown legacy specialties remain ineligible until reviewed. PostgreSQL excludes overlapping scheduled appointment intervals for one professional, including concurrent confirmation attempts. Existing patient-portal appointment request routes remain separate under `/api/v1/patients/me/appointment-requests`.
 
-| Method | Path | Authorization | Success | Notes |
-|---|---|---|---|---|
-| `GET` | `/api/v1/appointment-requests` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Filters: `from`, `to`, `patientId`, `professionalId`, `status`, `page`, `size`. |
-| `GET` | `/api/v1/appointment-requests/{requestId}` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Administrative detail. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/accept` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Accepts requested slot; a successful retry returns the same confirmation. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/proposal` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Body: future `proposedAt`, optional `professionalId`. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/reject` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Rejects an open request. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/link-patient` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Links a public request after identity verification; CUI must match when supplied. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/verify-requester-identity` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Audits reception's verification method before linking/registering. CUI and public OTP are not identity proof. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/register-patient` | `ADMINISTRATOR`, `SECRETARY` + `PATIENT_CREATE` | `200 OK` | Uses `CreatePatientRequest`/`PatientService`; requires verified identity, creates no portal account, links atomically. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/assign-professional` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Assigns/reassigns an active dentist to an open public request; does not confirm a slot. Body: `professionalId`. |
-| `GET` | `/api/v1/appointment-requests/{requestId}/availability?professionalId={uuid}&date=YYYY-MM-DD` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Returns only booked instants for that dentist on the Guatemala clinic date. Proposal submission validates availability again. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/messages` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Body is a predefined non-clinical template type; free-text/clinical messages are not accepted. |
-| `GET` | `/api/v1/appointment-requests/{requestId}/conversation/messages?size=20&cursor=...` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Cursor-paginated public conversation; size 1-100; list endpoints no longer embed full history. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/conversation/messages` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | `{ "text": "Please call after 3 pm" }`; UUID `Idempotency-Key`; sender comes from auth. |
-| `GET` | `/api/v1/appointment-requests/{requestId}/notifications?page=0&size=20` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Safe notification state only; no destination or ciphertext is returned. |
-| `GET` | `/api/v1/appointment-requests/{requestId}/whatsapp-draft` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Manual `wa.me` draft; `sentAutomatically` is always false. |
-| `POST` | `/api/v1/appointment-requests/{requestId}/confirm-public-proposal` | `ADMINISTRATOR`, `SECRETARY` | `409 Conflict` | Legacy compatibility route; public proposal acceptance is restricted to the verified conversation. |
-| `POST` | `/api/v1/public/appointment-requests` | Public | `202 Accepted` | First appointment intake; request time is not reserved. Requires UUID `Idempotency-Key`; returns a seven-day scoped conversation token in the receipt. |
-| `POST` | `/api/v1/public/appointment-requests/{requestId}/verification-codes` | Public (legacy-compatible) | `202 Accepted` | Optional legacy flow. Body `channel: SMS|EMAIL`; generic acknowledgment; OTP expires in 10 minutes, max five attempts. Not used by the new web flow. |
-| `POST` | `/api/v1/public/appointment-requests/{requestId}/verification` | Public (legacy-compatible) | `200 OK` | Optional legacy flow. Body `code`; success returns a scoped 24-hour `conversationToken`. Not used by the new web flow. |
-| `GET` | `/api/v1/public/appointment-requests/{requestId}/conversation` | Conversation bearer token | `200 OK` | Returns only that request's state, proposal and messages. |
-| `GET` | `/api/v1/public/appointment-requests/{requestId}/conversation/messages?size=20&cursor=...` | Conversation bearer token | `200 OK` | Stable chronological cursor page; size 1-100, latest page first. |
-| `POST` | `/api/v1/public/appointment-requests/{requestId}/conversation/messages` | Conversation bearer token | `200 OK` | `{ "text": "Please call after 3 pm" }`, UUID `Idempotency-Key`; non-clinical plain text only, max 500 chars. |
-| `POST` | `/api/v1/public/appointment-requests/{requestId}/decision` | Conversation bearer token | `200 OK` | Body `decision: ACCEPT|REJECT`; UUID `Idempotency-Key` required. Accept creates a cita only if an existing patient record is linked and slot still free. |
-| `POST` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `201 Created` | Body: `professionalId`, future `requestedAt`; patient comes from JWT. |
-| `GET` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `200 OK` | Lists only owned requests. |
-| `GET` | `/api/v1/patients/me/appointment-requests/{requestId}` | `PATIENT` | `200 OK` | Foreign and unknown ids both return 404. |
-| `POST` | `/api/v1/patients/me/appointment-requests/{requestId}/accept-proposal` | `PATIENT` | `200 OK` | Creates exactly one appointment. |
-| `POST` | `/api/v1/patients/me/appointment-requests/{requestId}/reject-proposal` | `PATIENT` | `200 OK` | Rejects the clinic proposal. |
-| `POST` | `/api/v1/patients/me/appointment-requests/{requestId}/cancel` | `PATIENT` | `200 OK` | Cancels a pending request. |
-
-`actionRequiredBy` is derived as `CLINIC`, `PATIENT`, or `NONE`. Existing direct appointment endpoints remain
-compatible.
-
-### Public first-appointment conversation
-
-Public intake creates `PENDING_CLINIC`; patient-portal requests keep their existing `PENDING`/`PROPOSED` lifecycle.
-Reception retains `ADMINISTRATOR`/`SECRETARY` access to list/detail, dentist assignment and proposal actions. A
-public proposal moves to `PENDING_PATIENT`, includes `proposedExpiresAt` (24-hour default), and adds a fixed,
-non-clinical clinic message to the conversation. Reception can inspect one dentist's already-booked instants for a
-Guatemala clinic date with `GET /api/v1/appointment-requests/{requestId}/availability?professionalId={uuid}&date=YYYY-MM-DD`;
-this response contains no patient details, and proposal submission checks the slot again.
-
-The receipt from `POST /api/v1/public/appointment-requests` includes a random 256-bit `conversationToken`,
-`tokenType: "Bearer"`, and `conversationExpiresAt` seven days from issuance. The token is returned only by intake
-and same-key/same-payload retries; such retries rotate the token and invalidate the previous one. The raw token is
-never persisted. Keep the token in `sessionStorage`, do not put it in a URL, and do not log it. There is no contact
-verification and no recovery if both the token and original idempotency key are lost. Possession authorizes only
-that request's non-clinical scheduling conversation; it does not prove phone/email ownership or legal identity.
-The legacy OTP endpoints remain available to existing clients. Invalid/missing token returns 401, expired token or
-proposal returns 410, and per-IP throttling returns 429 with `Retry-After`.
-
-Conversation reads and decisions require `Authorization: Bearer <conversationToken>`. `Idempotency-Key` (UUID) is
-required for decisions. Rejecting or expiring a proposal returns the request to `PENDING_CLINIC`; it remains open.
-Acceptance rechecks availability and creates the appointment transactionally. A partial unique PostgreSQL index
-on active dentist/time reservations closes concurrent booking races; an occupied slot returns `409` with
-`APPOINTMENT_TIME_UNAVAILABLE` and creates no appointment. If no patient record exists, acceptance returns
-`409 PATIENT_RECORD_LINK_REQUIRED`; reception verifies identity, then either links an existing record or creates
-one through the patient module before another acceptance attempt. The CUI is never used as chat authentication or
-an automatic record match. No account is created automatically, and no arbitrary patient messages are accepted.
-Reception may use predefined templates or free-text logistical messages. Both directions reject clinical terms, markup,
-control characters and messages above 500 characters. Message senders are server-derived (`PATIENT` from the scoped
-conversation token, `RECEPTION` from the authenticated staff principal); `BOT` and `SYSTEM` are server-only. Reusing
-the same sender/request/idempotency key and payload returns the original message; changing its payload returns 409.
-
-Conversation history is fetched through the cursor endpoint. A page response is shaped as
-`{"items":[{"id":"uuid","sender":"RECEPTION","type":"FREE_TEXT","text":"...","createdAt":"..."}],"nextCursor":"...","hasMore":true,"pageSize":20}`.
-Traversal uses `(createdAt DESC, id DESC)` and each page is presented chronologically; clients pass `nextCursor`
-unchanged. Legacy conversation/detail projections include at most the latest 20 messages.
-
-OTP and proposal notices use a PostgreSQL transactional outbox. Recipient and message payload are stored only as
-AES-256-GCM ciphertext while pending/retrying and erased after provider acceptance or terminal failure. `SENT` means
-accepted by SMTP/Twilio, not delivered. Admin status omits recipient data. Retries use capped exponential backoff,
-eight attempts by default, and expired OTP events are discarded. Configure `APPOINTMENT_OUTBOX_ENCRYPTION_KEY` as
-base64 for exactly 32 random bytes. Email requires explicit `PUBLIC_APPOINTMENT_EMAIL_ENABLED=true` and working SMTP;
-SMS requires Twilio credentials and has connection/request timeouts; SMTP connect/read/write timeouts default to five
-seconds and are configurable. If no OTP channel is configured, requests return 503 without disclosing whether the
-request exists. The WhatsApp draft endpoint does not send or claim delivery.
-
+The former public OTP, conversation, message, and decision routes and the administrative proposal/message/notification routes are no longer exposed. Frontend PR #137 must replace those calls with this contract.
 ## Waiting room endpoints
 
 | Method | Path | Authorization | Success | Notes |
@@ -676,3 +540,18 @@ Suggested parameters:
 ## OpenAPI
 
 Public API endpoints should be documented using OpenAPI/Swagger.
+
+## Public assistant
+
+`POST /api/v1/public/assistant/messages` accepts `{ "message": "...", "availabilityDate": "YYYY-MM-DD", "aiProcessingAccepted": true }`.
+`availabilityDate` is optional. The message is required and limited to 1,000 characters.
+The visitor must explicitly agree to sending the message to the configured AI provider.
+The endpoint returns `{ "answer": "...", "notice": "..." }` and has a public IP rate limit
+(20 requests per 15 minutes by default). It uses published clinic and service information;
+when a date is supplied, it uses the existing aggregate general-dentistry availability.
+The assistant does not create or confirm appointments and does not access patient records.
+Obvious email addresses, phone numbers, and numeric identifiers are rejected before a
+provider call. The frontend must render the answer as text and tell visitors not to enter
+personal or clinical record data. Urgent symptom phrases receive an immediate emergency
+response without a Gemini call. General dental answers are educational, not a diagnosis.
+If Gemini is not configured or unavailable, the API returns `503`.

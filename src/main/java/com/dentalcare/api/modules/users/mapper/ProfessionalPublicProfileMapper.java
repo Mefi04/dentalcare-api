@@ -9,6 +9,6 @@ public class ProfessionalPublicProfileMapper {
     public ProfessionalPublicProfileResponse toResponse(ProfessionalPublicProfile profile) {
         return new ProfessionalPublicProfileResponse(profile.getId(), profile.getUser().getId(), profile.getUser().getFullName(),
                 profile.getProfessionalRegistration(), profile.getSpecialty(), profile.getSummary(), profile.getYearsExperience(),
-                profile.getLanguages(), profile.getPhotoUrl(), profile.isPublicVisible());
+                profile.getLanguages(), profile.getPhotoUrl(), profile.isPublicVisible(), profile.getServiceCode());
     }
 }

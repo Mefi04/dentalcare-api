@@ -92,8 +92,19 @@ public class GlobalExceptionHandler {
                     "An equivalent appointment request already exists or the idempotency key was already used",
                     request, Map.of());
         }
+        if (request.getRequestURI() != null && request.getRequestURI().contains("/decision")) {
+            return buildResponse(HttpStatus.CONFLICT,
+                    "The appointment proposal has already been decided or updated",
+                    request, Map.of(), "PROPOSAL_ALREADY_RESPONDED");
+        }
         LOGGER.error("Database constraint rejected {} {}", request.getMethod(), request.getRequestURI(), exception);
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, UNEXPECTED_ERROR_MESSAGE, request, Map.of());
+    }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    ResponseEntity<ApiErrorResponse> handleNoResourceFound(
+            org.springframework.web.servlet.resource.NoResourceFoundException exception, HttpServletRequest request) {
+        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage(), request, Map.of());
     }
 
     @ExceptionHandler(UnauthorizedException.class)

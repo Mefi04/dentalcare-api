@@ -97,6 +97,13 @@ dentalcare:
         window: ${RATE_LIMIT_PUBLIC_APPOINTMENT_WINDOW:15m}
         ip-limit: ${RATE_LIMIT_PUBLIC_APPOINTMENT_IP:5}
         identity-limit: ${RATE_LIMIT_PUBLIC_APPOINTMENT_IDENTITY:10}
+      public-assistant:
+        window: ${RATE_LIMIT_ASSISTANT_WINDOW:15m}
+        ip-limit: ${RATE_LIMIT_ASSISTANT_IP:20}
+        identity-limit: 0
+  assistant:
+    gemini-api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-3.8-flash}
   initial-admin:
     enabled: ${INITIAL_ADMIN_ENABLED:false}
     full-name: ${INITIAL_ADMIN_FULL_NAME:}

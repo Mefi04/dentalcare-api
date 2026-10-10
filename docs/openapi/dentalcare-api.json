@@ -185,46 +185,34 @@
         "required" : [ "timestamp", "status", "error", "message", "path", "fieldErrors" ],
         "type" : "object"
       },
-      "AppointmentAvailabilityResponse" : {
+      "AppointmentContactAttemptResponse" : {
         "properties" : {
-          "bookedTimes" : {
-            "items" : {
-              "format" : "date-time",
-              "type" : "string"
-            },
-            "type" : "array"
-          },
-          "date" : {
-            "format" : "date",
-            "type" : "string"
-          },
-          "professionalId" : {
+          "actorId" : {
             "format" : "uuid",
             "type" : "string"
           },
-          "timezone" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "AppointmentConversationMessagesPageResponse" : {
-        "properties" : {
-          "hasMore" : {
-            "type" : "boolean"
-          },
-          "items" : {
-            "items" : {
-              "$ref" : "#/components/schemas/AppointmentRequestMessageResponse"
-            },
-            "type" : "array"
-          },
-          "nextCursor" : {
+          "attemptedAt" : {
+            "format" : "date-time",
             "type" : "string"
           },
-          "pageSize" : {
-            "format" : "int32",
-            "type" : "integer"
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "nextAttemptAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "observation" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "result" : {
+            "enum" : [ "CONTACTED", "NO_ANSWER", "CALL_BACK_LATER", "WRONG_NUMBER", "DECLINED" ],
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -246,56 +234,6 @@
           "total" : {
             "format" : "int64",
             "type" : "integer"
-          }
-        },
-        "type" : "object"
-      },
-      "AppointmentNotificationOutboxResponse" : {
-        "properties" : {
-          "attempts" : {
-            "format" : "int32",
-            "type" : "integer"
-          },
-          "channel" : {
-            "type" : "string"
-          },
-          "correlationId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "createdAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "errorCode" : {
-            "type" : "string"
-          },
-          "id" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "lastAttemptAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "nextAttemptAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "requestId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "sentAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "status" : {
-            "enum" : [ "PENDING", "PROCESSING", "SENT", "FAILED", "RETRY_PENDING", "DEAD_LETTER" ],
-            "type" : "string"
-          },
-          "type" : {
-            "type" : "string"
           }
         },
         "type" : "object"
@@ -406,37 +344,6 @@
             "type" : "string"
           }
         },
-        "type" : "object"
-      },
-      "AppointmentWhatsAppDraftResponse" : {
-        "properties" : {
-          "message" : {
-            "type" : "string"
-          },
-          "phone" : {
-            "type" : "string"
-          },
-          "requestId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "sentAutomatically" : {
-            "type" : "boolean"
-          },
-          "url" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "AssignAppointmentRequestProfessionalRequest" : {
-        "properties" : {
-          "professionalId" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        },
-        "required" : [ "professionalId" ],
         "type" : "object"
       },
       "AssignMedicalHistoryQuestionnaireRequest" : {
@@ -726,16 +633,6 @@
             "type" : "string"
           }
         },
-        "type" : "object"
-      },
-      "ClinicSchedulingMessageRequest" : {
-        "properties" : {
-          "type" : {
-            "enum" : [ "RECEPTION_FOLLOW_UP", "REQUEST_RECEIVED" ],
-            "type" : "string"
-          }
-        },
-        "required" : [ "type" ],
         "type" : "object"
       },
       "ClinicSettingsResponse" : {
@@ -1103,6 +1000,23 @@
         },
         "type" : "object"
       },
+      "ConfirmFirstAppointmentRequest" : {
+        "properties" : {
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "scheduledAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "telephoneAgreementConfirmed" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "professionalId", "scheduledAt" ],
+        "type" : "object"
+      },
       "ConfirmPasswordRecoveryRequest" : {
         "properties" : {
           "code" : {
@@ -1190,15 +1104,23 @@
         "required" : [ "patientId", "professionalId", "scheduledAt" ],
         "type" : "object"
       },
-      "CreateAppointmentConversationMessageRequest" : {
+      "CreateAppointmentContactAttemptRequest" : {
         "properties" : {
-          "text" : {
+          "nextAttemptAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "observation" : {
             "maxLength" : 500,
             "minLength" : 0,
             "type" : "string"
+          },
+          "result" : {
+            "enum" : [ "CONTACTED", "NO_ANSWER", "CALL_BACK_LATER", "WRONG_NUMBER", "DECLINED" ],
+            "type" : "string"
           }
         },
-        "required" : [ "text" ],
+        "required" : [ "result" ],
         "type" : "object"
       },
       "CreateAppointmentRequest" : {
@@ -1812,55 +1734,41 @@
         "required" : [ "basePrice", "category", "code", "durationMinutes", "name" ],
         "type" : "object"
       },
-      "CreatePublicAppointmentRequest" : {
-        "description" : "Non-clinical information needed to request a first appointment",
+      "CreateProfessionalScheduleBlockRequest" : {
         "properties" : {
-          "cui" : {
-            "description" : "Optional unverified DPI/CUI supplied by legacy clients; not required for scheduling and never used to create or link a clinical record. Reception verifies the physical DPI in person on the appointment day",
-            "example" : "1234567890123",
-            "pattern" : "^[0-9]{13}$",
+          "endsAt" : {
+            "format" : "date-time",
             "type" : "string"
           },
-          "email" : {
-            "example" : "maria@example.com",
-            "format" : "email",
-            "maxLength" : 255,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "fullName" : {
-            "example" : "María López",
+          "reason" : {
             "maxLength" : 150,
             "minLength" : 0,
             "type" : "string"
           },
-          "phone" : {
-            "example" : "+502 5555-0101",
-            "maxLength" : 30,
-            "minLength" : 0,
-            "pattern" : "^[+0-9() .-]{7,30}$",
-            "type" : "string"
-          },
-          "professionalId" : {
-            "description" : "Optional preferred active dentist; omit or send null if there is no preference",
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "reason" : {
-            "description" : "Optional non-clinical scheduling context only. Do not include symptoms or medical details.",
-            "example" : "Primera consulta, horario de tarde",
-            "maxLength" : 300,
-            "minLength" : 0,
-            "type" : "string"
-          },
-          "requestedAt" : {
-            "description" : "Preferred future time in ISO-8601 UTC. This is a request, not a reservation.",
-            "example" : "2027-03-15T16:00:00Z",
+          "startsAt" : {
             "format" : "date-time",
             "type" : "string"
           }
         },
-        "required" : [ "fullName", "phone", "requestedAt" ],
+        "required" : [ "endsAt", "startsAt" ],
+        "type" : "object"
+      },
+      "CreateProfessionalWorkIntervalRequest" : {
+        "properties" : {
+          "dayOfWeek" : {
+            "format" : "int32",
+            "maximum" : 7,
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "endTime" : {
+            "type" : "string"
+          },
+          "startTime" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "endTime", "startTime" ],
         "type" : "object"
       },
       "CreatePurchaseItemRequest" : {
@@ -2193,6 +2101,152 @@
           },
           "period" : {
             "$ref" : "#/components/schemas/ReportPeriodResponse"
+          }
+        },
+        "type" : "object"
+      },
+      "FirstAppointmentIntakeRequest" : {
+        "properties" : {
+          "address" : {
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "alternativeId" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "billingAddress" : {
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "billingName" : {
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "cui" : {
+            "pattern" : "^[0-9]{13}$",
+            "type" : "string"
+          },
+          "department" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "email" : {
+            "format" : "email",
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "emergencyName" : {
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "emergencyPhone" : {
+            "minLength" : 1,
+            "pattern" : "^[+0-9() .-]{7,30}$",
+            "type" : "string"
+          },
+          "fullName" : {
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "gender" : {
+            "enum" : [ "FEMALE", "MALE", "OTHER" ],
+            "type" : "string"
+          },
+          "guardianName" : {
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "guardianPhone" : {
+            "pattern" : "^[+0-9() .-]{7,30}$",
+            "type" : "string"
+          },
+          "guardianRelationship" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "logisticsNote" : {
+            "maxLength" : 300,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "municipality" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "nit" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "phone" : {
+            "minLength" : 1,
+            "pattern" : "^[+0-9() .-]{7,30}$",
+            "type" : "string"
+          },
+          "privacyAccepted" : {
+            "type" : "boolean"
+          },
+          "privacyNoticeVersion" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "requestedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "address", "birthDate", "department", "emergencyName", "emergencyPhone", "fullName", "gender", "municipality", "phone", "privacyNoticeVersion", "requestedAt" ],
+        "type" : "object"
+      },
+      "FirstAppointmentReceipt" : {
+        "properties" : {
+          "confirmed" : {
+            "type" : "boolean"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FirstAppointmentSchedulingOptionsResponse" : {
+        "properties" : {
+          "alternatives" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PublicAppointmentSlotResponse"
+            },
+            "type" : "array"
+          },
+          "conflict" : {
+            "type" : "boolean"
+          },
+          "preferredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "preferredStatus" : {
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -3022,6 +3076,52 @@
           "content" : {
             "items" : {
               "$ref" : "#/components/schemas/AdministrativeAppointmentResponse"
+            },
+            "type" : "array"
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "first" : {
+            "type" : "boolean"
+          },
+          "last" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "numberOfElements" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageable" : {
+            "$ref" : "#/components/schemas/PageableObject"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "$ref" : "#/components/schemas/SortObject"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageAppointmentContactAttemptResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AppointmentContactAttemptResponse"
             },
             "type" : "array"
           },
@@ -4213,6 +4313,52 @@
         },
         "type" : "object"
       },
+      "PageReceptionFirstAppointmentItem" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ReceptionFirstAppointmentItem"
+            },
+            "type" : "array"
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "first" : {
+            "type" : "boolean"
+          },
+          "last" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "numberOfElements" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageable" : {
+            "$ref" : "#/components/schemas/PageableObject"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "$ref" : "#/components/schemas/SortObject"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "PageStaffUserResponse" : {
         "properties" : {
           "content" : {
@@ -5338,6 +5484,10 @@
           "publicVisible" : {
             "type" : "boolean"
           },
+          "serviceCode" : {
+            "enum" : [ "GENERAL_DENTISTRY", "SPECIALIST" ],
+            "type" : "string"
+          },
           "specialty" : {
             "type" : "string"
           },
@@ -5355,96 +5505,70 @@
         },
         "type" : "object"
       },
-      "ProposeAppointmentRequest" : {
+      "ProfessionalScheduleBlockResponse" : {
         "properties" : {
+          "endsAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
           "professionalId" : {
             "format" : "uuid",
             "type" : "string"
           },
-          "proposedAt" : {
+          "reason" : {
+            "type" : "string"
+          },
+          "startsAt" : {
             "format" : "date-time",
             "type" : "string"
           }
         },
-        "required" : [ "proposedAt" ],
         "type" : "object"
       },
-      "PublicAppointmentConversationResponse" : {
+      "ProfessionalWorkIntervalResponse" : {
         "properties" : {
-          "appointmentId" : {
+          "dayOfWeek" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "endTime" : {
+            "type" : "string"
+          },
+          "id" : {
             "format" : "uuid",
             "type" : "string"
           },
-          "confirmedAt" : {
-            "format" : "date-time",
+          "professionalId" : {
+            "format" : "uuid",
             "type" : "string"
           },
-          "confirmedProfessional" : {
-            "$ref" : "#/components/schemas/AppointmentProfessionalResponse"
-          },
-          "conversationExpiresAt" : {
-            "format" : "date-time",
+          "startTime" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PublicAppointmentAvailabilityResponse" : {
+        "properties" : {
+          "date" : {
+            "format" : "date",
             "type" : "string"
           },
-          "messages" : {
+          "durationMinutes" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "slots" : {
             "items" : {
-              "$ref" : "#/components/schemas/AppointmentRequestMessageResponse"
+              "$ref" : "#/components/schemas/PublicAppointmentSlotResponse"
             },
             "type" : "array"
           },
-          "proposalExpiresAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "proposedAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "proposedProfessional" : {
-            "$ref" : "#/components/schemas/AppointmentProfessionalResponse"
-          },
-          "requestId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "status" : {
-            "enum" : [ "PENDING", "PROPOSED", "PENDING_CLINIC", "PENDING_PATIENT", "CONFIRMED", "REJECTED", "CANCELLED" ],
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "PublicAppointmentDecisionRequest" : {
-        "properties" : {
-          "decision" : {
-            "enum" : [ "ACCEPT", "REJECT" ],
-            "type" : "string"
-          }
-        },
-        "required" : [ "decision" ],
-        "type" : "object"
-      },
-      "PublicAppointmentRequestReceipt" : {
-        "description" : "Safe acknowledgment for an anonymous appointment request",
-        "properties" : {
-          "conversationExpiresAt" : {
-            "description" : "Conversation-token expiry; an idempotent retry with the same key and payload issues a replacement token.",
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "conversationToken" : {
-            "description" : "One-time 256-bit bearer secret scoped to this request. Save securely; it is never stored in plaintext.",
-            "type" : "string"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "requestId" : {
-            "format" : "uuid",
-            "type" : "string"
-          },
-          "tokenType" : {
-            "example" : "Bearer",
+          "timeZone" : {
             "type" : "string"
           }
         },
@@ -5453,19 +5577,119 @@
       "PublicAppointmentRequesterResponse" : {
         "description" : "Contact details supplied for a public request; visible only to authorized clinic staff",
         "properties" : {
+          "address" : {
+            "type" : "string"
+          },
+          "alternativeId" : {
+            "type" : "string"
+          },
+          "billingAddress" : {
+            "type" : "string"
+          },
+          "billingName" : {
+            "type" : "string"
+          },
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
           "cui" : {
+            "type" : "string"
+          },
+          "department" : {
             "type" : "string"
           },
           "email" : {
             "type" : "string"
           },
+          "emergencyName" : {
+            "type" : "string"
+          },
+          "emergencyPhone" : {
+            "type" : "string"
+          },
           "fullName" : {
+            "type" : "string"
+          },
+          "gender" : {
+            "enum" : [ "FEMALE", "MALE", "OTHER" ],
+            "type" : "string"
+          },
+          "guardianName" : {
+            "type" : "string"
+          },
+          "guardianPhone" : {
+            "type" : "string"
+          },
+          "guardianRelationship" : {
+            "type" : "string"
+          },
+          "municipality" : {
+            "type" : "string"
+          },
+          "nit" : {
             "type" : "string"
           },
           "phone" : {
             "type" : "string"
           },
+          "privacyAcceptedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "privacyNoticeVersion" : {
+            "type" : "string"
+          },
           "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PublicAppointmentSlotResponse" : {
+        "properties" : {
+          "availableProfessionals" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pendingRequests" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "startsAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PublicAssistantRequest" : {
+        "properties" : {
+          "aiProcessingAccepted" : {
+            "type" : "boolean"
+          },
+          "availabilityDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "message" : {
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "message" ],
+        "type" : "object"
+      },
+      "PublicAssistantResponse" : {
+        "properties" : {
+          "answer" : {
+            "type" : "string"
+          },
+          "notice" : {
             "type" : "string"
           }
         },
@@ -5489,21 +5713,6 @@
             "type" : "string"
           },
           "tradeName" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "PublicConversationTokenResponse" : {
-        "properties" : {
-          "conversationToken" : {
-            "type" : "string"
-          },
-          "expiresAt" : {
-            "format" : "date-time",
-            "type" : "string"
-          },
-          "tokenType" : {
             "type" : "string"
           }
         },
@@ -5575,24 +5784,6 @@
             "type" : "string"
           }
         },
-        "type" : "object"
-      },
-      "PublicVerificationAcknowledgement" : {
-        "properties" : {
-          "message" : {
-            "type" : "string"
-          }
-        },
-        "type" : "object"
-      },
-      "PublicVerificationChannelRequest" : {
-        "properties" : {
-          "channel" : {
-            "enum" : [ "SMS", "EMAIL" ],
-            "type" : "string"
-          }
-        },
-        "required" : [ "channel" ],
         "type" : "object"
       },
       "PurchaseItemResponse" : {
@@ -5820,6 +6011,36 @@
         "properties" : {
           "scanDocumentId" : {
             "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ReceptionFirstAppointmentItem" : {
+        "properties" : {
+          "conflict" : {
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "fullName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "phone" : {
+            "type" : "string"
+          },
+          "preferredAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PENDING", "PROPOSED", "PENDING_CLINIC", "PENDING_PATIENT", "CONFIRMED", "REJECTED", "CANCELLED" ],
             "type" : "string"
           }
         },
@@ -7151,6 +7372,10 @@
           "publicVisible" : {
             "type" : "boolean"
           },
+          "serviceCode" : {
+            "enum" : [ "GENERAL_DENTISTRY", "SPECIALIST" ],
+            "type" : "string"
+          },
           "specialty" : {
             "maxLength" : 150,
             "minLength" : 0,
@@ -7203,17 +7428,6 @@
             "type" : "string"
           }
         },
-        "type" : "object"
-      },
-      "VerifyPublicAppointmentCodeRequest" : {
-        "properties" : {
-          "code" : {
-            "minLength" : 1,
-            "pattern" : "^[0-9]{6}$",
-            "type" : "string"
-          }
-        },
-        "required" : [ "code" ],
         "type" : "object"
       },
       "VerifyPublicRequesterIdentityRequest" : {
@@ -7315,6 +7529,604 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/v1/appointment-professionals/{professionalId}/schedule/blocks" : {
+      "get" : {
+        "operationId" : "blocks",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ProfessionalScheduleBlockResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "professional-schedule-controller", "Audience: Staff" ]
+      },
+      "post" : {
+        "operationId" : "addBlock",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateProfessionalScheduleBlockRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfessionalScheduleBlockResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "professional-schedule-controller", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-professionals/{professionalId}/schedule/blocks/{blockId}" : {
+      "delete" : {
+        "operationId" : "removeBlock",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "blockId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "professional-schedule-controller", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-professionals/{professionalId}/schedule/work-intervals" : {
+      "get" : {
+        "operationId" : "workIntervals",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ProfessionalWorkIntervalResponse"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "professional-schedule-controller", "Audience: Staff" ]
+      },
+      "post" : {
+        "operationId" : "addWork",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateProfessionalWorkIntervalRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfessionalWorkIntervalResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "professional-schedule-controller", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-professionals/{professionalId}/schedule/work-intervals/{intervalId}" : {
+      "delete" : {
+        "operationId" : "removeWork",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "intervalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "professional-schedule-controller", "Audience: Staff" ]
+      }
+    },
     "/api/v1/appointment-requests" : {
       "get" : {
         "operationId" : "findAll_13",
@@ -7446,6 +8258,129 @@
         } ],
         "summary" : "List and filter patient appointment requests",
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-requests/public-inbox" : {
+      "get" : {
+        "operationId" : "search_4",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "PENDING", "PROPOSED", "PENDING_CLINIC", "PENDING_PATIENT", "CONFIRMED", "REJECTED", "CANCELLED" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "search",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "maximum" : 1000,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageReceptionFirstAppointmentItem"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "reception-first-appointment-inbox-controller", "Audience: Staff" ]
       }
     },
     "/api/v1/appointment-requests/{requestId}" : {
@@ -7636,120 +8571,9 @@
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
-    "/api/v1/appointment-requests/{requestId}/assign-professional" : {
-      "post" : {
-        "description" : "Reception may assign or reassign a dentist on an open public request. This does not confirm or reserve an appointment. 409 codes distinguish an ineligible request state (APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE), a non-public request (APPOINTMENT_REQUEST_NOT_PUBLIC), and an unavailable dentist (PROFESSIONAL_NOT_AVAILABLE).",
-        "operationId" : "assignProfessional",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/AssignAppointmentRequestProfessionalRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authentication is required or invalid"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authenticated caller lacks the required permission"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Operation conflicts with the current resource state"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "summary" : "Assign an active dentist to a public appointment request",
-        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
-      }
-    },
-    "/api/v1/appointment-requests/{requestId}/availability" : {
+    "/api/v1/appointment-requests/{requestId}/contact-attempts" : {
       "get" : {
-        "operationId" : "availability",
+        "operationId" : "history",
         "parameters" : [ {
           "in" : "path",
           "name" : "requestId",
@@ -7759,216 +8583,15 @@
             "type" : "string"
           }
         }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
           "in" : "query",
-          "name" : "professionalId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "date",
-          "required" : true,
-          "schema" : {
-            "format" : "date",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentAvailabilityResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authentication is required or invalid"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authenticated caller lacks the required permission"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "summary" : "Read a dentist's scheduled times for one clinic date; proposal validates again",
-        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
-      }
-    },
-    "/api/v1/appointment-requests/{requestId}/confirm-public-proposal" : {
-      "post" : {
-        "operationId" : "confirmPublicProposal",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authentication is required or invalid"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authenticated caller lacks the required permission"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Operation conflicts with the current resource state"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
-      }
-    },
-    "/api/v1/appointment-requests/{requestId}/conversation/messages" : {
-      "get" : {
-        "operationId" : "conversationMessages",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "cursor",
+          "name" : "page",
           "required" : false,
           "schema" : {
-            "type" : "string"
+            "default" : 0,
+            "format" : "int32",
+            "maximum" : 1000,
+            "type" : "integer"
           }
         }, {
           "description" : "Requested page size; values above 100 are capped to 100.",
@@ -7986,7 +8609,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentConversationMessagesPageResponse"
+                  "$ref" : "#/components/schemas/PageAppointmentContactAttemptResponse"
                 }
               }
             },
@@ -8000,7 +8623,7 @@
                 }
               }
             },
-            "description" : "Invalid request or failed validation"
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
           },
           "401" : {
             "content" : {
@@ -8055,24 +8678,15 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
-        "summary" : "Read a paginated public conversation as authorized reception",
-        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+        "summary" : "Read paginated telephone contact history",
+        "tags" : [ "Administrative appointment contacts", "Audience: Staff" ]
       },
       "post" : {
-        "description" : "Sender is derived from the authenticated administrator/secretary. Requires Idempotency-Key UUID.",
-        "operationId" : "addConversationMessage",
+        "operationId" : "record",
         "parameters" : [ {
           "in" : "path",
           "name" : "requestId",
           "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "in" : "header",
-          "name" : "Idempotency-Key",
-          "required" : false,
           "schema" : {
             "format" : "uuid",
             "type" : "string"
@@ -8082,7 +8696,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/CreateAppointmentConversationMessageRequest"
+                "$ref" : "#/components/schemas/CreateAppointmentContactAttemptRequest"
               }
             }
           },
@@ -8093,7 +8707,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentRequestMessageResponse"
+                  "$ref" : "#/components/schemas/AppointmentContactAttemptResponse"
                 }
               }
             },
@@ -8172,8 +8786,8 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
-        "summary" : "Send a non-clinical free-text message from reception",
-        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+        "summary" : "Record a telephone contact attempt for a pending public request",
+        "tags" : [ "Administrative appointment contacts", "Audience: Staff" ]
       }
     },
     "/api/v1/appointment-requests/{requestId}/link-patient" : {
@@ -8283,340 +8897,6 @@
           "bearerAuth" : [ ]
         } ],
         "summary" : "Link an existing patient record after in-person physical DPI verification on the confirmed appointment day",
-        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
-      }
-    },
-    "/api/v1/appointment-requests/{requestId}/messages" : {
-      "post" : {
-        "operationId" : "addMessage_1",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ClinicSchedulingMessageRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authentication is required or invalid"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authenticated caller lacks the required permission"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Operation conflicts with the current resource state"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "summary" : "Send a predefined non-clinical scheduling message into a public conversation",
-        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
-      }
-    },
-    "/api/v1/appointment-requests/{requestId}/notifications" : {
-      "get" : {
-        "operationId" : "notifications",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
-          "in" : "query",
-          "name" : "page",
-          "required" : false,
-          "schema" : {
-            "default" : 0,
-            "format" : "int32",
-            "maximum" : 1000,
-            "type" : "integer"
-          }
-        }, {
-          "description" : "Requested page size; values above 100 are capped to 100.",
-          "in" : "query",
-          "name" : "size",
-          "required" : false,
-          "schema" : {
-            "default" : 20,
-            "format" : "int32",
-            "type" : "integer"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "items" : {
-                    "$ref" : "#/components/schemas/AppointmentNotificationOutboxResponse"
-                  },
-                  "type" : "array"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation; page must not exceed 1000"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authentication is required or invalid"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authenticated caller lacks the required permission"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "summary" : "Read safe delivery status and retries for a public appointment request",
-        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
-      }
-    },
-    "/api/v1/appointment-requests/{requestId}/proposal" : {
-      "post" : {
-        "operationId" : "propose",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/ProposeAppointmentRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authentication is required or invalid"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authenticated caller lacks the required permission"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Operation conflicts with the current resource state"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "summary" : "Propose a real available appointment time to a public requester",
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
@@ -8830,6 +9110,205 @@
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
+    "/api/v1/appointment-requests/{requestId}/scheduling-options" : {
+      "get" : {
+        "operationId" : "get_5",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FirstAppointmentSchedulingOptionsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "first-appointment-scheduling-options-controller", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-requests/{requestId}/telephone-confirmation" : {
+      "post" : {
+        "operationId" : "confirm_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfirmFirstAppointmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Confirm a first appointment after telephone agreement",
+        "tags" : [ "first-appointment-confirmation-controller", "Audience: Staff" ]
+      }
+    },
     "/api/v1/appointment-requests/{requestId}/verify-requester-identity" : {
       "post" : {
         "description" : "Only IN_PERSON is accepted for a public appointment. The public CUI, if submitted, is unverified and is not used to establish the link.",
@@ -8938,96 +9417,6 @@
           "bearerAuth" : [ ]
         } ],
         "summary" : "Record in-person physical DPI verification on the confirmed appointment day",
-        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
-      }
-    },
-    "/api/v1/appointment-requests/{requestId}/whatsapp-draft" : {
-      "get" : {
-        "operationId" : "whatsappDraft",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentWhatsAppDraftResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authentication is required or invalid"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Authenticated caller lacks the required permission"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "summary" : "Prepare but do not send a WhatsApp message for reception to review manually",
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
@@ -16877,7 +17266,7 @@
     },
     "/api/v1/patients/me/medical-history/questionnaires/{questionnaireId}" : {
       "get" : {
-        "operationId" : "get_5",
+        "operationId" : "get_4",
         "parameters" : [ {
           "in" : "path",
           "name" : "questionnaireId",
@@ -22201,7 +22590,7 @@
     },
     "/api/v1/patients/{patientId}/medical-history/questionnaires/{questionnaireId}" : {
       "get" : {
-        "operationId" : "get_4",
+        "operationId" : "get_3",
         "parameters" : [ {
           "in" : "path",
           "name" : "patientId",
@@ -26012,9 +26401,67 @@
         "tags" : [ "prescription-controller", "Audience: Staff" ]
       }
     },
+    "/api/v1/public/appointment-availability" : {
+      "get" : {
+        "operationId" : "forDate",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "date",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublicAppointmentAvailabilityResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ],
+        "summary" : "Read aggregate general dentistry availability without patient or dentist identities",
+        "tags" : [ "Public first appointment availability", "Audience: Public" ]
+      }
+    },
     "/api/v1/public/appointment-requests" : {
       "post" : {
-        "description" : "Returns a scoped 30-day conversation bearer token; save it because it cannot be recovered. An authenticated conversation read renews it when fewer than seven days remain. A retry with the same Idempotency-Key and payload rotates and returns a new token without persisting token material in plaintext. requestedAt is a preference, not a confirmed or reserved appointment. DPI is optional at intake and is verified in person before patient registration. No email/SMS verification is required.",
+        "description" : "Returns 202 with an acknowledgement. The preferred time is not reserved; reception calls to confirm. Idempotency-Key must be a UUID.",
         "operationId" : "create_5",
         "parameters" : [ {
           "in" : "header",
@@ -26029,7 +26476,7 @@
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/CreatePublicAppointmentRequest"
+                "$ref" : "#/components/schemas/FirstAppointmentIntakeRequest"
               }
             }
           },
@@ -26040,7 +26487,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/PublicAppointmentRequestReceipt"
+                  "$ref" : "#/components/schemas/FirstAppointmentReceipt"
                 }
               }
             },
@@ -26087,210 +26534,19 @@
           }
         },
         "security" : [ ],
-        "summary" : "Request a first appointment without an account",
+        "summary" : "Submit a first-appointment request for general dentistry",
         "tags" : [ "Public appointment requests", "Audience: Public" ]
       }
     },
-    "/api/v1/public/appointment-requests/{requestId}/conversation" : {
-      "get" : {
-        "description" : "401 missing/invalid token; 410 expired token. The token is limited to this request.",
-        "operationId" : "get_3",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "in" : "header",
-          "name" : "Authorization",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PublicAppointmentConversationResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ ],
-        "summary" : "Read a public appointment conversation using its scoped bearer token",
-        "tags" : [ "Public appointment conversation", "Audience: Public" ]
-      }
-    },
-    "/api/v1/public/appointment-requests/{requestId}/conversation/messages" : {
-      "get" : {
-        "description" : "Requires the scoped conversation bearer token. Results are chronological within each page, newest first page, size 1-100.",
-        "operationId" : "messages",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "in" : "header",
-          "name" : "Authorization",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "cursor",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "description" : "Requested page size; values above 100 are capped to 100.",
-          "in" : "query",
-          "name" : "size",
-          "required" : false,
-          "schema" : {
-            "default" : 20,
-            "format" : "int32",
-            "type" : "integer"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentConversationMessagesPageResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ ],
-        "summary" : "Read a stable cursor-paginated public conversation history",
-        "tags" : [ "Public appointment conversation", "Audience: Public" ]
-      },
+    "/api/v1/public/assistant/messages" : {
       "post" : {
-        "description" : "Requires the scoped bearer token and Idempotency-Key UUID. HTML, clinical content, and messages over 500 characters are rejected.",
-        "operationId" : "addMessage",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "in" : "header",
-          "name" : "Authorization",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "header",
-          "name" : "Idempotency-Key",
-          "required" : false,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
+        "description" : "Do not submit personal identifiers or patient records. The assistant does not diagnose, prescribe or book appointments.",
+        "operationId" : "answer",
         "requestBody" : {
           "content" : {
             "application/json" : {
               "schema" : {
-                "$ref" : "#/components/schemas/CreateAppointmentConversationMessageRequest"
+                "$ref" : "#/components/schemas/PublicAssistantRequest"
               }
             }
           },
@@ -26301,7 +26557,7 @@
             "content" : {
               "application/json" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/AppointmentRequestMessageResponse"
+                  "$ref" : "#/components/schemas/PublicAssistantResponse"
                 }
               }
             },
@@ -26316,16 +26572,6 @@
               }
             },
             "description" : "Invalid request or failed validation"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
           },
           "409" : {
             "content" : {
@@ -26358,290 +26604,8 @@
           }
         },
         "security" : [ ],
-        "summary" : "Send a non-clinical scheduling message from the verified requester",
-        "tags" : [ "Public appointment conversation", "Audience: Public" ]
-      }
-    },
-    "/api/v1/public/appointment-requests/{requestId}/decision" : {
-      "post" : {
-        "description" : "Requires Idempotency-Key UUID. Acceptance reserves an appointment with public contact; patient registration and physical DPI verification occur on the appointment day. 400 invalid decision/key; 401 invalid token; 409 state conflict or APPOINTMENT_TIME_UNAVAILABLE (no appointment is created); 410 expired/responded proposal or token; 429 rate limit.",
-        "operationId" : "decide",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        }, {
-          "in" : "header",
-          "name" : "Authorization",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "header",
-          "name" : "Idempotency-Key",
-          "required" : false,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/PublicAppointmentDecisionRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PublicAppointmentConversationResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Operation conflicts with the current resource state"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ ],
-        "summary" : "Accept or reject the current public appointment proposal",
-        "tags" : [ "Public appointment conversation", "Audience: Public" ]
-      }
-    },
-    "/api/v1/public/appointment-requests/{requestId}/verification" : {
-      "post" : {
-        "description" : "400 invalid format, 401 invalid code, 410 expired/consumed code, 429 after five attempts or IP throttling.",
-        "operationId" : "verify",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/VerifyPublicAppointmentCodeRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PublicConversationTokenResponse"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Operation conflicts with the current resource state"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ ],
-        "summary" : "Verify one-time code and receive a short-lived scoped conversation token",
-        "tags" : [ "Public appointment conversation", "Audience: Public" ]
-      }
-    },
-    "/api/v1/public/appointment-requests/{requestId}/verification-codes" : {
-      "post" : {
-        "description" : "Returns 202 without disclosing whether the request/contact exists. 400 malformed channel, 429 IP rate limit, 503 delivery unavailable.",
-        "operationId" : "requestCode",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "requestId",
-          "required" : true,
-          "schema" : {
-            "format" : "uuid",
-            "type" : "string"
-          }
-        } ],
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "$ref" : "#/components/schemas/PublicVerificationChannelRequest"
-              }
-            }
-          },
-          "required" : true
-        },
-        "responses" : {
-          "200" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PublicVerificationAcknowledgement"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "400" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Invalid request or failed validation"
-          },
-          "404" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Resource was not found or is not visible to this caller"
-          },
-          "409" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Operation conflicts with the current resource state"
-          },
-          "429" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            },
-            "description" : "Request rate limit exceeded",
-            "headers" : {
-              "Retry-After" : {
-                "description" : "Seconds until the request may be retried",
-                "schema" : {
-                  "format" : "int64",
-                  "type" : "integer"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ ],
-        "summary" : "Request a generic OTP acknowledgment; delivery only occurs for a registered contact channel",
-        "tags" : [ "Public appointment conversation", "Audience: Public" ]
+        "summary" : "Ask the public assistant about clinic information, first appointments or general dental health",
+        "tags" : [ "Public assistant", "Audience: Public" ]
       }
     },
     "/api/v1/public/clinic" : {

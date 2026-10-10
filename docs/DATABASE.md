@@ -1,5 +1,22 @@
 # Database
 
+## Public first appointments
+
+Changeset 049 adds the administrative telephone contact history. Changeset 050 adds
+unverified administrative intake and privacy evidence to `appointment_requests`,
+explicit `GENERAL_DENTISTRY`/`SPECIALIST` classification on professional profiles,
+weekly work intervals, one-off schedule blocks, and appointment end instants.
+Existing profiles remain unclassified until an administrator reviews them.
+Existing appointments are backfilled to 30 minutes. PostgreSQL `btree_gist`
+enforces that two `SCHEDULED` appointments for the same professional cannot
+overlap; a migration will fail if existing scheduled rows already violate this
+rule, preserving the old data for review. Prior changesets and conversation data
+remain untouched pending an approved retention migration.
+
+The application owns all business access. Frontend clients must use Spring Boot;
+do not grant Supabase Data API roles direct access to these tables. Review RLS and
+grants in any Supabase schema exposed through its Data API.
+
 ## Engine
 
 PostgreSQL (version 17+).

@@ -1,5 +1,12 @@
 # DentalCare Modules
 
+Public first-appointment intake, aggregated general-dentistry availability,
+reception call history, telephone confirmation, and professional schedules live
+in the `appointments` module. The patient portal retains its separate
+authenticated appointment workflow. Public intake never creates a patient
+record; the existing patient module handles registration after in-person
+identity verification.
+
 ## auth
 
 Responsible for:
@@ -142,3 +149,9 @@ Business logic must remain within the appropriate module.
 Do not move unrelated functionality into another module only for convenience.
 
 Cross-module dependencies must be explicit and limited.
+# Public assistant module
+
+`modules/assistant` owns the public assistant HTTP contract, safe application rules, and
+Gemini gateway. It reads published clinic/service information and general-dentistry
+availability through their existing services. It does not persist conversations, read
+patient records, or mutate appointment requests.

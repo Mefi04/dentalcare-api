@@ -11,6 +11,8 @@ public class ProfessionalPublicProfile {
     @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id", nullable = false, unique = true) private User user;
     @Column(name = "professional_registration", nullable = false, length = 100) private String professionalRegistration;
     @Column(nullable = false, length = 150) private String specialty;
+    @Enumerated(EnumType.STRING) @Column(name = "service_code", length = 40)
+    private ProfessionalServiceCode serviceCode;
     @Column(nullable = false, length = 1000) private String summary;
     @Column(name = "years_experience") private Integer yearsExperience;
     @Column(length = 255) private String languages;
@@ -32,6 +34,8 @@ public class ProfessionalPublicProfile {
     }
     public UUID getId(){return id;} public User getUser(){return user;} public String getProfessionalRegistration(){return professionalRegistration;}
     public String getSpecialty(){return specialty;} public String getSummary(){return summary;} public Integer getYearsExperience(){return yearsExperience;}
+    public ProfessionalServiceCode getServiceCode(){return serviceCode;}
+    public void setServiceCode(ProfessionalServiceCode value){serviceCode=value;}
     public String getLanguages(){return languages;} public String getPhotoUrl(){return photoUrl;} public boolean isPublicVisible(){return publicVisible;}
     public UUID getCreatedBy(){return createdBy;} public UUID getUpdatedBy(){return updatedBy;} public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;}
     public void setProfessionalRegistration(String value){professionalRegistration=value;} public void setSpecialty(String value){specialty=value;}

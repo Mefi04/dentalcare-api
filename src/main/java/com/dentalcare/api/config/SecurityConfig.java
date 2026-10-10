@@ -39,19 +39,18 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(authorize -> {
+                    authorize.dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR, jakarta.servlet.DispatcherType.FORWARD).permitAll();
+                    authorize.requestMatchers("/error").permitAll();
                     authorize.requestMatchers(org.springframework.http.HttpMethod.GET,
                             "/api/v1/public/clinic",
                             "/api/v1/public/services",
                             "/api/v1/public/professionals",
-                            "/api/v1/public/professionals/*").permitAll();
+                            "/api/v1/public/professionals/*",
+                            "/api/v1/public/appointment-availability").permitAll();
                     authorize.requestMatchers(org.springframework.http.HttpMethod.POST,
                             "/api/v1/public/contact-inquiries",
-                            "/api/v1/public/appointment-requests").permitAll();
-                    authorize.requestMatchers("/api/v1/public/appointment-requests/*/verification-codes",
-                            "/api/v1/public/appointment-requests/*/verification",
-                            "/api/v1/public/appointment-requests/*/conversation",
-                            "/api/v1/public/appointment-requests/*/conversation/messages",
-                            "/api/v1/public/appointment-requests/*/decision").permitAll();
+                            "/api/v1/public/appointment-requests",
+                            "/api/v1/public/assistant/messages").permitAll();
                     authorize.requestMatchers(org.springframework.http.HttpMethod.POST,
                             "/api/v1/auth/login",
                             "/api/v1/auth/refresh",

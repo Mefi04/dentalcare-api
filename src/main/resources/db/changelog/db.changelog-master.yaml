@@ -95,3 +95,7 @@ databaseChangeLog:
       file: db/changelog/changes/047-confirm-public-appointments-before-patient-registration.sql
   - include:
       file: db/changelog/changes/048-retain-public-conversation-tokens.sql
+  - include:
+      file: db/changelog/changes/049-appointment-contact-attempts.sql
+  - include:
+      file: db/changelog/changes/050-first-appointment-scheduling.sql

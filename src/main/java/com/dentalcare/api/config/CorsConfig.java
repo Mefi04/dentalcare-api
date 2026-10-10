@@ -20,9 +20,8 @@ public class CorsConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of(
                 "Authorization", "Content-Type", "Accept", "X-Client-Session-Id", "Idempotency-Key"));
-        configuration.setExposedHeaders(List.of("Retry-After"));
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(List.of("X-Request-ID"));
+        configuration.setExposedHeaders(List.of("Retry-After", "X-Request-ID"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
