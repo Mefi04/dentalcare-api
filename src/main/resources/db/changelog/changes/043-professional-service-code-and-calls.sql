@@ -6,6 +6,10 @@
 ALTER TABLE professional_public_profiles
     ADD COLUMN IF NOT EXISTS service_code VARCHAR(50) NOT NULL DEFAULT 'GENERAL_DENTISTRY';
 
+UPDATE professional_public_profiles
+    SET service_code = 'GENERAL_DENTISTRY'
+    WHERE service_code IS NULL;
+
 ALTER TABLE professional_public_profiles
     DROP CONSTRAINT IF EXISTS chk_professional_public_profiles_service_code;
 
