@@ -71,6 +71,19 @@ class AssistantServiceImplTests {
     }
 
     @Test
+    void answersServicesInquiryEvenWhenAvailabilityDateIsSupplied() {
+        when(geminiClient.isConfigured()).thenReturn(false);
+
+        LocalDate date = LocalDate.parse("2026-10-30");
+        var request = new PublicAssistantRequest("¿Qué servicios ofrecen en la clínica?", date, true);
+        PublicAssistantResponse response = service.processMessage(request);
+
+        assertThat(response.reply()).contains("odontología general y tratamientos dentales");
+        assertThat(response.action()).isEqualTo("PROVIDE_INFORMATION");
+        assertThat(response.suggestedSlots()).isEmpty();
+    }
+
+    @Test
     void givesSpecificGuidanceForClinicOpeningHoursWhenGeminiIsUnavailable() {
         var response = service.processMessage(new PublicAssistantRequest("¿Cuáles son sus horarios de atención presencial?", null, true));
         assertThat(response.reply()).contains("horario general de atención");

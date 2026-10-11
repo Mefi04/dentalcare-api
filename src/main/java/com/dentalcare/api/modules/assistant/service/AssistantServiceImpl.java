@@ -67,7 +67,10 @@ public class AssistantServiceImpl implements AssistantService {
         LocalDate queryDate = request.availabilityDate() != null
                 ? request.availabilityDate() : extractAvailabilityDate(sanitizedUserMessage);
 
-        if (queryDate != null) {
+        String lowerUserMsg = sanitizedUserMessage.toLowerCase(java.util.Locale.ROOT);
+        boolean isInfoQuery = containsAny(lowerUserMsg, "servicio", "servicios", "tratamiento", "tratamientos", "limpieza", "ortodoncia", "endodoncia", "blanqueamiento", "extracción", "extraccion", "caries");
+
+        if (queryDate != null && !isInfoQuery && (request.availabilityDate() != null || isAppointmentIntent(sanitizedUserMessage))) {
             try {
                 suggestedSlots = availabilityService.getAvailableSlotsForGemini(queryDate);
             } catch (Exception e) {
@@ -158,14 +161,18 @@ public class AssistantServiceImpl implements AssistantService {
             sb.append("Por motivos de seguridad, no compartas datos personales (como DPI o teléfono) en el chat. ");
         }
 
-        if (date != null && !slots.isEmpty()) {
+        String lowerMessage = originalMessage != null ? originalMessage.toLowerCase(java.util.Locale.ROOT) : "";
+        boolean asksForServices = containsAny(lowerMessage, "servicio", "servicios", "tratamiento", "tratamientos", "limpieza", "ortodoncia", "endodoncia", "blanqueamiento", "extracción", "extraccion", "caries");
+        boolean asksForClinicHours = containsAny(lowerMessage, "horario de atención", "horario de atencion", "horarios de atención", "horarios de atencion", "abren", "abierto", "atención presencial", "atencion presencial");
+
+        if (!asksForServices && !asksForClinicHours && isAppointmentIntent(originalMessage) && date != null && slots != null && !slots.isEmpty()) {
             sb.append(localReply("disponibilidad", date, slots));
             return new PublicAssistantResponse(sb.toString(), slots, "GUIDE_TO_INTAKE");
         }
 
         sb.append(localReply(originalMessage, date, slots));
         if (providerUnavailable) sb.append(" (La respuesta automática está temporalmente limitada; puedes continuar usando el formulario de cita.)");
-        return new PublicAssistantResponse(sb.toString(), slots, "PROVIDE_INFORMATION");
+        return new PublicAssistantResponse(sb.toString(), List.of(), "PROVIDE_INFORMATION");
     }
 
     private String localReply(String message, LocalDate date, List<AppointmentSlotResponse> slots) {
