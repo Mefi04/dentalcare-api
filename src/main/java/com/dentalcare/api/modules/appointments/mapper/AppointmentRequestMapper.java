@@ -18,8 +18,26 @@ public class AppointmentRequestMapper {
     private AppointmentRequestResponse toResponse(AppointmentRequest request, boolean administrative) {
         boolean publicRequest = request.getRequesterFullName() != null;
         PublicAppointmentRequesterResponse contact = publicRequest ? new PublicAppointmentRequesterResponse(
-                request.getRequesterFullName(), request.getRequesterCui(), request.getRequesterPhone(),
-                request.getRequesterEmail(), request.getRequestReason()) : null;
+                request.getRequesterFullName(),
+                request.getRequesterCui(),
+                request.getRequesterPhone(),
+                request.getRequesterEmail(),
+                request.getRequestReason(),
+                request.getBirthDate(),
+                request.getGender(),
+                request.getAlternativeId(),
+                request.getGuardianName(),
+                request.getGuardianRelationship(),
+                request.getGuardianPhone(),
+                request.getDepartment(),
+                request.getMunicipality(),
+                request.getAddress(),
+                request.getEmergencyName(),
+                request.getEmergencyPhone(),
+                request.getNit(),
+                request.getBillingName(),
+                request.getBillingAddress(),
+                request.getPrivacyAccepted()) : null;
         return new AppointmentRequestResponse(
                 request.getId(),
                 request.getPatient() == null ? null : new AdministrativeAppointmentPatientResponse(
@@ -34,7 +52,7 @@ public class AppointmentRequestMapper {
                 request.getAppointment() == null ? null : request.getAppointment().getId(),
                 request.getCreatedAt(), request.getUpdatedAt(),
                 contact,
-                administrative ? (publicRequest ? "PUBLIC" : "PATIENT_PORTAL") : null,
+                administrative ? (request.getSource() != null ? request.getSource().name() : (publicRequest ? "PUBLIC" : "PATIENT_PORTAL")) : null,
                 administrative ? contact : null,
                 administrative && publicRequest ? professional(request.getAssignedProfessional()) : null);
     }

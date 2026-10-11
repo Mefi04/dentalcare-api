@@ -42,4 +42,15 @@ public interface AppointmentRequestRepository extends JpaRepository<AppointmentR
     boolean existsByRequesterCuiAndRequestedAtAndRequestedProfessional_IdAndStatusIn(
             String requesterCui, java.time.Instant requestedAt, UUID professionalId,
             List<com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus> statuses);
+
+    @Query("""
+            SELECT r FROM AppointmentRequest r
+            WHERE r.status IN (com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus.PENDING,
+                               com.dentalcare.api.modules.appointments.model.AppointmentRequestStatus.PROPOSED)
+              AND (
+                (r.requestedAt >= :start AND r.requestedAt < :end)
+                OR (r.proposedAt >= :start AND r.proposedAt < :end)
+              )
+            """)
+    List<AppointmentRequest> findActiveRequestsBetween(@Param("start") java.time.Instant start, @Param("end") java.time.Instant end);
 }

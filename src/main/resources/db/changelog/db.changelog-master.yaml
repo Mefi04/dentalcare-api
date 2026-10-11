@@ -81,3 +81,13 @@ databaseChangeLog:
       file: db/changelog/changes/040-public-appointment-requests.sql
   - include:
       file: db/changelog/changes/041-add-assigned-professional-to-appointment-requests.sql
+  - include:
+      file: db/changelog/changes/042-appointment-requests-v2-source-and-intake.sql
+  - include:
+      file: db/changelog/changes/043-professional-service-code-and-calls.sql
+  - include:
+      file: db/changelog/changes/044-appointment-contact-attempts-created-at.sql
+  - include:
+      file: db/changelog/changes/045-sanitize-appointment-request-statuses.sql
+  - include:
+      file: db/changelog/changes/046-cleanup-appointments-residual-columns.sql

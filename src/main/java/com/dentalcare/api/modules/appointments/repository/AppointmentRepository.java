@@ -36,4 +36,11 @@ public interface AppointmentRepository extends JpaRepository<Appointment, UUID> 
     @Query("SELECT a FROM Appointment a WHERE a.id = :id AND a.patient.id = :patientId")
     Optional<Appointment> findByIdAndPatient_IdForUpdate(
             @Param("id") UUID id, @Param("patientId") UUID patientId);
+
+    @Query("""
+            SELECT a FROM Appointment a JOIN FETCH a.professional p
+            WHERE a.status = com.dentalcare.api.modules.appointments.model.AppointmentStatus.SCHEDULED
+              AND a.scheduledAt >= :start AND a.scheduledAt < :end
+            """)
+    java.util.List<Appointment> findScheduledBetween(@Param("start") Instant start, @Param("end") Instant end);
 }

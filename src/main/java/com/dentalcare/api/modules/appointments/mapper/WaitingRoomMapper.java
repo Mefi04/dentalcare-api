@@ -9,11 +9,15 @@ import org.springframework.stereotype.Component;
 public class WaitingRoomMapper {
     public WaitingRoomEntryResponse toResponse(WaitingRoomEntry entry) {
         Appointment appointment = entry.getAppointment();
+        AdministrativeAppointmentPatientResponse patientResponse = appointment.getPatient() != null
+                ? new AdministrativeAppointmentPatientResponse(
+                        appointment.getPatient().getId(), appointment.getPatient().getCode(),
+                        appointment.getPatient().getName(), appointment.getPatient().getPhone())
+                : new AdministrativeAppointmentPatientResponse(
+                        null, "EXTERNO", appointment.getPublicContactName(), appointment.getPublicContactPhone());
         return new WaitingRoomEntryResponse(
                 entry.getId(), appointment.getId(),
-                new AdministrativeAppointmentPatientResponse(
-                        appointment.getPatient().getId(), appointment.getPatient().getCode(),
-                        appointment.getPatient().getName(), appointment.getPatient().getPhone()),
+                patientResponse,
                 new AppointmentProfessionalResponse(
                         appointment.getProfessional().getId(), appointment.getProfessional().getFullName()),
                 appointment.getScheduledAt(), entry.getStatus(), entry.getArrivedAt(),

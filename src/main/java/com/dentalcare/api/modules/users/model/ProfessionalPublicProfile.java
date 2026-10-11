@@ -18,10 +18,16 @@ public class ProfessionalPublicProfile {
     @Column(name = "public_visible", nullable = false) private boolean publicVisible;
     @Column(name = "created_by", nullable = false, updatable = false) private UUID createdBy;
     @Column(name = "updated_by", nullable = false) private UUID updatedBy;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "service_code", nullable = false, length = 50)
+    private ProfessionalServiceCode serviceCode = ProfessionalServiceCode.GENERAL_DENTISTRY;
+
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
-    protected ProfessionalPublicProfile() { }
+    public ProfessionalPublicProfile() { }
+    public void setId(UUID id) { this.id = id; }
+    public void setUser(User user) { this.user = user; }
     public ProfessionalPublicProfile(UUID id, User user, String professionalRegistration, String specialty, String summary,
                                      Integer yearsExperience, String languages, String photoUrl, boolean publicVisible,
                                      UUID createdBy, UUID updatedBy, Instant createdAt, Instant updatedAt) {
@@ -33,6 +39,8 @@ public class ProfessionalPublicProfile {
     public UUID getId(){return id;} public User getUser(){return user;} public String getProfessionalRegistration(){return professionalRegistration;}
     public String getSpecialty(){return specialty;} public String getSummary(){return summary;} public Integer getYearsExperience(){return yearsExperience;}
     public String getLanguages(){return languages;} public String getPhotoUrl(){return photoUrl;} public boolean isPublicVisible(){return publicVisible;}
+    public ProfessionalServiceCode getServiceCode(){return serviceCode;}
+    public void setServiceCode(ProfessionalServiceCode value){serviceCode=value;}
     public UUID getCreatedBy(){return createdBy;} public UUID getUpdatedBy(){return updatedBy;} public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;}
     public void setProfessionalRegistration(String value){professionalRegistration=value;} public void setSpecialty(String value){specialty=value;}
     public void setSummary(String value){summary=value;} public void setYearsExperience(Integer value){yearsExperience=value;}
