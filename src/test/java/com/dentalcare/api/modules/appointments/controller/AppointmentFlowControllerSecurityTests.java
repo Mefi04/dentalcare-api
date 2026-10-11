@@ -44,6 +44,7 @@ class AppointmentFlowControllerSecurityTests {
     @MockitoBean WaitingRoomService waitingRoomService;
     @MockitoBean JwtService jwtService;
     @MockitoBean RateLimitService rateLimitService;
+    @MockitoBean AppointmentAvailabilityService availabilityService;
 
     @Test
     void publicAppointmentRequestIsAnonymousAndReturnsOnlyReceipt() throws Exception {
@@ -94,6 +95,68 @@ class AppointmentFlowControllerSecurityTests {
         when(requestService.findAll(isNull(), isNull(), isNull(), isNull(), isNull(), eq(0), eq(20)))
                 .thenReturn(Page.empty());
         mockMvc.perform(get("/api/v1/appointment-requests").header("Authorization", "Bearer secretary"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void secretaryCanUseDedicatedPublicRequestInbox() throws Exception {
+        token("secretary", "ROLE_SECRETARY");
+        when(requestService.findAll(isNull(), isNull(), isNull(), isNull(), isNull(),
+                eq(com.dentalcare.api.modules.appointments.model.AppointmentRequestSource.PUBLIC), eq(0), eq(20)))
+                .thenReturn(Page.empty());
+        mockMvc.perform(get("/api/v1/appointment-requests/public-inbox")
+                        .header("Authorization", "Bearer secretary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void secretaryCanQueryAdministrativeAvailabilityForAnActiveDentist() throws Exception {
+        UUID professionalId = UUID.randomUUID();
+        var date = java.time.LocalDate.parse("2026-10-12");
+        var response = new com.dentalcare.api.modules.appointments.dto.response.AppointmentAvailabilityResponse(
+                date, "GENERAL_DENTISTRY", professionalId, List.of());
+        token("cashier", "ROLE_CASHIER");
+        mockMvc.perform(get("/api/v1/appointment-requests/availability")
+                        .header("Authorization", "Bearer cashier")
+                        .param("date", date.toString())
+                        .param("professionalId", professionalId.toString()))
+                .andExpect(status().isForbidden());
+
+        token("secretary", "ROLE_SECRETARY");
+        when(availabilityService.getAdministrativeAvailability(date, professionalId,
+                com.dentalcare.api.modules.users.model.ProfessionalServiceCode.GENERAL_DENTISTRY))
+                .thenReturn(response);
+        mockMvc.perform(get("/api/v1/appointment-requests/availability")
+                        .header("Authorization", "Bearer secretary")
+                        .param("date", date.toString())
+                        .param("professionalId", professionalId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.professionalId").value(professionalId.toString()))
+                .andExpect(jsonPath("$.slots").isArray());
+    }
+
+    @Test
+    void directPublicAppointmentConfirmationIsSecretaryOnly() throws Exception {
+        UUID requestId = UUID.randomUUID();
+        UUID professionalId = UUID.randomUUID();
+        String body = "{\"professionalId\":\"%s\",\"scheduledAt\":\"2099-10-12T14:00:00Z\"}"
+                .formatted(professionalId);
+        token("cashier", "ROLE_CASHIER");
+        mockMvc.perform(post("/api/v1/appointment-requests/{id}/confirm-public", requestId)
+                        .header("Authorization", "Bearer cashier")
+                        .contentType("application/json")
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        token("secretary", "ROLE_SECRETARY");
+        when(requestService.confirmPublicAppointment(any(), eq(requestId),
+                any(com.dentalcare.api.modules.appointments.dto.request.ConfirmPublicAppointmentRequest.class)))
+                .thenReturn(null);
+        mockMvc.perform(post("/api/v1/appointment-requests/{id}/confirm-public", requestId)
+                        .header("Authorization", "Bearer secretary")
+                        .contentType("application/json")
+                        .content(body))
                 .andExpect(status().isOk());
     }
 

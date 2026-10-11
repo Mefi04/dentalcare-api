@@ -182,6 +182,67 @@
         "required" : [ "timestamp", "status", "error", "message", "path", "fieldErrors" ],
         "type" : "object"
       },
+      "AppointmentAvailabilityResponse" : {
+        "description" : "Aggregated appointment availability response for a given date",
+        "properties" : {
+          "date" : {
+            "description" : "Requested clinic date in YYYY-MM-DD",
+            "example" : "2026-10-20",
+            "format" : "date",
+            "type" : "string"
+          },
+          "professionalId" : {
+            "description" : "Dentist ID if specific filter was requested, null for aggregate clinic availability",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "serviceCode" : {
+            "description" : "Service code or specialty queried",
+            "example" : "GENERAL_DENTISTRY",
+            "type" : "string"
+          },
+          "slots" : {
+            "description" : "Available time slots on the requested date",
+            "items" : {
+              "$ref" : "#/components/schemas/AppointmentSlotResponse"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "AppointmentContactAttemptResponse" : {
+        "description" : "Details of a contact attempt made by staff",
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "createdBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "createdByName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "notes" : {
+            "type" : "string"
+          },
+          "requestId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "result" : {
+            "enum" : [ "CONTACTED", "NO_ANSWER", "CALL_BACK_LATER", "WRONG_NUMBER", "DECLINED" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "AppointmentMetricsResponse" : {
         "properties" : {
           "cancelled" : {
@@ -271,6 +332,40 @@
           "updatedAt" : {
             "format" : "date-time",
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AppointmentSlotResponse" : {
+        "description" : "Representation of an appointment time slot with its availability status",
+        "properties" : {
+          "availableCapacity" : {
+            "description" : "Number of open capacity spots currently available",
+            "example" : 2,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "localTime" : {
+            "description" : "Local time in America/Guatemala",
+            "example" : "08:00",
+            "type" : "string"
+          },
+          "slotTime" : {
+            "description" : "Instant in UTC when the slot starts",
+            "example" : "2026-10-20T14:00:00Z",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "description" : "Availability status for this slot: AVAILABLE, REQUESTED, BOOKED, UNAVAILABLE",
+            "enum" : [ "AVAILABLE", "REQUESTED", "BOOKED", "UNAVAILABLE" ],
+            "type" : "string"
+          },
+          "totalCapacity" : {
+            "description" : "Total theoretical capacity for this slot",
+            "example" : 2,
+            "format" : "int32",
+            "type" : "integer"
           }
         },
         "type" : "object"
@@ -960,6 +1055,20 @@
         "required" : [ "code", "cui", "newPassword" ],
         "type" : "object"
       },
+      "ConfirmPublicAppointmentRequest" : {
+        "properties" : {
+          "professionalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "scheduledAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "professionalId", "scheduledAt" ],
+        "type" : "object"
+      },
       "ContactInquiryAcknowledgement" : {
         "properties" : {
           "message" : {
@@ -1188,6 +1297,26 @@
             "type" : "number"
           }
         },
+        "type" : "object"
+      },
+      "CreateContactAttemptRequest" : {
+        "description" : "Reception contact attempt record for an appointment request",
+        "properties" : {
+          "notes" : {
+            "description" : "Notes regarding the call or conversation",
+            "example" : "El paciente confirmó disponibilidad para el martes por la tarde.",
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "result" : {
+            "description" : "Outcome of the contact attempt",
+            "enum" : [ "CONTACTED", "NO_ANSWER", "CALL_BACK_LATER", "WRONG_NUMBER", "DECLINED" ],
+            "example" : "CONTACTED",
+            "type" : "string"
+          }
+        },
+        "required" : [ "result" ],
         "type" : "object"
       },
       "CreateContactInquiryRequest" : {
@@ -1638,11 +1767,46 @@
         "type" : "object"
       },
       "CreatePublicAppointmentRequest" : {
-        "description" : "Non-clinical information needed to request a first appointment",
+        "description" : "Non-clinical administrative information needed to request a first appointment",
         "properties" : {
+          "address" : {
+            "description" : "Residential address",
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "alternativeId" : {
+            "description" : "Alternative ID or passport for foreigners",
+            "maxLength" : 50,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "billingAddress" : {
+            "description" : "Billing address",
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "billingName" : {
+            "description" : "Billing business or person name",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "birthDate" : {
+            "description" : "Date of birth (YYYY-MM-DD)",
+            "format" : "date",
+            "type" : "string"
+          },
           "cui" : {
-            "description" : "Optional Guatemalan DPI/CUI, used only to associate an existing patient record",
+            "description" : "Optional Guatemalan DPI/CUI for identity reference (verified in person)",
             "pattern" : "^[0-9]{13}$",
+            "type" : "string"
+          },
+          "department" : {
+            "description" : "Guatemalan department",
+            "maxLength" : 100,
+            "minLength" : 0,
             "type" : "string"
           },
           "email" : {
@@ -1652,9 +1816,57 @@
             "minLength" : 0,
             "type" : "string"
           },
+          "emergencyName" : {
+            "description" : "Emergency contact name",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "emergencyPhone" : {
+            "description" : "Emergency contact phone",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "type" : "string"
+          },
           "fullName" : {
             "example" : "María López",
             "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "gender" : {
+            "description" : "Gender",
+            "maxLength" : 20,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "guardianName" : {
+            "description" : "Legal guardian full name if patient is a minor",
+            "maxLength" : 150,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "guardianPhone" : {
+            "description" : "Guardian contact phone",
+            "maxLength" : 30,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "guardianRelationship" : {
+            "description" : "Relationship with guardian (e.g. Madre, Padre, Tutor)",
+            "maxLength" : 50,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "municipality" : {
+            "description" : "Guatemalan municipality",
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "nit" : {
+            "description" : "NIT for electronic invoice",
+            "maxLength" : 20,
             "minLength" : 0,
             "type" : "string"
           },
@@ -1663,6 +1875,18 @@
             "maxLength" : 30,
             "minLength" : 0,
             "pattern" : "^[+0-9() .-]{7,30}$",
+            "type" : "string"
+          },
+          "privacyAccepted" : {
+            "description" : "Mandatory acceptance of privacy notice",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "privacyNoticeVersion" : {
+            "description" : "Accepted privacy notice version",
+            "example" : "1.0",
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : "string"
           },
           "professionalId" : {
@@ -2846,6 +3070,52 @@
           "content" : {
             "items" : {
               "$ref" : "#/components/schemas/AdministrativeAppointmentResponse"
+            },
+            "type" : "array"
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "first" : {
+            "type" : "boolean"
+          },
+          "last" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "numberOfElements" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "pageable" : {
+            "$ref" : "#/components/schemas/PageableObject"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sort" : {
+            "$ref" : "#/components/schemas/SortObject"
+          },
+          "totalElements" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PageAppointmentContactAttemptResponse" : {
+        "properties" : {
+          "content" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AppointmentContactAttemptResponse"
             },
             "type" : "array"
           },
@@ -5209,20 +5479,114 @@
       "PublicAppointmentRequesterResponse" : {
         "description" : "Contact details supplied for a public request; visible only to authorized clinic staff",
         "properties" : {
+          "address" : {
+            "type" : "string"
+          },
+          "alternativeId" : {
+            "type" : "string"
+          },
+          "billingAddress" : {
+            "type" : "string"
+          },
+          "billingName" : {
+            "type" : "string"
+          },
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
           "cui" : {
+            "type" : "string"
+          },
+          "department" : {
             "type" : "string"
           },
           "email" : {
             "type" : "string"
           },
+          "emergencyName" : {
+            "type" : "string"
+          },
+          "emergencyPhone" : {
+            "type" : "string"
+          },
           "fullName" : {
+            "type" : "string"
+          },
+          "gender" : {
+            "type" : "string"
+          },
+          "guardianName" : {
+            "type" : "string"
+          },
+          "guardianPhone" : {
+            "type" : "string"
+          },
+          "guardianRelationship" : {
+            "type" : "string"
+          },
+          "municipality" : {
+            "type" : "string"
+          },
+          "nit" : {
             "type" : "string"
           },
           "phone" : {
             "type" : "string"
           },
+          "privacyAccepted" : {
+            "type" : "boolean"
+          },
           "reason" : {
             "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PublicAssistantRequest" : {
+        "description" : "Message sent to the public virtual assistant",
+        "properties" : {
+          "aiProcessingAccepted" : {
+            "description" : "Mandatory user consent for AI message processing",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "availabilityDate" : {
+            "description" : "Optional specific date for checking appointment availability (YYYY-MM-DD)",
+            "example" : "2026-10-20",
+            "format" : "date",
+            "type" : "string"
+          },
+          "message" : {
+            "description" : "User query or question",
+            "example" : "¿Qué horarios tienen disponibles para primera cita?",
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "aiProcessingAccepted", "message" ],
+        "type" : "object"
+      },
+      "PublicAssistantResponse" : {
+        "description" : "Response returned by the public virtual assistant",
+        "properties" : {
+          "action" : {
+            "description" : "Recommended UI action: GUIDE_TO_INTAKE, PROVIDE_INFORMATION, NONE",
+            "example" : "GUIDE_TO_INTAKE",
+            "type" : "string"
+          },
+          "reply" : {
+            "description" : "Assistant textual reply",
+            "example" : "Contamos con disponibilidad el día solicitado. Por favor selecciona tu horario preferido.",
+            "type" : "string"
+          },
+          "suggestedSlots" : {
+            "description" : "Suggested available appointment slots, if availability was consulted",
+            "items" : {
+              "$ref" : "#/components/schemas/AppointmentSlotResponse"
+            },
+            "type" : "array"
           }
         },
         "type" : "object"
@@ -7003,6 +7367,7 @@
   "paths" : {
     "/api/v1/appointment-requests" : {
       "get" : {
+        "description" : "Supports filtering by date range, patient, professional, status, and dual inbox source (PUBLIC vs PATIENT_PORTAL).",
         "operationId" : "findAll_13",
         "parameters" : [ {
           "in" : "query",
@@ -7026,6 +7391,237 @@
           "required" : false,
           "schema" : {
             "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "professionalId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "PENDING", "PROPOSED", "CONFIRMED", "REJECTED", "CANCELLED" ],
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "source",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "PUBLIC", "PATIENT_PORTAL" ],
+            "type" : "string"
+          }
+        }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "maximum" : 1000,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageAppointmentRequestResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "List and filter patient appointment requests",
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-requests/availability" : {
+      "get" : {
+        "description" : "Includes active dentists even when they do not have a public profile. Restricted to administrators and secretaries.",
+        "operationId" : "getAvailabilityForReception",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "date",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "professionalId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "serviceCode",
+          "required" : false,
+          "schema" : {
+            "default" : "GENERAL_DENTISTRY",
+            "enum" : [ "GENERAL_DENTISTRY", "ORTHODONTICS", "ENDODONTICS", "PERIODONTICS", "PEDIATRIC_DENTISTRY", "ORAL_SURGERY" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentAvailabilityResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Get availability for an active dentist from the reception workflow",
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-requests/public-inbox" : {
+      "get" : {
+        "operationId" : "publicInbox",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
             "type" : "string"
           }
         }, {
@@ -7130,7 +7726,7 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
-        "summary" : "List and filter patient appointment requests",
+        "summary" : "List public first-appointment requests for the reception inbox",
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
@@ -7433,6 +8029,117 @@
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
+    "/api/v1/appointment-requests/{requestId}/confirm-public" : {
+      "post" : {
+        "description" : "Requires an earlier CONTACTED call attempt, an active dentist, and an available clinic slot. Creates the appointment and confirms the request in one transaction.",
+        "operationId" : "confirmPublicAppointment",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ConfirmPublicAppointmentRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentRequestResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Atomically confirm a public first appointment at the time agreed with the caller",
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
     "/api/v1/appointment-requests/{requestId}/confirm-public-proposal" : {
       "post" : {
         "operationId" : "confirmPublicProposal",
@@ -7529,6 +8236,227 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      }
+    },
+    "/api/v1/appointment-requests/{requestId}/contact-attempts" : {
+      "get" : {
+        "description" : "Returns paginated contact attempts ordered by most recent first.",
+        "operationId" : "findContactAttempts",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "description" : "Zero-based page index; values above 1000 are rejected with HTTP 400.",
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "maximum" : 1000,
+            "type" : "integer"
+          }
+        }, {
+          "description" : "Requested page size; values above 100 are capped to 100.",
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageAppointmentContactAttemptResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation; page must not exceed 1000"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "List contact attempts for an appointment request",
+        "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
+      },
+      "post" : {
+        "description" : "Records the outcome and notes of a phone or messaging attempt to reach the patient.",
+        "operationId" : "logContactAttempt",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "requestId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateContactAttemptRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentContactAttemptResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Resource was not found or is not visible to this caller"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Log a receptionist contact attempt for an appointment request",
         "tags" : [ "Administrative appointment requests", "Audience: Staff" ]
       }
     },
@@ -14210,6 +15138,102 @@
         "security" : [ {
           "bearerAuth" : [ ]
         } ],
+        "tags" : [ "Patient appointment requests", "Audience: Patient self-service" ]
+      }
+    },
+    "/api/v1/patients/me/appointment-requests/availability" : {
+      "get" : {
+        "operationId" : "getAvailability_1",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "date",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "professionalId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "serviceCode",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "GENERAL_DENTISTRY", "ORTHODONTICS", "ENDODONTICS", "PERIODONTICS", "PEDIATRIC_DENTISTRY", "ORAL_SURGERY" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentAvailabilityResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authentication is required or invalid"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Authenticated caller lacks the required permission"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "summary" : "Get appointment availability for authenticated patients",
         "tags" : [ "Patient appointment requests", "Audience: Patient self-service" ]
       }
     },
@@ -24830,6 +25854,82 @@
         "tags" : [ "prescription-controller", "Audience: Staff" ]
       }
     },
+    "/api/v1/public/appointment-availability" : {
+      "get" : {
+        "description" : "Returns capacity status per time slot (AVAILABLE, REQUESTED, BOOKED, UNAVAILABLE) without revealing patient or doctor identities.",
+        "operationId" : "getAvailability",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "date",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "professionalId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "serviceCode",
+          "required" : false,
+          "schema" : {
+            "default" : "GENERAL_DENTISTRY",
+            "enum" : [ "GENERAL_DENTISTRY", "ORTHODONTICS", "ENDODONTICS", "PERIODONTICS", "PEDIATRIC_DENTISTRY", "ORAL_SURGERY" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AppointmentAvailabilityResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ],
+        "summary" : "Get aggregated appointment availability for first appointments",
+        "tags" : [ "Public appointment availability", "Audience: Public" ]
+      }
+    },
     "/api/v1/public/appointment-requests" : {
       "post" : {
         "description" : "Returns an acknowledgment only. requestedAt is a preference, not a confirmed or reserved appointment. Reuse the same UUID Idempotency-Key for retries.",
@@ -24907,6 +26007,76 @@
         "security" : [ ],
         "summary" : "Request a first appointment without an account",
         "tags" : [ "Public appointment requests", "Audience: Public" ]
+      }
+    },
+    "/api/v1/public/assistant/messages" : {
+      "post" : {
+        "description" : "Public endpoint with rate limiting (20 requests per 15 min per IP). Explicit consent (aiProcessingAccepted: true) is required.",
+        "operationId" : "sendMessage",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PublicAssistantRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublicAssistantResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Invalid request or failed validation"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Operation conflicts with the current resource state"
+          },
+          "429" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description" : "Request rate limit exceeded",
+            "headers" : {
+              "Retry-After" : {
+                "description" : "Seconds until the request may be retried",
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            }
+          }
+        },
+        "security" : [ ],
+        "summary" : "Send a message to the AI virtual assistant",
+        "tags" : [ "Public assistant", "Audience: Public" ]
       }
     },
     "/api/v1/public/clinic" : {
@@ -29542,6 +30712,9 @@
   }, {
     "description" : "Assignment, paper intake, review, validation and immutable history",
     "name" : "Medical history staff workflow"
+  }, {
+    "description" : "AI-assisted public guidance and first appointment assistant",
+    "name" : "Public assistant"
   }, {
     "description" : "Available to any authenticated account type.",
     "name" : "Audience: Authenticated"

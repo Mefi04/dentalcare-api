@@ -542,10 +542,13 @@ public requests, including those linked to an existing patient by CUI and those 
 existing `publicRequester` field is retained for compatibility. `contact` is non-clinical and staff-only; public
 intake never returns clinical data. Patient-origin requests identify as `PATIENT_PORTAL` in the administrative
 projection and otherwise retain their existing patient data and workflow. `POST /api/v1/appointment-requests/{requestId}/link-patient` accepts
-`{ "patientId": "<uuid>" }`; when the intake included CUI, it must match the selected patient's DPI. A proposed
-public request is confirmed by staff through `POST /api/v1/appointment-requests/{requestId}/confirm-public-proposal`
-after linking the patient, because an anonymous requester cannot use the authenticated patient's proposal
-acceptance route. Existing patient endpoints and their contracts are unchanged.
+`{ "patientId": "<uuid>" }`; when the intake included CUI, it must match the selected patient's DPI. For a
+public first-appointment request, reception may confirm the time agreed during a phone call directly through
+`POST /api/v1/appointment-requests/{requestId}/confirm-public`. Its body contains an active `professionalId`
+and the agreed `scheduledAt` UTC instant. A saved contact attempt with result `CONTACTED` is required first.
+The transaction validates the request state and slot, creates the appointment, stores the agreed professional/time
+on the request, and marks it `CONFIRMED` atomically. It does not require linking the anonymous requester to a
+patient record. Existing patient-portal proposal/acceptance endpoints are unchanged.
 
 Assignment errors use `409 Conflict` with a stable `code`: `APPOINTMENT_REQUEST_NOT_PUBLIC`,
 `APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE` (includes the actual and allowed states), or
@@ -563,6 +566,7 @@ produce an appointment-slot conflict.
 | `POST` | `/api/v1/appointment-requests/{requestId}/link-patient` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Links a public request after identity verification; CUI must match when supplied. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/assign-professional` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Assigns/reassigns an active dentist to an open public request; does not confirm a slot. Body: `professionalId`. |
 | `POST` | `/api/v1/appointment-requests/{requestId}/confirm-public-proposal` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Confirms a public request after staff has linked the patient; still validates real slot availability. |
+| `POST` | `/api/v1/appointment-requests/{requestId}/confirm-public` | `ADMINISTRATOR`, `SECRETARY` | `200 OK` | Atomically confirms a public request at the call-agreed time. Body: `professionalId`, `scheduledAt`; requires a saved `CONTACTED` attempt. |
 | `POST` | `/api/v1/public/appointment-requests` | Public | `202 Accepted` | First appointment intake; request time is not reserved. Requires UUID `Idempotency-Key`; see contract above. |
 | `POST` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `201 Created` | Body: `professionalId`, future `requestedAt`; patient comes from JWT. |
 | `GET` | `/api/v1/patients/me/appointment-requests` | `PATIENT` | `200 OK` | Lists only owned requests. |
@@ -599,3 +603,30 @@ Suggested parameters:
 ## OpenAPI
 
 Public API endpoints should be documented using OpenAPI/Swagger.
+
+## Appointment proposal and reception inbox
+
+The secretary/administrator availability endpoint is
+`GET /api/v1/appointment-requests/availability`. It requires `date` (`YYYY-MM-DD`)
+and `professionalId` (active dentist user UUID); `serviceCode` is optional and
+defaults to `GENERAL_DENTISTRY`. Authorization is limited to `ADMINISTRATOR` and
+`SECRETARY`. Unlike the public availability endpoint, it includes an active dentist
+even if that dentist has no publicly visible profile. The response uses the same
+`AppointmentAvailabilityResponse` contract (`date`, `serviceCode`, `professionalId`,
+`slots`); each slot includes its UTC `slotTime`, clinic-local `localTime`, `status`,
+`availableCapacity`, and `totalCapacity`. For a selected dentist, pending requests
+for other dentists do not mark that dentist's slot as `REQUESTED`.
+
+`GET /api/v1/appointment-requests/public-inbox` is the secretary/administrator inbox
+for source `PUBLIC`. It accepts the same `from`, `to`, `professionalId`, `status`,
+`page`, and `size` filters as the administrative list and returns a Spring `Page`
+of `AppointmentRequestResponse` objects. The general administrative list remains
+available at `GET /api/v1/appointment-requests` with its `source` filter.
+
+Before saving a time proposal, the API validates that its instant is a published,
+future, bookable slot for the selected dentist. Accepting a patient-portal proposal
+rechecks availability to catch appointments booked after the proposal was sent.
+An unavailable time returns `409 Conflict` with code
+`APPOINTMENT_TIME_UNAVAILABLE`; a stale request state returns
+`APPOINTMENT_REQUEST_STATE_NOT_ELIGIBLE`. Clients should refresh request details
+and availability, explain the returned code, and let reception send a new proposal.

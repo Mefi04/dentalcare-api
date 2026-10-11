@@ -23,8 +23,8 @@ public class Appointment {
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "patient_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "patient_id")
     private Patient patient;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -37,6 +37,12 @@ public class Appointment {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private AppointmentStatus status;
+
+    @Column(name = "public_contact_name", length = 150)
+    private String publicContactName;
+
+    @Column(name = "public_contact_phone", length = 30)
+    private String publicContactPhone;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -57,6 +63,20 @@ public class Appointment {
         this.updatedAt = updatedAt;
     }
 
+    public Appointment(UUID id, User professional, Instant scheduledAt,
+                       AppointmentStatus status, String publicContactName, String publicContactPhone,
+                       Instant createdAt, Instant updatedAt) {
+        this.id = id;
+        this.patient = null;
+        this.professional = professional;
+        this.scheduledAt = scheduledAt;
+        this.status = status;
+        this.publicContactName = publicContactName;
+        this.publicContactPhone = publicContactPhone;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+    }
+
     public UUID getId() { return id; }
     public Patient getPatient() { return patient; }
     public User getProfessional() { return professional; }
@@ -64,6 +84,9 @@ public class Appointment {
     public AppointmentStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public String getPublicContactName() { return publicContactName; }
+    public String getPublicContactPhone() { return publicContactPhone; }
+    public void linkPatient(Patient patient) { this.patient = patient; }
     public void setScheduledAt(Instant scheduledAt) { this.scheduledAt = scheduledAt; }
     public void setStatus(AppointmentStatus status) { this.status = status; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }

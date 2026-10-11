@@ -20,9 +20,22 @@ import java.util.UUID;
 @Tag(name = "Patient appointment requests")
 public class PatientAppointmentRequestController {
     private final AppointmentRequestService service;
+    private final com.dentalcare.api.modules.appointments.service.AppointmentAvailabilityService availabilityService;
 
-    public PatientAppointmentRequestController(AppointmentRequestService service) {
+    public PatientAppointmentRequestController(
+            AppointmentRequestService service,
+            com.dentalcare.api.modules.appointments.service.AppointmentAvailabilityService availabilityService) {
         this.service = service;
+        this.availabilityService = availabilityService;
+    }
+
+    @GetMapping("/availability")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get appointment availability for authenticated patients")
+    public ResponseEntity<com.dentalcare.api.modules.appointments.dto.response.AppointmentAvailabilityResponse> getAvailability(
+            @RequestParam @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
+            @RequestParam(required = false) UUID professionalId,
+            @RequestParam(required = false) com.dentalcare.api.modules.users.model.ProfessionalServiceCode serviceCode) {
+        return ResponseEntity.ok(availabilityService.getPatientAvailability(date, professionalId, serviceCode));
     }
 
     @PostMapping

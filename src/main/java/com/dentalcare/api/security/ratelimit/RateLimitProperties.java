@@ -19,6 +19,7 @@ public class RateLimitProperties {
     @Valid private Rule passwordRecovery = new Rule(Duration.ofHours(1), 15, 5);
     @Valid private Rule publicContact = new Rule(Duration.ofMinutes(15), 10, 0);
     @Valid private Rule publicAppointmentRequest = new Rule(Duration.ofMinutes(15), 5, 0);
+    @Valid private Rule publicAssistant = new Rule(Duration.ofMinutes(15), 20, 0);
     @Valid private Rule apiRead = new Rule(Duration.ofMinutes(1), 600, 300);
     @Valid private Rule apiWrite = new Rule(Duration.ofMinutes(1), 100, 50);
     @Valid private Rule clinicalDocumentUpload = new Rule(Duration.ofMinutes(1), 40, 20);
@@ -37,6 +38,8 @@ public class RateLimitProperties {
     public void setPublicContact(Rule publicContact) { this.publicContact = publicContact; }
     public Rule getPublicAppointmentRequest() { return publicAppointmentRequest; }
     public void setPublicAppointmentRequest(Rule value) { this.publicAppointmentRequest = value; }
+    public Rule getPublicAssistant() { return publicAssistant; }
+    public void setPublicAssistant(Rule value) { this.publicAssistant = value; }
     public Rule getApiRead() { return apiRead; }
     public void setApiRead(Rule apiRead) { this.apiRead = apiRead; }
     public Rule getApiWrite() { return apiWrite; }
@@ -54,6 +57,7 @@ public class RateLimitProperties {
             case PASSWORD_RECOVERY -> passwordRecovery;
             case PUBLIC_CONTACT -> publicContact;
             case PUBLIC_APPOINTMENT_REQUEST -> publicAppointmentRequest;
+            case PUBLIC_ASSISTANT -> publicAssistant;
             case API_READ -> apiRead;
             case API_WRITE -> apiWrite;
             case CLINICAL_DOCUMENT_UPLOAD -> clinicalDocumentUpload;

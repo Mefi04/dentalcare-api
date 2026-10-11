@@ -10,13 +10,20 @@ import org.springframework.stereotype.Component;
 public class AdministrativeAppointmentMapper {
 
     public AdministrativeAppointmentResponse toResponse(Appointment appointment) {
-        return new AdministrativeAppointmentResponse(
-                appointment.getId(),
-                new AdministrativeAppointmentPatientResponse(
+        AdministrativeAppointmentPatientResponse patientResponse = appointment.getPatient() != null
+                ? new AdministrativeAppointmentPatientResponse(
                         appointment.getPatient().getId(),
                         appointment.getPatient().getCode(),
                         appointment.getPatient().getName(),
-                        appointment.getPatient().getPhone()),
+                        appointment.getPatient().getPhone())
+                : new AdministrativeAppointmentPatientResponse(
+                        null,
+                        "EXTERNO",
+                        appointment.getPublicContactName(),
+                        appointment.getPublicContactPhone());
+        return new AdministrativeAppointmentResponse(
+                appointment.getId(),
+                patientResponse,
                 new AppointmentProfessionalResponse(
                         appointment.getProfessional().getId(),
                         appointment.getProfessional().getFullName()),

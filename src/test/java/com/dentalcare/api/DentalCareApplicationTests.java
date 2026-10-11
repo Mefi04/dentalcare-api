@@ -53,6 +53,9 @@ class DentalCareApplicationTests {
     com.dentalcare.api.modules.appointments.repository.AppointmentRequestRepository appointmentRequestRepository;
 
     @MockitoBean
+    com.dentalcare.api.modules.appointments.repository.AppointmentContactAttemptRepository appointmentContactAttemptRepository;
+
+    @MockitoBean
     com.dentalcare.api.modules.appointments.repository.WaitingRoomRepository waitingRoomRepository;
 
     @MockitoBean
